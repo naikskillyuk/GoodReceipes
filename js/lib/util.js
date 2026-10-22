@@ -8,9 +8,9 @@ export function acak(panjang = 8) {
   return Array.from(b, (x) => ALFABET[x % ALFABET.length]).join('');
 }
 
-/** Id unik, contoh: "res_lq3k9a1x7f2b". */
+/** Id unik, contoh: "res_lq3k9a1x7f2b9c4d". */
 export function buatId(awalan) {
-  return `${awalan}_${Date.now().toString(36)}${acak(4)}`;
+  return `${awalan}_${Date.now().toString(36)}${acak(8)}`;
 }
 
 /** Token acak untuk tautan penilaian (sulit ditebak). */
