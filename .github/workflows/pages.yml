@@ -1,0 +1,47 @@
+# Menerbitkan aplikasi ke GitHub Pages setiap kali ada push ke cabang main.
+# Aktifkan dulu di repositori: Settings > Pages > Build and deployment > Source: GitHub Actions.
+name: Terbitkan ke GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  bangun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Jalankan uji
+        run: npm test
+      - name: Perbarui daftar cache offline
+        run: node tools/perbarui-sw.mjs
+      - name: Kumpulkan hanya berkas aplikasi
+        run: |
+          mkdir _situs
+          cp -r index.html config.js manifest.webmanifest sw.js css js vendor icons _situs/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _situs
+
+  terbitkan:
+    needs: bangun
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

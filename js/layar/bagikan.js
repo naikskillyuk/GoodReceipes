@@ -1,0 +1,163 @@
+// Bagikan kode QR supaya orang lain bisa menilai eksperimen tanpa login.
+
+import { html, useEffect, useState } from '../../vendor/preact-htm.js';
+import { Kerangka, Hero, Kosong, unduhBerkas, LogoMerek } from '../ui/komponen.js';
+import { Ikon } from '../ui/ikon.js';
+import { tampilToast } from '../ui/pesan.js';
+import { tautan } from '../ui/router.js';
+import { pastikanToken, skorDariDB, penilaianEksperimen, ambilMerek } from '../lib/repo.js';
+import { desimal1 } from '../lib/util.js';
+
+/** Tautan yang dibuka penilai. Alamat Apps Script ikut di tautan kecuali sudah ditetapkan di config.js. */
+export function buatTautanNilai(token, scriptUrl) {
+  const tetap = (window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
+  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '');
+  return `${dasar}#/nilai/${token}` + (tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`);
+}
+
+function buatQR(teks, opsi) {
+  const qr = window.qrcode(0, 'M');
+  qr.addData(teks);
+  qr.make();
+  return qr.createSvgTag(opsi);
+}
+
+async function salin(teks) {
+  try {
+    await navigator.clipboard.writeText(teks);
+    return true;
+  } catch {
+    const t = document.createElement('textarea');
+    t.value = teks;
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    t.remove();
+    return ok;
+  }
+}
+
+function svgKePng(svg, ukuran) {
+  return new Promise((ok, gagal) => {
+    const img = new Image();
+    img.onload = () => {
+      const kanvas = document.createElement('canvas');
+      kanvas.width = kanvas.height = ukuran;
+      const ctx = kanvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, ukuran, ukuran);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, ukuran, ukuran);
+      kanvas.toBlob((b) => (b ? ok(b) : gagal(new Error('Gagal membuat gambar.'))), 'image/png');
+    };
+    img.onerror = () => gagal(new Error('Gagal membuat gambar.'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+
+export function Bagikan({ k, id }) {
+  const { db } = k;
+  const e = db.ambil('Eksperimen', id);
+  const resep = e && db.ambil('Resep', e.idResep);
+  const [sibuk, setSibuk] = useState(false);
+
+  useEffect(() => {
+    if (e && !e.tokenNilai) pastikanToken(db, id);
+  }, [id, e && e.tokenNilai]);
+
+  if (!e || !resep) {
+    return html`<${Kerangka} k=${k} aktif="resep">
+      <${Hero} label="Bagikan" judul="Tidak ada" kembali="/resep" />
+      <div class="isi"><${Kosong} judul="Eksperimen tidak ditemukan"><a class="btn solid" href=${tautan('/resep')}>Ke daftar resep</a><//></div>
+    <//>`;
+  }
+
+  const kat = db.ambil('Kategori', resep.idKategori);
+  const p = db.pengaturan;
+  const tersambung = !!(p.scriptUrl && p.kunci);
+  const kotor = db.ambilKotor();
+  const belumSinkron = (kotor.Eksperimen || []).some((r) => r.id === e.id) || (kotor.Resep || []).some((r) => r.id === e.idResep);
+  const aktif = tersambung && !belumSinkron && !!e.tokenNilai;
+  const tautanNilai = e.tokenNilai ? buatTautanNilai(e.tokenNilai, p.scriptUrl) : '';
+  const skor = skorDariDB(db, id);
+  const dariOrangLain = penilaianEksperimen(db, id).filter((n) => !n.dariPemilik).length;
+  const svg = tautanNilai ? buatQR(tautanNilai, { cellSize: 4, margin: 2, scalable: true, alt: `Kode QR penilaian ${resep.nama} eksperimen ${e.nomor}` }) : '';
+
+  const ubah = (patch) => db.simpan('Eksperimen', { ...e, ...patch });
+  const sinkron = async () => {
+    setSibuk(true);
+    await k.sinkronSekarang(true);
+    setSibuk(false);
+  };
+  const bagikanSistem = async () => {
+    try {
+      await navigator.share({ title: `Nilai ${resep.nama}`, text: `Tolong beri nilai untuk ${resep.nama} (Eksperimen ${e.nomor}):`, url: tautanNilai });
+    } catch {
+      /* dibatalkan */
+    }
+  };
+  const unduhQR = async () => {
+    try {
+      const png = await svgKePng(buatQR(tautanNilai, { cellSize: 10, margin: 4 }), 600);
+      unduhBerkas(`qr-${resep.nama.replace(/[^\w]+/g, '-').toLowerCase()}-eks-${e.nomor}.png`, png);
+    } catch (err) {
+      tampilToast(err.message);
+    }
+  };
+
+  return html`<${Kerangka} k=${k} aktif="resep">
+    <${Hero} warna=${kat ? kat.warna : 'var(--tomat)'} label=${resep.nama} judul="Bagikan QR" kembali=${'/eksperimen/' + id} />
+    <div class="isi">
+      <div class="kolom-2">
+        <div class="kolom">
+          <div class="kartu-qr">
+            <div class="merek-qr"><${LogoMerek} src=${ambilMerek(db).logo} ukuran=${32} /><span>${ambilMerek(db).nama}</span></div>
+            <div class="label-kecil">${resep.nama} · Eksperimen ${e.nomor}</div>
+            <div class=${'qr-kotak' + (aktif ? '' : ' mati')} role="img" aria-label="Kode QR penilaian" dangerouslySetInnerHTML=${{ __html: svg }}></div>
+            <p style="font-weight:700">Pindai untuk memberi nilai</p>
+            <p class="tautan-teks">${tautanNilai || 'Menyiapkan tautan…'}</p>
+          </div>
+          <div class="baris-btn">
+            <button class="btn solid" disabled=${!tautanNilai} onClick=${async () => tampilToast((await salin(tautanNilai)) ? 'Tautan disalin.' : 'Gagal menyalin. Salin manual dari teks tautan.')}><${Ikon} nama="salin" ukuran=${18} />Salin tautan</button>
+            ${navigator.share && html`<button class="btn" disabled=${!tautanNilai} onClick=${bagikanSistem}><${Ikon} nama="bagikan" ukuran=${18} />Kirim</button>`}
+            <button class="btn" disabled=${!tautanNilai} onClick=${unduhQR}><${Ikon} nama="unduh" ukuran=${18} />Unduh QR</button>
+          </div>
+        </div>
+
+        <div class="kolom">
+          ${!tersambung &&
+          html`<div class="peringatan" role="alert"><b>Belum tersambung ke Google.</b>Penilai membuka tautan lewat Google Apps Script milik Anda. Sambungkan dulu di <a href=${tautan('/pengaturan')} style="text-decoration:underline">Pengaturan</a>, baru kode QR ini berfungsi.</div>`}
+          ${tersambung && belumSinkron &&
+          html`<div class="peringatan" role="alert"><b>Kode QR belum aktif.</b>Eksperimen ini belum dikirim ke Spreadsheet, jadi penilai belum bisa membukanya.
+            <div style="margin-top:10px"><button class="btn solid" onClick=${sinkron} disabled=${sibuk || k.status.sedang}><${Ikon} nama="sinkron" ukuran=${18} />Sinkron sekarang</button></div></div>`}
+          ${aktif && html`<div class="info"><b>Kode QR aktif.</b>Siapa pun yang punya tautan ini bisa menilai tanpa login. Penilaian masuk ke Spreadsheet Anda dan muncul di sini setelah sinkron.</div>`}
+
+          <div class="kartu">
+            <div class="label-kecil" style="margin-bottom:4px">Pengaturan penilaian</div>
+            <label class="sakelar">
+              <span><b>Terima penilaian</b><small>Matikan untuk menutup penilaian.</small></span>
+              <input type="checkbox" checked=${e.terimaNilai !== false} onChange=${(ev) => ubah({ terimaNilai: ev.target.checked })} />
+            </label>
+            <label class="sakelar">
+              <span><b>Nama wajib diisi</b><small>Jika mati, penilai boleh anonim.</small></span>
+              <input type="checkbox" checked=${!!e.wajibNama} onChange=${(ev) => ubah({ wajibNama: ev.target.checked })} />
+            </label>
+            <p class="bantu">Perubahan berlaku bagi penilai setelah tersinkron ke Spreadsheet.</p>
+          </div>
+
+          <a class="kartu" href=${tautan('/eksperimen/' + id)} style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span><b style="display:block">${dariOrangLain} penilai dari tautan</b><span class="teks-kecil">${skor.jumlah ? `Skor rata-rata ${desimal1(skor.rata)} dari ${skor.jumlah} penilaian` : 'Belum ada penilaian masuk'}</span></span>
+            <${Ikon} nama="maju" />
+          </a>
+        </div>
+      </div>
+    </div>
+  <//>`;
+}

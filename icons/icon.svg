@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#0F5B3C"/><g><g>
+  <defs><clipPath id="botol"><path d="M226 112V220L124 378Q108 408 142 408H370Q404 408 388 378L286 220V112Z"/></clipPath></defs>
+  <path d="M226 112V220L124 378Q108 408 142 408H370Q404 408 388 378L286 220V112Z" fill="#FFF8EE"/>
+  <g clip-path="url(#botol)"><rect x="100" y="318" width="320" height="110" fill="#F2B632"/></g>
+  <rect x="204" y="86" width="104" height="26" rx="13" fill="#FFF8EE"/>
+  <circle cx="246" cy="360" r="15" fill="#CF3520"/>
+  <circle cx="300" cy="378" r="10" fill="#CF3520"/>
+  <circle cx="270" cy="318" r="8" fill="#CF3520"/>
+  <circle cx="338" cy="60" r="12" fill="#F2B632"/>
+  <circle cx="300" cy="38" r="7" fill="#F2B632"/>
+</g></g></svg>
