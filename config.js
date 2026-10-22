@@ -5,5 +5,5 @@
 //             dan penilai tidak perlu membawa alamat itu di tautannya.
 // Kunci rahasia JANGAN ditaruh di sini (berkas ini ikut tampil di GitHub).
 window.APP_CONFIG = {
-  scriptUrl: '',
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbyxjl8gKF0wtIQOkOS2kFVWGMksivZNcYL9CtJVajfuAHhnxwf7RVou_MOlEpCHJDhwkA/exec',
 };

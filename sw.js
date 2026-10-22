@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke Google Apps Script tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-fb53238707';
+const VERSI = 'resep-0714ecc060';
 const FILE = [
   // <daftar-file>
   'config.js',
