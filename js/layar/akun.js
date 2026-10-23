@@ -101,7 +101,7 @@ export function LayarAkun({ k }) {
       const p = await masukAkun(db, url, { login, kataSandi: sandi });
       setSandi('');
       tampilToast(`Selamat datang, ${p.nama}.`);
-      k.sinkronSekarang(false);
+      k.sinkronSekarang().catch(() => {});
     });
   };
 

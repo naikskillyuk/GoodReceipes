@@ -78,7 +78,7 @@ export async function keluarAkun(db, { sinkronkan, fetchFn } = {}) {
   const url = alamatServer(db);
   const kunci = db.pengaturan.kunci;
   if (url && kunci) panggilApi(url, { aksi: 'keluar', kunci }, { fetchFn }).catch(() => {});
-  await db.hapusSemua({ hapusKataSandi: true });
+  await db.hapusSemua({ keluar: true });
   db.aturPengaturan({ akun: null, kunci: '' });
   await db.tulis();
   return { hilang: sisa };

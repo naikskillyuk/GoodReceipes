@@ -404,6 +404,37 @@ export function dataHPP(db, idResep) {
   return { resep, target, eksperimen, biaya, tambahan, biayaLain, hpp, porsi };
 }
 
+/**
+ * Semua data satu resep untuk diekspor (PDF): resep, HPP, dan setiap eksperimen lengkap dengan
+ * bahan, biaya, HPP per porsi, langkah, catatan, skor, dan penilaian.
+ */
+export function dataEksporResep(db, idResep) {
+  const resep = db.ambil('Resep', idResep);
+  if (!resep) return null;
+  const tambahan = biayaResepTambahan(db, idResep);
+  const biayaLain = biayaLainResep(db, idResep);
+  const eksperimen = eksperimenResep(db, idResep).map((e) => {
+    const biaya = biayaBahanEksperimen(db, e.id);
+    const porsi = Number(e.porsi) || 0;
+    return {
+      eksperimen: e,
+      juara: resep.idJuara === e.id,
+      foto: fotoSrc(e, 'fotoHasilLokal', 'fotoHasilUrl'),
+      biaya,
+      hpp: hitungHPP({ biayaBahan: biaya.total, biayaResepLain: tambahan.total, biayaLain, porsi }),
+      skor: skorDariDB(db, e.id),
+      penilaian: penilaianEksperimen(db, e.id),
+    };
+  });
+  return {
+    resep,
+    kategori: db.ambil('Kategori', resep.idKategori),
+    fotoAcuan: fotoSrc(resep, 'fotoAcuanLokal', 'fotoAcuanUrl'),
+    hpp: dataHPP(db, idResep),
+    eksperimen,
+  };
+}
+
 // ---------- Merek (nama dan logo aplikasi) ----------
 
 export const NAMA_APLIKASI_BAWAAN = 'Good Receipes';

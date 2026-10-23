@@ -11,9 +11,6 @@ const PENGATURAN_AWAL = {
   namaPemilik: '',
   scriptUrl: '',
   kunci: '',
-  sinkronOtomatis: true,
-  kunciAplikasi: null, // {garam, hash, iterasi}; null = aplikasi tidak dikunci
-  kunciOtomatisMenit: 15, // 0 = hanya terkunci saat aplikasi ditutup
 };
 
 function keadaanKosong() {
@@ -263,44 +260,15 @@ export function buatDB(penyimpanan = penyimpananMemori()) {
       kabari();
     },
 
-    /** Cadangan lengkap sebagai teks JSON (tanpa kunci rahasia). */
-    ekspor() {
-      const salin = JSON.parse(JSON.stringify(k));
-      salin.pengaturan.kunci = '';
-      salin.pengaturan.kunciAplikasi = null;
-      return JSON.stringify(salin, null, 1);
-    },
-
-    /** Pulihkan dari cadangan. Pengaturan koneksi perangkat ini dipertahankan. */
-    async impor(teks) {
-      const dibaca = JSON.parse(teks);
-      if (!dibaca || typeof dibaca !== 'object' || !dibaca.tabel) throw new Error('Berkas cadangan tidak dikenali.');
-      const dasar = keadaanKosong();
-      const pengaturanLama = k.pengaturan;
-      k = {
-        ...dasar,
-        tabel: { ...dasar.tabel, ...dibaca.tabel },
-        kotor: { ...dasar.kotor },
-        meta: { ...dasar.meta, ...k.meta, sinkronTerakhir: 0 },
-        pengaturan: pengaturanLama,
-      };
-      // Semua baris dianggap belum terkirim agar ikut ke server.
-      for (const n of NAMA_TABEL) k.kotor[n] = Object.keys(k.tabel[n]);
-      await tulisSekarang();
-      kabari();
-    },
-
     /**
-     * Kosongkan data di perangkat. Pengaturan koneksi dipertahankan.
-     * Dengan hapusKataSandi (jalur "lupa kata sandi"), kata sandi aplikasi dan kunci rahasia server
-     * ikut dihapus supaya data tidak bisa dipulihkan lewat sinkron tanpa mengetahui kunci itu.
+     * Kosongkan salinan data di perangkat (data di server tidak tersentuh). Pengaturan koneksi dipertahankan.
+     * Dengan keluar, sesi akun ikut dibuang dan perangkat tidak lagi tercatat milik akun mana pun.
      */
-    async hapusSemua({ hapusKataSandi = false } = {}) {
-      const pengaturanLama = hapusKataSandi ? { ...k.pengaturan, kunciAplikasi: null, kunci: '' } : k.pengaturan;
-      const pemilik = hapusKataSandi ? null : k.meta.idPengguna;
+    async hapusSemua({ keluar = false } = {}) {
+      const pengaturanLama = keluar ? { ...k.pengaturan, kunci: '' } : k.pengaturan;
+      const pemilik = keluar ? null : k.meta.idPengguna;
       k = keadaanKosong();
       k.pengaturan = pengaturanLama;
-      // Data perangkat tetap tercatat milik akun yang sama (kecuali jalur lupa/keluar).
       if (pemilik) k.meta.idPengguna = pemilik;
       await tulisSekarang();
       kabari();

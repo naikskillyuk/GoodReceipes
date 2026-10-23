@@ -8,25 +8,6 @@ import { tampilToast } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
 
-const jam = (ts) => new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
-
-/** Ringkasan status sinkronisasi untuk ditampilkan. */
-export function infoSinkron(db, status) {
-  const p = db.pengaturan;
-  if (!p.scriptUrl || !p.kunci) return { kelas: '', teks: 'Belum tersambung ke server' };
-  if (status.sedang) return { kelas: 'jalan', teks: 'Menyinkron…' };
-  if (status.galat) return { kelas: 'gagal', teks: status.galat };
-  const kotor = db.jumlahKotor();
-  if (kotor) return { kelas: 'jalan', teks: `${kotor} perubahan belum terkirim` };
-  if (status.berhasilTerakhir) return { kelas: 'ok', teks: `Tersinkron ${jam(status.berhasilTerakhir)}` };
-  return { kelas: 'ok', teks: 'Tersambung' };
-}
-
-export function StatusSinkron({ k }) {
-  const info = infoSinkron(k.db, k.status);
-  return html`<span class=${'status-sinkron ' + info.kelas}><i></i>${info.teks}</span>`;
-}
-
 /** Logo aplikasi di dalam ubin putih; kembali ke logo bawaan bila gambarnya gagal dimuat. */
 export function LogoMerek({ src, ukuran = 40, kelas = '' }) {
   const [gagal, setGagal] = useState(false);
@@ -82,13 +63,6 @@ export function Kerangka({ k, aktif, plus, children }) {
           )}
         </div>
       </div>`}
-      <div class="sinkron-sisi">
-        <${StatusSinkron} k=${k} />
-        ${db.pengaturan.scriptUrl && db.pengaturan.kunci
-          ? html`<button class="btn" onClick=${() => k.sinkronSekarang(true)} disabled=${k.status.sedang}><${Ikon} nama="sinkron" ukuran=${16} />Sinkron sekarang</button>`
-          : html`<a class="btn" style="margin-top:8px;width:100%;background:var(--bg);color:var(--hijau);border-color:var(--bg)" href=${tautan('/pengaturan')}>Sambungkan server</a>`}
-        ${db.pengaturan.kunciAplikasi && html`<button class="btn" onClick=${k.kunciSekarang}><${Ikon} nama="gembok" ukuran=${16} />Kunci aplikasi</button>`}
-      </div>
     </aside>
     <main class="utama">
       <div class="halaman">${children}</div>

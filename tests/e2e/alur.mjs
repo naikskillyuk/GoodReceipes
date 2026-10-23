@@ -219,11 +219,11 @@ try {
   assert.equal(Math.round(hppSesudah.hpp.totalResep - hppSebelum), Math.round(hppSesudah.tambahan.total));
   assert.equal(await page.locator('select[aria-label="Tambah resep tambahan"]').count(), 0, 'tidak ada resep lain yang bisa ditambahkan lagi');
 
-  tahap('sinkronkan lewat Pengaturan > Akun, foto ikut terunggah');
+  tahap('semua perubahan tersimpan ke server sendiri (tanpa tombol), foto ikut terunggah');
   await page.goto(BASE + '/#/pengaturan');
   await page.getByRole('heading', { name: 'Akun' }).waitFor();
   assert.equal(await page.getByText('chefuji').count(), 1, 'username tampil');
-  await page.getByRole('button', { name: 'Sinkron sekarang' }).last().click();
+  assert.equal(await page.getByRole('button', { name: /Sinkron/ }).count(), 0, 'tidak ada tombol sinkron');
   await page.waitForFunction(() => window.__app.db.jumlahKotor() === 0, null, { timeout: 15000 });
   const fotoUrl = await page.evaluate(() => window.__app.db.semua('Eksperimen')[0].fotoHasilUrl);
   assert.match(fotoUrl, /^\/foto\//);
@@ -267,7 +267,7 @@ try {
   await rater.getByRole('button', { name: /Kirim penilaian/ }).click();
   await rater.getByText('Terima kasih!').waitFor();
 
-  tahap('pemilik menerima penilaian setelah sinkron dan skor dihitung ulang');
+  tahap('penilaian dari QR masuk ke aplikasi pemilik dan skor dihitung ulang');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   const nilaiMasuk = await page.evaluate((id) => window.__app.db.semua('Penilaian', (p) => p.idEksperimen === id && !p.dariPemilik).map((p) => ({ n: p.namaPenilai, r: p.rasa, a: p.aroma, k: p.komentar })), idEks2);
   assert.deepEqual(nilaiMasuk, [{ n: 'Tamu Uji', r: 9, a: 10, k: 'Enak sekali, tidak terlalu manis.' }]);

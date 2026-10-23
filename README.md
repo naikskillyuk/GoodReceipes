@@ -1,6 +1,6 @@
 # Good Receipes
 
-Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Data tersimpan di perangkat Anda lebih dulu (tetap jalan tanpa internet), lalu disalin ke **akun pengguna** di server: backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: akun pembeli dibuat lewat halaman admin setelah membayar, dan data setiap pembeli terpisah.
+Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Semua data tersimpan di **akun pengguna** di server (setiap perubahan langsung dikirim, tanpa tombol sinkron): backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: akun pembeli dibuat lewat halaman admin setelah membayar, dan data setiap pembeli terpisah.
 
 ## Yang bisa dilakukan
 
@@ -13,9 +13,10 @@ Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, 
 - **Marketing**: ide konten dan ide pemasaran per resep, dengan status dan rencana pekan ini.
 - **Akun pengguna**: dibuat admin; username dan kata sandi dikirim ke email pembeli. Halaman pembuka dengan foto dan tombol **Login**. Masuk dengan username atau email, ganti kata sandi, lupa kata sandi lewat tautan email, dan keluar. Data setiap akun terpisah.
 - **Petunjuk untuk penilai**: tulis apa yang dinilai per aspek (mis. Tekstur: "harus kriuk dan kering", Rasa: "jangan terlalu asin") dan **catatan chef**; penilai melihatnya saat membuka QR.
-- **Kunci layar perangkat** (opsional): kata sandi tambahan untuk membuka aplikasi di perangkat ini, dengan kunci otomatis saat lama tidak dipakai.
+- **Export PDF satu resep**: data resep, HPP, dan setiap eksperimen (bahan dan biaya, langkah, catatan, foto, skor, serta penilaian beserta komentar), lewat tombol **Export PDF** di halaman resep lalu *Simpan sebagai PDF*.
+- **Hapus resep** dari halaman resep; eksperimen, penilaian, HPP, dan marketing-nya ikut terhapus.
 - **Nama dan logo aplikasi** yang bisa diganti sendiri dan tampil di beranda, halaman masuk, kode QR, dan halaman penilai.
-- Bisa dipasang ke layar utama (PWA) dan dibuka tanpa internet.
+- Bisa dipasang ke layar utama (PWA). Saat sinyal putus, aplikasi tetap terbuka dan perubahan menunggu lalu terkirim begitu tersambung lagi.
 
 ## Mencoba di komputer
 
@@ -27,7 +28,7 @@ npm run dev
 
 Buka http://localhost:8080. Server uji ini memakai tiruan backend Laravel di memori (`tools/server-tiruan.mjs`, tanpa database dan tanpa email). Di `localhost`, `config.js` sengaja tidak memakai server produksi. Di halaman **Masuk**, isi alamat server `http://localhost:8080/api`, lalu masuk dengan email apa saja dan kata sandi `kunci-dev`. Untuk mencoba akun sungguhan (halaman admin, email, banyak akun), pakai backend Laravel di bawah. Data uji disimpan di `.dev-data.json` (hapus berkas ini atau jalankan `node tools/dev-server.mjs --reset` untuk mengosongkan).
 
-Tombol **Muat data contoh** (Beranda atau Pengaturan) mengisi empat resep contoh, lengkap dengan foto makanan dan bahan, supaya semua layar bisa dilihat. Fotonya berlisensi bebas untuk penggunaan komersial (domain publik, CC0, atau CC BY); daftar pembuat dan sumbernya ada di `contoh/SUMBER.md` dan wajib ikut disertakan bila foto itu dipakai.
+`js/lib/seed.js` berisi empat resep contoh (dipakai tes otomatis, tidak ada tombolnya di aplikasi). Fotonya berlisensi bebas untuk penggunaan komersial (domain publik, CC0, atau CC BY); daftar pembuat dan sumbernya ada di `contoh/SUMBER.md` dan wajib ikut disertakan bila foto itu dipakai.
 
 ## Backend Laravel + Supabase
 
@@ -164,18 +165,6 @@ Aplikasi memakai alamat berbasis `#` sehingga berjalan di subfolder GitHub Pages
 
 Isi `scriptUrl` di `config.js` dengan alamat API server Anda (wajib untuk dijual). URL itu bukan rahasia, tetapi **jangan pernah menaruh kunci atau kata sandi** di berkas ini.
 
-## Kunci layar perangkat (opsional)
-
-Selain login akun, pengguna bisa menambah kata sandi khusus perangkat di **Pengaturan > Keamanan > Buat kata sandi** (minimal 6 karakter), misalnya untuk HP yang dipakai bersama. Sesudah itu:
-
-- Setiap kali aplikasi dibuka di perangkat itu (atau setelah lama tidak dipakai), yang tampil lebih dulu adalah halaman **Masuk**. Isi aplikasi tidak dimuat ke halaman sebelum kata sandi benar.
-- **Kunci otomatis** bisa diatur: 1, 5, 15, 30 menit, 1 jam, atau hanya saat aplikasi ditutup. **Kunci sekarang** ada di Pengaturan, di Beranda (ikon gembok), dan di sisi kiri pada laptop.
-- Salah kata sandi dua kali masih langsung bisa mengulang; sesudahnya ada jeda 1, 2, 4, … sampai 30 detik.
-- **Penilai yang membuka kode QR tidak pernah diminta masuk.** Halaman penilai terpisah dari data pemilik.
-- **Lupa kata sandi perangkat?** Masukkan **kata sandi akun** untuk menghapusnya tanpa kehilangan data, atau **keluar dari akun** (data perangkat dihapus; data di server aman dan kembali setelah masuk lagi).
-
-Yang perlu diketahui dengan jujur: kata sandi disimpan sebagai hash PBKDF2-SHA256 dengan garam acak, hanya di perangkat ini, dan **tidak ikut ke server maupun berkas cadangan**. Ia mengunci *tampilan* aplikasi, bukan mengenkripsi data di browser. Orang yang mahir dan memegang perangkat Anda masih bisa membaca data lewat alat pengembang browser, jadi tetap pakai kunci layar HP. Kata sandi butuh koneksi aman (HTTPS atau `localhost`); GitHub Pages sudah HTTPS.
-
 ## Nama dan logo aplikasi
 
 Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan pilih gambar logo. Logo otomatis diperkecil menjadi PNG maksimal 256 piksel (transparan boleh). Setelah **Simpan tampilan**:
@@ -190,37 +179,38 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 
 - Di halaman eksperimen, pilih **Bagikan kode QR**. Tautan berisi token acak 16 karakter untuk eksperimen itu.
 - Penilai membuka tautan tanpa login, mengisi lima penggeser, nama (boleh dikosongkan atau diwajibkan), dan komentar. Jawaban dikirim langsung ke server Anda, tanpa melalui aplikasi Anda.
-- QR **baru aktif setelah eksperimen tersinkron** ke server. Aplikasi memberi tahu bila belum.
-- Penilaian masuk ke perangkat Anda pada sinkron berikutnya (otomatis tiap menit saat aplikasi terbuka).
-- Untuk menutup penilaian, matikan **Terima penilaian** di halaman QR, lalu sinkron.
+- QR aktif begitu eksperimen tersimpan di server (biasanya sedetik setelah disimpan). Aplikasi memberi tahu bila belum.
+- Penilaian langsung tersimpan di database (tabel `penilaian`) dan muncul di aplikasi pemilik dalam beberapa detik (diperiksa tiap 20 detik saat aplikasi terbuka).
+- Untuk menutup penilaian, matikan **Terima penilaian** di halaman QR; langsung berlaku.
 
 ## Keamanan singkat
 
-- Semua tindakan pemilik (sinkron, unggah foto, ubah akun) butuh token sesi dari login. Server hanya menyimpan hash SHA-256 token itu, dan setiap baca/tulis dibatasi ke data akun pemilik token. Token tidak ikut berkas cadangan.
+- Semua tindakan pemilik (simpan data, unggah foto, ubah akun) butuh token sesi dari login. Server hanya menyimpan hash SHA-256 token itu, dan setiap baca/tulis dibatasi ke data akun pemilik token.
 - Kata sandi akun disimpan dengan bcrypt (bawaan Laravel). Mengganti kata sandi mengeluarkan perangkat lain; atur ulang lewat email mengeluarkan semua perangkat.
 - Penilai hanya bisa membaca nama resep, nomor eksperimen, dan foto hasil, serta mengirim satu penilaian. Mereka tidak bisa membaca atau mengubah data lain.
 - Masukan penilai dibersihkan: nilai harus bilangan bulat 1 sampai 10, teks dipotong, karakter kontrol dibuang, dan petunjuk dari pemilik juga dibatasi panjangnya. Server Laravel membatasi 180 permintaan per menit per alamat IP. Setiap eksperimen menerima maksimal 500 penilaian.
 - Siapa pun yang memegang tautan QR dapat menilai berkali-kali. Untuk uji pasar kecil ini wajar; matikan **Terima penilaian** bila sudah cukup.
 - Foto dan logo disimpan di bucket publik Supabase Storage agar tampil di aplikasi dan halaman penilai. Jangan unggah gambar yang bersifat pribadi.
-- Kata sandi aplikasi (lihat bagian di atas) hanya mengunci tampilan di perangkat itu dan bukan enkripsi data.
 
-## Cara data disimpan dan disinkronkan
+## Cara data disimpan
 
-- Satu dokumen JSON di IndexedDB perangkat. Setiap baris punya waktu ubah; penghapusan ditandai (bukan dibuang) supaya perangkat lain ikut menghapus.
-- Sinkron mengirim baris yang berubah lalu menerima baris baru. Jika dua perangkat mengubah baris yang sama, **yang terakhir diubah menang**.
-- Foto disimpan di perangkat sebagai JPEG maksimal 900 piksel, lalu diunggah ke Supabase Storage saat sinkron.
-- Aplikasi meminta browser menjaga penyimpanan tetap permanen. Tetap unduh **cadangan** dari Pengaturan sesekali.
+- Data utama ada di database server (Supabase). Perangkat hanya menyimpan salinan di IndexedDB supaya aplikasi cepat dan tetap terbuka saat sinyal putus.
+- Setiap perubahan dikirim ke server sekitar 1 detik setelah disimpan; data baru (mis. penilaian QR, perubahan dari perangkat lain) diambil saat aplikasi dibuka, tiap 20 detik, dan saat tersambung lagi. Tidak ada tombol sinkron. Bila pengiriman gagal, muncul pemberitahuan dan dicoba lagi otomatis.
+- Setiap baris punya waktu ubah; penghapusan ditandai (bukan dibuang) supaya perangkat lain ikut menghapus. Jika dua perangkat mengubah baris yang sama, **yang terakhir diubah menang**.
+- Foto diperkecil menjadi JPEG maksimal 900 piksel lalu diunggah ke Supabase Storage.
+- Keluar dari akun membuang salinan di perangkat; semua data kembali dari server saat masuk lagi.
 
 ## Struktur folder
 
 ```
 index.html, config.js, manifest.webmanifest, sw.js   berkas yang diterbitkan
 css/app.css                                           gaya (HP dan laptop)
-js/main.js                                            titik masuk, sinkron otomatis
-js/lib/                                               logika murni (HPP, satuan, skor, data, sinkron, akun, kunci)
-js/ui/ dan js/layar/                                  komponen dan layar (termasuk masuk.js)
+js/main.js                                            titik masuk, simpan otomatis ke server
+js/lib/                                               logika murni (HPP, satuan, skor, data, sinkron, akun)
+js/ui/ dan js/layar/                                  komponen dan layar (termasuk cetak-resep.js untuk export PDF)
 vendor/                                               Preact + htm, qrcode, font (lihat vendor/LISENSI.md)
-contoh/foto/                                          foto untuk "Muat data contoh" (sumber dan lisensi: contoh/SUMBER.md)
+contoh/foto/                                          foto data contoh untuk tes (sumber dan lisensi: contoh/SUMBER.md)
+gambar/                                               foto latar halaman Login
 icons/                                                ikon aplikasi
 backend/                                              backend Laravel (API, migrasi database, Supabase)
 tools/                                                server uji dan pembaruan cache offline
@@ -230,10 +220,10 @@ tests/                                                uji otomatis
 ## Pengujian
 
 ```bash
-npm test          # uji logika, data, sinkronisasi, kata sandi, dan PWA (tanpa paket tambahan)
+npm test          # uji logika, data, export, hapus resep, sinkronisasi, dan PWA (tanpa paket tambahan)
 npm i             # sekali saja, memasang playwright-core
 npm run e2e       # semua alur di browser Chromium: bahan, resep, eksperimen, HPP, QR, penilai, offline,
-                  # lalu layar sambutan dan Login, kunci layar, lupa kata sandi, keluar, serta nama dan logo aplikasi
+                  # lalu Login, simpan otomatis ke server, export PDF, hapus resep, keluar, nama dan logo aplikasi
 npm run e2e:masuk # hanya alur masuk dan merek (SS=/folder untuk menyimpan tangkapan layar)
 npm run test:api  # backend Laravel sungguhan (lihat bagian Backend Laravel + Supabase)
 ```

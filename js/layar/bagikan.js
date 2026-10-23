@@ -94,9 +94,9 @@ export function Bagikan({ k, id }) {
   const ubah = (patch) => db.simpan('Eksperimen', { ...e, ...patch });
   const panduan = e.panduanNilai && typeof e.panduanNilai === 'object' ? e.panduanNilai : {};
   const ubahPanduan = (kunci, teks) => ubah({ panduanNilai: { ...panduan, [kunci]: teks } });
-  const sinkron = async () => {
+  const simpanSekarang = async () => {
     setSibuk(true);
-    await k.sinkronSekarang(true);
+    await k.sinkronSekarang().catch(() => {});
     setSibuk(false);
   };
   const bagikanSistem = async () => {
@@ -138,9 +138,9 @@ export function Bagikan({ k, id }) {
           ${!tersambung &&
           html`<div class="peringatan" role="alert"><b>Belum tersambung ke server.</b>Penilai membuka tautan lewat server milik Anda. Sambungkan dulu di <a href=${tautan('/pengaturan')} style="text-decoration:underline">Pengaturan</a>, baru kode QR ini berfungsi.</div>`}
           ${tersambung && belumSinkron &&
-          html`<div class="peringatan" role="alert"><b>Kode QR belum aktif.</b>Eksperimen ini belum dikirim ke server, jadi penilai belum bisa membukanya.
-            <div style="margin-top:10px"><button class="btn solid" onClick=${sinkron} disabled=${sibuk || k.status.sedang}><${Ikon} nama="sinkron" ukuran=${18} />Sinkron sekarang</button></div></div>`}
-          ${aktif && html`<div class="info"><b>Kode QR aktif.</b>Siapa pun yang punya tautan ini bisa menilai tanpa login. Penilaian masuk ke server Anda dan muncul di sini setelah sinkron.</div>`}
+          html`<div class="peringatan" role="alert"><b>Menyimpan ke server…</b>Kode QR aktif begitu eksperimen ini tersimpan. Bila lama, periksa internet lalu coba lagi.
+            <div style="margin-top:10px"><button class="btn solid" onClick=${simpanSekarang} disabled=${sibuk || k.status.sedang}><${Ikon} nama="sinkron" ukuran=${18} />Coba lagi</button></div></div>`}
+          ${aktif && html`<div class="info"><b>Kode QR aktif.</b>Siapa pun yang punya tautan ini bisa menilai tanpa login. Penilaian langsung tersimpan di database dan muncul di sini dalam beberapa detik.</div>`}
 
           <div class="kartu">
             <div class="label-kecil" style="margin-bottom:4px">Pengaturan penilaian</div>
@@ -152,7 +152,7 @@ export function Bagikan({ k, id }) {
               <span><b>Nama wajib diisi</b><small>Jika mati, penilai boleh anonim.</small></span>
               <input type="checkbox" checked=${!!e.wajibNama} onChange=${(ev) => ubah({ wajibNama: ev.target.checked })} />
             </label>
-            <p class="bantu">Perubahan berlaku bagi penilai setelah tersinkron ke server.</p>
+            <p class="bantu">Perubahan langsung berlaku bagi penilai.</p>
           </div>
 
           <section class="kartu kolom" aria-labelledby="h-petunjuk">

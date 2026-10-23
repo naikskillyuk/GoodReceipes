@@ -6,8 +6,6 @@ import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
 import { daftarJuara, ambilMerek } from '../lib/repo.js';
 import { desimal1 } from '../lib/util.js';
-import { muatContoh } from '../lib/seed.js';
-import { tampilToast } from '../ui/pesan.js';
 
 function sapaan() {
   const j = new Date().getHours();
@@ -24,7 +22,6 @@ export function Beranda({ k }) {
   const jumlahBahan = db.semua('Bahan').length;
   const jumlahUlasan = db.semua('Penilaian').length;
   const nama = (db.pengaturan.namaPemilik || '').trim();
-  const tersambung = !!(db.pengaturan.scriptUrl && db.pengaturan.kunci);
   const merek = ambilMerek(db);
 
   const menu = [
@@ -46,9 +43,8 @@ export function Beranda({ k }) {
         </div>
       </div>
       <div class="sapa-aksi">
-        ${db.pengaturan.kunciAplikasi && html`<button class="bulat putih" onClick=${k.kunciSekarang} aria-label="Kunci aplikasi"><${Ikon} nama="gembok" /></button>`}
-        <a class="bulat putih" href=${tautan('/pengaturan')} aria-label=${tersambung ? 'Pengaturan sinkronisasi' : 'Sambungkan ke server'}>
-          <${Ikon} nama=${tersambung ? 'awan' : 'awanMati'} />
+        <a class="bulat putih" href=${tautan('/pengaturan')} aria-label="Pengaturan">
+          <${Ikon} nama="gerigi" />
         </a>
       </div>
     </div>
@@ -87,13 +83,9 @@ export function Beranda({ k }) {
         </div>`
       : html`<div style="padding:0 20px">
           ${jumlahResep === 0
-            ? html`<${Kosong} judul="Belum ada resep" teks="Mulai dengan membuat resep pertama, atau lihat dulu cara kerjanya memakai data contoh.">
+            ? html`<${Kosong} judul="Belum ada resep" teks="Mulai dengan membuat resep pertama.">
                 <div class="baris-btn" style="width:100%;justify-content:center">
                   <a class="btn solid" href=${tautan('/resep/baru')}>Buat resep pertama</a>
-                  <button class="btn" onClick=${() => {
-                    muatContoh(db);
-                    tampilToast('Data contoh dimuat. Hapus kapan saja di Pengaturan.');
-                  }}>Muat data contoh</button>
                 </div>
               <//>`
             : html`<div class="kosong kosong-juara" style="background:var(--krem);border-style:solid;border-color:var(--garis)">

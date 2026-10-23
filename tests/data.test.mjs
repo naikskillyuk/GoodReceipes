@@ -170,19 +170,36 @@ test('simpan ke penyimpanan lalu muat ulang', async () => {
   assert.equal(b.semua('Bahan').length, a.semua('Bahan').length);
 });
 
-test('cadangan: ekspor tanpa kunci, impor menandai semua baris untuk dikirim', async () => {
-  const a = await dbBaru();
-  muatContoh(a);
-  a.aturPengaturan({ kunci: 'rahasia', scriptUrl: 'https://x' });
-  const teks = a.ekspor();
-  assert.ok(!teks.includes('rahasia'));
-  const b = await dbBaru();
-  b.aturPengaturan({ kunci: 'milik-b' });
-  await b.impor(teks);
-  assert.equal(b.semua('Resep').length, 4);
-  assert.equal(b.pengaturan.kunci, 'milik-b');
-  assert.ok(b.jumlahKotor() > 50);
-  await assert.rejects(() => b.impor('{"bukan":"cadangan"}'));
+test('ekspor satu resep: semua eksperimen lengkap dengan bahan, biaya, HPP, dan penilaian', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
+  const d = repo.dataEksporResep(db, brownies);
+  assert.equal(d.resep.nama, 'Brownies Fudgy');
+  assert.equal(d.eksperimen.length, 4);
+  assert.deepEqual(d.eksperimen.map((x) => x.eksperimen.nomor), [1, 2, 3, 4]);
+  const juara = d.eksperimen.find((x) => x.juara);
+  assert.equal(juara.eksperimen.id, db.ambil('Resep', brownies).idJuara);
+  assert.ok(juara.biaya.rincian.length > 0 && juara.biaya.total > 0);
+  assert.ok(Number.isFinite(juara.hpp.hppPorsi));
+  assert.ok(juara.skor.jumlah > 0 && juara.penilaian.length === juara.skor.jumlah);
+  assert.equal(Math.round(d.hpp.biaya.total), 38960);
+  assert.ok(d.hpp.hpp.totalResep > d.hpp.biaya.total, 'HPP per resep ikut biaya lain');
+  assert.equal(repo.dataEksporResep(db, 'tidak-ada'), null);
+});
+
+test('hapus resep: eksperimen, bahan eksperimen, penilaian, HPP, dan marketing ikut terhapus', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
+  const idEks = repo.eksperimenResep(db, brownies).map((e) => e.id);
+  const resepLain = db.semua('Resep').length - 1;
+  repo.hapusResep(db, brownies);
+  assert.equal(db.ambil('Resep', brownies), null);
+  assert.equal(db.semua('Resep').length, resepLain);
+  assert.equal(db.semua('Eksperimen', (e) => e.idResep === brownies).length, 0);
+  assert.equal(db.semua('BahanEksperimen', (b) => idEks.includes(b.idEksperimen)).length, 0);
+  assert.equal(db.semua('Penilaian', (p) => idEks.includes(p.idEksperimen)).length, 0);
+  for (const t of ['BiayaLain', 'Target', 'Marketing', 'ResepTambahan']) assert.equal(db.semua(t, (r) => r.idResep === brownies).length, 0, t);
+  assert.ok(db.jumlahKotor() > 0, 'penghapusan ikut dikirim ke server');
 });
 
 test('serialisasi baris untuk server: JSON, boolean, dan kolom lokal', async () => {

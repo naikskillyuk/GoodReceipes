@@ -48,7 +48,7 @@ export function DetailEksperimen({ k, id }) {
   if (!e || !resep) {
     return html`<${Kerangka} k=${k} aktif="resep">
       <${Hero} label="Eksperimen" judul="Tidak ada" kembali="/resep" />
-      <div class="isi"><${Kosong} judul="Eksperimen tidak ditemukan" teks="Mungkin sudah dihapus, atau belum tersinkron ke perangkat ini."><a class="btn solid" href=${tautan('/resep')}>Ke daftar resep</a><//></div>
+      <div class="isi"><${Kosong} judul="Eksperimen tidak ditemukan" teks="Mungkin sudah dihapus, atau belum termuat dari server."><a class="btn solid" href=${tautan('/resep')}>Ke daftar resep</a><//></div>
     <//>`;
   }
 
