@@ -6,5 +6,5 @@
 //             Backend Apps Script lama tidak mendukung akun, jadi tidak bisa dipakai lagi.
 // Kunci rahasia JANGAN ditaruh di sini (berkas ini ikut tampil di GitHub).
 window.APP_CONFIG = {
-  scriptUrl: '',
+  scriptUrl: 'https://goodreceipes-api.vercel.app/api',
 };
