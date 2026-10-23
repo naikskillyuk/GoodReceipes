@@ -6,7 +6,7 @@ Berkas di folder `vendor/` adalah salinan pustaka dan font sumber terbuka. Semua
 | --- | --- | --- |
 | `preact-htm.js` | Preact 10.29.8 + htm 3.1.1 (satu bundel) | MIT (Preact), Apache-2.0 (htm) |
 | `qrcode.js` | qrcode-generator 1.5.2, Kazuhiko Arase | MIT |
-| `fonts/fraunces.woff2` | Fraunces (paket @fontsource-variable/fraunces 5.3.0) | SIL OFL 1.1 |
+| `fonts/fraunces.woff2`, `fonts/fraunces-italic.woff2` | Fraunces tegak dan miring (paket @fontsource-variable/fraunces 5.3.0) | SIL OFL 1.1 |
 | `fonts/plus-jakarta-sans.woff2` | Plus Jakarta Sans (paket @fontsource-variable/plus-jakarta-sans 5.3.0) | SIL OFL 1.1 |
 
 ## MIT: Preact

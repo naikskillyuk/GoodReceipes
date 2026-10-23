@@ -1,9 +1,10 @@
 // Pengaturan bawaan aplikasi. Boleh dikosongkan; semua bisa diatur dari menu Pengaturan.
 //
-// scriptUrl : alamat Web App Google Apps Script Anda (berakhiran /exec).
-//             Jika diisi di sini, tautan QR untuk penilai menjadi lebih pendek
-//             dan penilai tidak perlu membawa alamat itu di tautannya.
+// scriptUrl : alamat API backend Laravel Anda, mis. https://backend-anda.vercel.app/api (lihat README).
+//             WAJIB diisi sebelum aplikasi dijual: semua pembeli masuk ke server ini.
+//             Tanpa ini, layar Masuk meminta alamat server (hanya untuk uji).
+//             Backend Apps Script lama tidak mendukung akun, jadi tidak bisa dipakai lagi.
 // Kunci rahasia JANGAN ditaruh di sini (berkas ini ikut tampil di GitHub).
 window.APP_CONFIG = {
-  scriptUrl: 'https://script.google.com/macros/s/AKfycbyxjl8gKF0wtIQOkOS2kFVWGMksivZNcYL9CtJVajfuAHhnxwf7RVou_MOlEpCHJDhwkA/exec',
+  scriptUrl: '',
 };

@@ -1,4 +1,4 @@
-// Sinkronisasi dengan Google Apps Script (Spreadsheet + Drive).
+// Sinkronisasi dengan server (Laravel + Supabase; apps-script/Code.gs juga tetap bisa dipakai).
 //
 // Aturan: data utama ada di perangkat. Saat sinkron, baris yang berubah dikirim,
 // lalu baris baru dari server (mis. penilaian dari QR) diterima. Jika dua perangkat
@@ -13,7 +13,7 @@ const BARIS_PER_KIRIM = 600;
 
 /** POST ke Web App. `text/plain` dipakai agar browser tidak mengirim preflight CORS. */
 export async function panggilApi(scriptUrl, isi, { fetchFn = globalThis.fetch, batasWaktu = 45000 } = {}) {
-  if (!scriptUrl) throw new GalatSinkron('Alamat Apps Script belum diisi.');
+  if (!scriptUrl) throw new GalatSinkron('Alamat server belum diisi.');
   const kendali = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = kendali ? setTimeout(() => kendali.abort(), batasWaktu) : null;
   let res;
@@ -26,7 +26,7 @@ export async function panggilApi(scriptUrl, isi, { fetchFn = globalThis.fetch, b
       signal: kendali?.signal,
     });
   } catch (e) {
-    throw new GalatSinkron(e?.name === 'AbortError' ? 'Server tidak menjawab (waktu habis).' : 'Tidak bisa terhubung. Periksa internet dan alamat Apps Script.');
+    throw new GalatSinkron(e?.name === 'AbortError' ? 'Server tidak menjawab (waktu habis).' : 'Tidak bisa terhubung. Periksa internet dan alamat server.');
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -34,7 +34,7 @@ export async function panggilApi(scriptUrl, isi, { fetchFn = globalThis.fetch, b
   try {
     data = await res.json();
   } catch {
-    throw new GalatSinkron('Jawaban server tidak dikenali. Pastikan alamat Apps Script benar dan akses Web App diatur ke "Siapa saja".');
+    throw new GalatSinkron('Jawaban server tidak dikenali. Pastikan alamat server benar (berakhiran /api).');
   }
   if (!data || data.ok !== true) {
     const galat = new GalatSinkron(data?.galat || 'Permintaan ditolak server.');
@@ -102,7 +102,7 @@ export function buatPenyinkron(db, { fetchFn } = {}) {
 
   async function jalankan() {
     const p = db.pengaturan;
-    if (!p.scriptUrl || !p.kunci) throw new GalatSinkron('Alamat Apps Script dan kunci belum diisi.');
+    if (!p.scriptUrl || !p.kunci) throw new GalatSinkron('Alamat server dan kunci belum diisi.');
     const foto = await unggahFoto(p);
 
     const kotor = db.ambilKotor();

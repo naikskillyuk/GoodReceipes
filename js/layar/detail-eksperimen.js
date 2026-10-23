@@ -1,17 +1,17 @@
 // Detail eksperimen: foto, juara, skor, catatan kegagalan, bahan, langkah, ulasan, dan aksi.
 
 import { html, useState } from '../../vendor/preact-htm.js';
-import { Kerangka, Hero, Foto, Kosong } from '../ui/komponen.js';
+import { Kerangka, Hero, Foto, Kosong, Stat } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
 import { PenggeserNilai, NILAI_AWAL } from './penilai.js';
 import {
   skorDariDB, penilaianEksperimen, biayaBahanEksperimen, biayaLainResep, fotoSrc, ubahJuara,
-  hapusEksperimen, tambahPenilaianPemilik, eksperimenResep,
+  hapusEksperimen, tambahPenilaianPemilik, eksperimenResep, biayaResepTambahan,
 } from '../lib/repo.js';
 import { hitungHPP } from '../lib/hpp.js';
-import { ASPEK, skorPenilaian } from '../lib/skor.js';
+import { ASPEK, skorPenilaian, bacaPanduan } from '../lib/skor.js';
 import { desimal1, angka, rupiah, tampilJumlah, tanggal } from '../lib/util.js';
 
 function ModalNilaiSendiri({ k, e, onTutup }) {
@@ -30,7 +30,7 @@ function ModalNilaiSendiri({ k, e, onTutup }) {
     onTutup();
   };
   return html`<${Modal} judul=${`Nilai Eksperimen ${e.nomor}`} onTutup=${onTutup}>
-    <${PenggeserNilai} nilai=${nilai} disentuh=${disentuh} onUbah=${(kunci, v) => (setNilai((n) => ({ ...n, [kunci]: v })), setDisentuh((d) => ({ ...d, [kunci]: true })), setGalat(''))} />
+    <${PenggeserNilai} panduan=${bacaPanduan(e.panduanNilai)} nilai=${nilai} disentuh=${disentuh} onUbah=${(kunci, v) => (setNilai((n) => ({ ...n, [kunci]: v })), setDisentuh((d) => ({ ...d, [kunci]: true })), setGalat(''))} />
     <label class="bidang"><span>Catatan</span><textarea class="area" rows="3" maxlength="1000" value=${komentar} onInput=${(ev) => setKomentar(ev.target.value)}></textarea></label>
     ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
     <div class="baris-btn">
@@ -57,7 +57,12 @@ export function DetailEksperimen({ k, id }) {
   const skor = skorDariDB(db, id);
   const ulasan = penilaianEksperimen(db, id);
   const biaya = biayaBahanEksperimen(db, id);
-  const hpp = hitungHPP({ biayaBahan: biaya.total, biayaLain: biayaLainResep(db, resep.id), porsi: Number(e.porsi) || 0 });
+  const hpp = hitungHPP({
+    biayaBahan: biaya.total,
+    biayaResepLain: biayaResepTambahan(db, resep.id).total,
+    biayaLain: biayaLainResep(db, resep.id),
+    porsi: Number(e.porsi) || 0,
+  });
   const juara = resep.idJuara === id;
   const juaraLain = resep.idJuara && !juara ? db.ambil('Eksperimen', resep.idJuara) : null;
   const foto = fotoSrc(e, 'fotoHasilLokal', 'fotoHasilUrl');
@@ -120,28 +125,36 @@ export function DetailEksperimen({ k, id }) {
       <p style="line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap">${e.catatanKegagalan}</p>
     </div>`}
 
-    <details class="lipat" open>
-      <summary>Bahan (${biaya.rincian.length}) <${Ikon} nama="bawah" ukuran=${20} /></summary>
-      <div class="badan">
-        ${biaya.rincian.length === 0
-          ? html`<p class="bantu">Belum ada bahan tercatat.</p>`
-          : biaya.rincian.map((b) => html`<div class="bahan-baris" key=${b.id}>
-              <span>${b.bahan ? b.bahan.nama : 'Bahan terhapus'}${b.bahan && b.bahan.merek ? html`<small class="teks-kecil"> · ${b.bahan.merek}</small>` : ''}</span>
-              <span class="nilai">${tampilJumlah(b.jumlah)} ${b.satuan} · ${Number.isFinite(b.biaya) ? rupiah(b.biaya) : '–'}</span>
-            </div>`)}
-        ${biaya.rincian.length > 0 && html`<div class="bahan-baris" style="font-weight:800"><span>Total biaya bahan</span><span class="nilai">${rupiah(biaya.total)}</span></div>`}
-        ${biaya.bermasalah.length > 0 && html`<p class="galat-teks" style="margin-top:6px">Ada bahan yang biayanya belum bisa dihitung. Periksa Daftar Bahan.</p>`}
+    <section class="kartu" aria-labelledby="h-bahan">
+      <div class="baris-pisah" style="margin-bottom:12px">
+        <h2 class="judul-kecil" id="h-bahan">Bahan <small class="teks-kecil">(${biaya.rincian.length})</small></h2>
+        <a class="tautan-hijau" href=${tautan(`/eksperimen/${id}/ubah`)}>Ubah</a>
       </div>
-    </details>
+      ${biaya.rincian.length === 0
+        ? html`<p class="bantu">Belum ada bahan tercatat.</p>`
+        : html`<ul class="ubin-bahan">
+            ${biaya.rincian.map((b) => {
+              const fotoBahan = b.bahan ? fotoSrc(b.bahan, 'fotoLokal', 'fotoUrl') : '';
+              return html`<li key=${b.id} class=${Number.isFinite(b.biaya) ? '' : 'bermasalah'}>
+                <span class="ubin-foto">${fotoBahan ? html`<${Foto} src=${fotoBahan} alt="" />` : html`<span class="ubin-huruf" aria-hidden="true">${(b.bahan ? b.bahan.nama : '?').trim().charAt(0).toUpperCase()}</span>`}</span>
+                <b>${b.bahan ? b.bahan.nama : 'Bahan terhapus'}</b>
+                <small>${tampilJumlah(b.jumlah)} ${b.satuan}</small>
+                <small class="ubin-harga">${Number.isFinite(b.biaya) ? rupiah(b.biaya) : 'harga ?'}</small>
+              </li>`;
+            })}
+          </ul>
+          <div class="total-ubin"><span>Total biaya bahan</span><b>${rupiah(biaya.total)}</b></div>`}
+      ${biaya.bermasalah.length > 0 && html`<p class="galat-teks" style="margin-top:6px">Ada bahan yang biayanya belum bisa dihitung. Periksa Daftar Bahan.</p>`}
+    </section>
 
-    <details class="lipat" open>
-      <summary>Langkah (${(e.langkah || []).length}) <${Ikon} nama="bawah" ukuran=${20} /></summary>
-      <div class="badan">
-        ${(e.langkah || []).length === 0
-          ? html`<p class="bantu">Belum ada langkah tercatat.</p>`
-          : e.langkah.map((l, i) => html`<div class="langkah-baris" key=${i}><span class="nomor-langkah">${i + 1}</span><span style="overflow-wrap:anywhere">${l}</span></div>`)}
-      </div>
-    </details>
+    <section class="kartu" aria-labelledby="h-langkah">
+      <h2 class="judul-kecil" id="h-langkah" style="margin-bottom:12px">Langkah <small class="teks-kecil">(${(e.langkah || []).length})</small></h2>
+      ${(e.langkah || []).length === 0
+        ? html`<p class="bantu">Belum ada langkah tercatat.</p>`
+        : html`<ol class="langkah-gulir">
+            ${e.langkah.map((l, i) => html`<li key=${i}><span class="nomor-langkah">${i + 1}</span><p>${l}</p></li>`)}
+          </ol>`}
+    </section>
   </div>`;
 
   const kanan = html`<div class="kolom">
@@ -194,11 +207,17 @@ export function DetailEksperimen({ k, id }) {
       label=${resep.nama}
       judul=${`Eksperimen ${e.nomor}`}
       panjang=${true}
+      foto=${foto}
       kembali=${'/resep/' + resep.id}
       kanan=${html`<a class="bulat" href=${tautan(`/eksperimen/${id}/ubah`)} aria-label="Ubah eksperimen"><${Ikon} nama="ubah" /></a>`}
-      stat=${html`<div class="foto-besar" role="img" aria-label=${foto ? 'Foto hasil akhir' : 'Belum ada foto'}><${Foto} src=${foto} ikon="kamera" ukuranIkon=${32} /></div>`}
+      stat=${juara && html`<span class="chip-hero"><${Ikon} nama="piala" ukuran=${14} />Juara</span>`}
     >
-      ${juara && html`<div style="margin-top:12px"><span class="chip-hero"><${Ikon} nama="piala" ukuran=${14} />Juara</span></div>`}
+      <div class="stat-baris">
+        ${e.waktuMenit ? html`<${Stat} ikon="jam" nilai=${`${e.waktuMenit} mnt`} label="Waktu" />` : ''}
+        ${e.suhuC ? html`<${Stat} ikon="api" nilai=${`${e.suhuC}°C`} label="Suhu" />` : ''}
+        ${e.porsi ? html`<${Stat} ikon="kue" nilai=${`${angka(e.porsi, e.porsi % 1 ? 1 : 0)}`} label=${e.satuanPorsi || 'porsi'} />` : ''}
+        <${Stat} ikon="kalkulator" nilai=${rupiah(hpp.hppPorsi)} label="HPP/porsi" />
+      </div>
     <//>
     <div class="isi"><div class="kolom-2">${kiri}${kanan}</div></div>
     ${nilaiTerbuka && html`<${ModalNilaiSendiri} k=${k} e=${e} onTutup=${() => setNilaiTerbuka(false)} />`}
@@ -212,10 +231,11 @@ export function Bandingkan({ k, id }) {
   const kat = db.ambil('Kategori', resep.idKategori);
   const daftar = eksperimenResep(db, id);
   const lain = biayaLainResep(db, id);
+  const biayaResepLain = biayaResepTambahan(db, id).total;
   const kolom = daftar.map((e) => {
     const skor = skorDariDB(db, e.id);
     const biaya = biayaBahanEksperimen(db, e.id);
-    const hpp = hitungHPP({ biayaBahan: biaya.total, biayaLain: lain, porsi: Number(e.porsi) || 0 });
+    const hpp = hitungHPP({ biayaBahan: biaya.total, biayaResepLain, biayaLain: lain, porsi: Number(e.porsi) || 0 });
     return { e, skor, biaya, hpp };
   });
   const baris = [

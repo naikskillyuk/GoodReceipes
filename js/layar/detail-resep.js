@@ -76,15 +76,16 @@ export function DetailResep({ k, id, tab }) {
   return html`<${Kerangka} k=${k} aktif="resep" plus=${tabAktif === 'eksperimen' ? { href: `/resep/${id}/eksperimen/baru`, label: 'Eksperimen baru' } : null}>
     <${Hero}
       warna=${warna}
+      foto=${r.foto}
       label=${r.kategori ? r.kategori.nama : 'Resep'}
       judul=${resep.nama}
       kembali="/resep"
       kanan=${html`<a class="bulat" href=${tautan(`/resep/${id}/ubah`)} aria-label="Ubah resep"><${Ikon} nama="ubah" /></a>`}
     >
       <div class="stat-baris">
-        <${Stat} nilai=${r.eksperimen.length} label="Eksperimen" />
-        <${Stat} nilai=${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'} label=${r.juara ? 'Skor juara' : 'Skor terbaik'} />
-        <${Stat} nilai=${hppPorsi} label="HPP/porsi" />
+        <${Stat} ikon="resep" nilai=${r.eksperimen.length} label="Eksperimen" />
+        <${Stat} ikon="bintang" nilai=${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'} label=${r.juara ? 'Skor juara' : 'Skor terbaik'} />
+        <${Stat} ikon="kalkulator" nilai=${hppPorsi} label="HPP/porsi" />
       </div>
     <//>
     <${Tab}

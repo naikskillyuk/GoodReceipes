@@ -6,6 +6,9 @@ import { ASPEK } from './skor.js';
 
 const HARI = 24 * 3600 * 1000;
 
+/** Foto contoh di folder contoh/foto (sumber dan lisensi: contoh/SUMBER.md). */
+const FOTO = (nama) => `contoh/foto/${nama}.jpg`;
+
 /** Lima nilai bulat (1-10) yang totalnya persis `total`. */
 function nilaiDariTotal(total) {
   const dasar = Math.floor(total / 5);
@@ -23,21 +26,21 @@ export function muatContoh(db) {
   const sekarang = Date.now();
 
   const bahan = (data, konversi = []) => simpanBahan(db, { satuanBeli: 'kg', isiKemasan: 1, ...data }, konversi).id;
-  const kakao = bahan({ nama: 'Cokelat bubuk', merek: 'Van Houten', beliDi: 'Toko Sentosa', hargaBeli: 45000, isiKemasan: 500, satuanBeli: 'g' }, [
+  const kakao = bahan({ nama: 'Cokelat bubuk', fotoUrl: FOTO('cokelat-bubuk'), merek: 'Van Houten', beliDi: 'Toko Sentosa', hargaBeli: 45000, isiKemasan: 500, satuanBeli: 'g' }, [
     { satuan: 'sdm', nilai: 6 },
     { satuan: 'sdt', nilai: 2 },
   ]);
   const dark = bahan({ nama: 'Dark chocolate', merek: 'Collata', beliDi: 'Toko Sentosa', hargaBeli: 95000 });
-  const mentega = bahan({ nama: 'Mentega tawar', merek: 'Anchor', beliDi: 'Pasar Induk', hargaBeli: 120000 });
-  const gula = bahan({ nama: 'Gula pasir', merek: 'Gulaku', beliDi: 'Toko Sentosa', hargaBeli: 18000 }, [{ satuan: 'sdm', nilai: 12 }]);
-  const telur = bahan({ nama: 'Telur ayam', merek: 'Peternak lokal', beliDi: 'Pasar Induk', hargaBeli: 30000 }, [{ satuan: 'butir', nilai: 55 }]);
+  const mentega = bahan({ nama: 'Mentega tawar', fotoUrl: FOTO('mentega'), merek: 'Anchor', beliDi: 'Pasar Induk', hargaBeli: 120000 });
+  const gula = bahan({ nama: 'Gula pasir', fotoUrl: FOTO('gula-pasir'), merek: 'Gulaku', beliDi: 'Toko Sentosa', hargaBeli: 18000 }, [{ satuan: 'sdm', nilai: 12 }]);
+  const telur = bahan({ nama: 'Telur ayam', fotoUrl: FOTO('telur'), merek: 'Peternak lokal', beliDi: 'Pasar Induk', hargaBeli: 30000 }, [{ satuan: 'butir', nilai: 55 }]);
   const terigu = bahan({ nama: 'Tepung terigu', merek: 'Segitiga Biru', beliDi: 'Toko Sentosa', hargaBeli: 13000 });
-  const susu = bahan({ nama: 'Susu cair', merek: 'Full cream', beliDi: 'Minimarket', hargaBeli: 18000, satuanBeli: 'l' });
-  const kopi = bahan({ nama: 'Kopi bubuk arabika', merek: 'Lokal sangrai', beliDi: 'Roastery', hargaBeli: 120000 }, [{ satuan: 'sdm', nilai: 5 }]);
+  const susu = bahan({ nama: 'Susu cair', fotoUrl: FOTO('susu'), merek: 'Full cream', beliDi: 'Minimarket', hargaBeli: 18000, satuanBeli: 'l' });
+  const kopi = bahan({ nama: 'Kopi bubuk arabika', fotoUrl: FOTO('kopi-bubuk'), merek: 'Lokal sangrai', beliDi: 'Roastery', hargaBeli: 120000 }, [{ satuan: 'sdm', nilai: 5 }]);
   const gulaAren = bahan({ nama: 'Gula aren cair', merek: '', beliDi: 'Pasar Induk', hargaBeli: 30000, satuanBeli: 'l' });
-  const ayam = bahan({ nama: 'Dada ayam fillet', merek: '', beliDi: 'Pasar Induk', hargaBeli: 42000 });
-  const mayo = bahan({ nama: 'Mayones', merek: 'Kewpie', beliDi: 'Minimarket', hargaBeli: 38000, isiKemasan: 1 });
-  const sambal = bahan({ nama: 'Bawang merah dan serai', merek: '', beliDi: 'Pasar Induk', hargaBeli: 35000 });
+  const ayam = bahan({ nama: 'Dada ayam fillet', fotoUrl: FOTO('dada-ayam'), merek: '', beliDi: 'Pasar Induk', hargaBeli: 42000 });
+  const mayo = bahan({ nama: 'Mayones', fotoUrl: FOTO('mayones'), merek: 'Kewpie', beliDi: 'Minimarket', hargaBeli: 38000, isiKemasan: 1 });
+  const sambal = bahan({ nama: 'Bawang merah dan serai', fotoUrl: FOTO('bawang-merah'), merek: '', beliDi: 'Pasar Induk', hargaBeli: 35000 });
 
   const ulasan = (idEksp, daftarTotal, mulaiHariLalu = 6) => {
     const nama = ['Sari', 'Dewi', 'Budi', 'Rina', 'Andi', 'Maya', 'Tono', 'Lina'];
@@ -65,7 +68,7 @@ export function muatContoh(db) {
     idKategori: kat('Kue').id,
     targetDicapai: 'Rasa minimal 8, HPP di bawah Rp 5.000 per potong, tekstur fudgy dan lembap, tidak seret.',
     fotoAcuanLokal: '',
-    fotoAcuanUrl: '',
+    fotoAcuanUrl: FOTO('brownies-1'),
     idJuara: '',
     dibuat: sekarang - 12 * HARI,
   });
@@ -82,14 +85,14 @@ export function muatContoh(db) {
     { idBahan: telur, jumlah: 3, satuan: 'butir' },
     { idBahan: terigu, jumlah: 100, satuan: 'g' },
   ]);
-  const e2 = eksperimen(brownies.id, 2, { porsi: 16, satuanPorsi: 'potong', suhuC: 175, waktuMenit: 30, langkah, catatanKegagalan: 'Bagian tengah masih terlalu basah.' }, [
+  const e2 = eksperimen(brownies.id, 2, { fotoHasilUrl: FOTO('brownies-2'), porsi: 16, satuanPorsi: 'potong', suhuC: 175, waktuMenit: 30, langkah, catatanKegagalan: 'Bagian tengah masih terlalu basah.' }, [
     { idBahan: dark, jumlah: 150, satuan: 'g' },
     { idBahan: mentega, jumlah: 120, satuan: 'g' },
     { idBahan: gula, jumlah: 170, satuan: 'g' },
     { idBahan: telur, jumlah: 3, satuan: 'butir' },
     { idBahan: terigu, jumlah: 70, satuan: 'g' },
   ]);
-  const e3 = eksperimen(brownies.id, 3, { porsi: 16, satuanPorsi: 'potong', suhuC: 175, waktuMenit: 28, langkah, catatanKegagalan: 'Sudah pas. Permukaan retak tipis seperti yang diinginkan.', idAsalDuplikat: e2.id }, [
+  const e3 = eksperimen(brownies.id, 3, { fotoHasilUrl: FOTO('brownies-1'), porsi: 16, satuanPorsi: 'potong', suhuC: 175, waktuMenit: 28, langkah, catatanKegagalan: 'Sudah pas. Permukaan retak tipis seperti yang diinginkan.', idAsalDuplikat: e2.id }, [
     { idBahan: dark, jumlah: 150, satuan: 'g' },
     { idBahan: mentega, jumlah: 120, satuan: 'g' },
     { idBahan: gula, jumlah: 150, satuan: 'g' },
@@ -97,7 +100,7 @@ export function muatContoh(db) {
     { idBahan: terigu, jumlah: 80, satuan: 'g' },
     { idBahan: kakao, jumlah: 3, satuan: 'sdm' },
   ]);
-  const e4 = eksperimen(brownies.id, 4, { porsi: 16, satuanPorsi: 'potong', suhuC: 170, waktuMenit: 32, langkah, catatanKegagalan: 'Lebih padat, kurang fudgy dibanding Eks. 3.', idAsalDuplikat: e3.id }, [
+  const e4 = eksperimen(brownies.id, 4, { fotoHasilUrl: FOTO('brownies-3'), porsi: 16, satuanPorsi: 'potong', suhuC: 170, waktuMenit: 32, langkah, catatanKegagalan: 'Lebih padat, kurang fudgy dibanding Eks. 3.', idAsalDuplikat: e3.id }, [
     { idBahan: dark, jumlah: 150, satuan: 'g' },
     { idBahan: mentega, jumlah: 120, satuan: 'g' },
     { idBahan: gula, jumlah: 150, satuan: 'g' },
@@ -129,16 +132,16 @@ export function muatContoh(db) {
     idKategori: kat('Minuman').id,
     targetDicapai: 'Rasa kopi kuat tapi tidak pahit, HPP di bawah Rp 6.000 per gelas.',
     fotoAcuanLokal: '',
-    fotoAcuanUrl: '',
+    fotoAcuanUrl: FOTO('es-kopi-1'),
     idJuara: '',
     dibuat: sekarang - 8 * HARI,
   });
-  const ek1 = eksperimen(kopiResep.id, 1, { porsi: 10, satuanPorsi: 'gelas', suhuC: null, waktuMenit: 15, langkah: ['Seduh kopi pekat.', 'Campur susu dan gula aren.', 'Tuang ke gelas berisi es.'], catatanKegagalan: 'Terlalu encer.' }, [
+  const ek1 = eksperimen(kopiResep.id, 1, { fotoHasilUrl: FOTO('es-kopi-2'), porsi: 10, satuanPorsi: 'gelas', suhuC: null, waktuMenit: 15, langkah: ['Seduh kopi pekat.', 'Campur susu dan gula aren.', 'Tuang ke gelas berisi es.'], catatanKegagalan: 'Terlalu encer.' }, [
     { idBahan: kopi, jumlah: 6, satuan: 'sdm' },
     { idBahan: susu, jumlah: 1000, satuan: 'ml' },
     { idBahan: gulaAren, jumlah: 150, satuan: 'ml' },
   ]);
-  const ek2 = eksperimen(kopiResep.id, 2, { porsi: 10, satuanPorsi: 'gelas', suhuC: null, waktuMenit: 15, langkah: ['Seduh kopi pekat.', 'Campur susu dan gula aren.', 'Tuang ke gelas berisi es.'], catatanKegagalan: '' }, [
+  const ek2 = eksperimen(kopiResep.id, 2, { fotoHasilUrl: FOTO('es-kopi-1'), porsi: 10, satuanPorsi: 'gelas', suhuC: null, waktuMenit: 15, langkah: ['Seduh kopi pekat.', 'Campur susu dan gula aren.', 'Tuang ke gelas berisi es.'], catatanKegagalan: '' }, [
     { idBahan: kopi, jumlah: 9, satuan: 'sdm' },
     { idBahan: susu, jumlah: 900, satuan: 'ml' },
     { idBahan: gulaAren, jumlah: 180, satuan: 'ml' },
@@ -153,11 +156,11 @@ export function muatContoh(db) {
     idKategori: kat('Camilan').id,
     targetDicapai: 'Kulit tipis tidak sobek saat digoreng, isian creamy.',
     fotoAcuanLokal: '',
-    fotoAcuanUrl: '',
+    fotoAcuanUrl: FOTO('risol-1'),
     idJuara: '',
     dibuat: sekarang - 5 * HARI,
   });
-  const er1 = eksperimen(risol.id, 1, { porsi: 12, satuanPorsi: 'buah', suhuC: null, waktuMenit: 45, langkah: ['Buat kulit dadar.', 'Tumis ayam, campur mayones.', 'Isi, gulung, goreng.'], catatanKegagalan: 'Kulit agak tebal.' }, [
+  const er1 = eksperimen(risol.id, 1, { fotoHasilUrl: FOTO('risol-1'), porsi: 12, satuanPorsi: 'buah', suhuC: null, waktuMenit: 45, langkah: ['Buat kulit dadar.', 'Tumis ayam, campur mayones.', 'Isi, gulung, goreng.'], catatanKegagalan: 'Kulit agak tebal.' }, [
     { idBahan: terigu, jumlah: 150, satuan: 'g' },
     { idBahan: telur, jumlah: 2, satuan: 'butir' },
     { idBahan: susu, jumlah: 300, satuan: 'ml' },
@@ -172,15 +175,15 @@ export function muatContoh(db) {
     idKategori: kat('Lauk').id,
     targetDicapai: 'Ayam juicy, sambal segar, harga jual Rp 22.000 per kotak.',
     fotoAcuanLokal: '',
-    fotoAcuanUrl: '',
+    fotoAcuanUrl: FOTO('nasi-ayam-1'),
     idJuara: '',
     dibuat: sekarang - 3 * HARI,
   });
-  const en1 = eksperimen(nasi.id, 1, { porsi: 8, satuanPorsi: 'kotak', suhuC: 180, waktuMenit: 40, langkah: ['Marinasi ayam.', 'Panggang.', 'Buat sambal matah.'], catatanKegagalan: 'Ayam agak kering.' }, [
+  const en1 = eksperimen(nasi.id, 1, { fotoHasilUrl: FOTO('nasi-ayam-2'), porsi: 8, satuanPorsi: 'kotak', suhuC: 180, waktuMenit: 40, langkah: ['Marinasi ayam.', 'Panggang.', 'Buat sambal matah.'], catatanKegagalan: 'Ayam agak kering.' }, [
     { idBahan: ayam, jumlah: 800, satuan: 'g' },
     { idBahan: sambal, jumlah: 150, satuan: 'g' },
   ]);
-  const en2 = eksperimen(nasi.id, 2, { porsi: 8, satuanPorsi: 'kotak', suhuC: 170, waktuMenit: 35, langkah: ['Marinasi ayam semalam.', 'Panggang.', 'Buat sambal matah.'], catatanKegagalan: '', idAsalDuplikat: en1.id }, [
+  const en2 = eksperimen(nasi.id, 2, { fotoHasilUrl: FOTO('nasi-ayam-1'), porsi: 8, satuanPorsi: 'kotak', suhuC: 170, waktuMenit: 35, langkah: ['Marinasi ayam semalam.', 'Panggang.', 'Buat sambal matah.'], catatanKegagalan: '', idAsalDuplikat: en1.id }, [
     { idBahan: ayam, jumlah: 800, satuan: 'g' },
     { idBahan: sambal, jumlah: 180, satuan: 'g' },
   ]);

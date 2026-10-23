@@ -16,7 +16,7 @@ const KUNCI = 'GANTI-DENGAN-KUNCI-RAHASIA-ANDA';
 const VERSI = 1;
 const NAMA_TABEL = [
   'Kategori', 'Resep', 'Eksperimen', 'Bahan', 'KonversiSatuan',
-  'BahanEksperimen', 'Penilaian', 'BiayaLain', 'Target', 'Marketing', 'Setelan',
+  'BahanEksperimen', 'Penilaian', 'BiayaLain', 'ResepTambahan', 'Target', 'Marketing', 'Setelan',
 ];
 const NAMA_FOLDER_FOTO = 'Foto Eksperimen Resep';
 const KOLOM_WAJIB = ['id', 'diubah', 'dihapus'];
@@ -117,7 +117,24 @@ function infoNilai_(req) {
     wajibNama: benar_(e.wajibNama, false),
     namaAplikasi: merek ? String(merek.namaAplikasi || '') : '',
     logoUrl: merek ? String(merek.logoUrl || '') : '',
+    panduan: bacaPanduan_(e.panduanNilai),
+    catatanChef: String(e.catatanChef || '').slice(0, 1000),
   };
+}
+
+/** Petunjuk penilaian (teks JSON di sel) -> objek berisi teks saja. */
+function bacaPanduan_(v) {
+  let o = {};
+  try {
+    o = typeof v === 'string' ? JSON.parse(v || '{}') : v || {};
+  } catch (err) {
+    o = {};
+  }
+  const keluar = {};
+  ['umum', 'rasa', 'tekstur', 'tampilan', 'aroma', 'minatBeli'].forEach(function (k) {
+    if (o && typeof o[k] === 'string' && o[k].trim()) keluar[k] = o[k].trim().slice(0, k === 'umum' ? 500 : 200);
+  });
+  return keluar;
 }
 
 function kirimNilai_(req) {

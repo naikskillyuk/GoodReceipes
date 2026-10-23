@@ -1,8 +1,8 @@
 // Kunci aplikasi: kata sandi pemilik untuk membuka aplikasi di perangkat ini.
 //
 // Yang dilindungi adalah tampilan aplikasi (mis. saat HP dipinjam). Kata sandi hanya ada di perangkat
-// dan tidak ikut ke Spreadsheet atau berkas cadangan. Data di perangkat tidak dienkripsi, dan
-// perlindungan data di Google tetap kunci Apps Script.
+// dan tidak ikut ke server atau berkas cadangan. Data di perangkat tidak dienkripsi, dan
+// perlindungan data di server tetap kunci rahasia server.
 // Kata sandi disimpan sebagai hash PBKDF2-SHA256 dengan garam acak, tidak pernah sebagai teks.
 
 export const ITERASI_BAWAAN = 150000;

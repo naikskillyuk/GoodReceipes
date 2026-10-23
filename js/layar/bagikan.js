@@ -7,8 +7,9 @@ import { tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
 import { pastikanToken, skorDariDB, penilaianEksperimen, ambilMerek } from '../lib/repo.js';
 import { desimal1 } from '../lib/util.js';
+import { ASPEK, CONTOH_PANDUAN, BATAS_PANDUAN } from '../lib/skor.js';
 
-/** Tautan yang dibuka penilai. Alamat Apps Script ikut di tautan kecuali sudah ditetapkan di config.js. */
+/** Tautan yang dibuka penilai. Alamat server ikut di tautan kecuali sudah ditetapkan di config.js. */
 export function buatTautanNilai(token, scriptUrl) {
   const tetap = (window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
   const dasar = (location.origin + location.pathname).replace(/index\.html$/, '');
@@ -91,6 +92,8 @@ export function Bagikan({ k, id }) {
   const svg = tautanNilai ? buatQR(tautanNilai, { cellSize: 4, margin: 2, scalable: true, alt: `Kode QR penilaian ${resep.nama} eksperimen ${e.nomor}` }) : '';
 
   const ubah = (patch) => db.simpan('Eksperimen', { ...e, ...patch });
+  const panduan = e.panduanNilai && typeof e.panduanNilai === 'object' ? e.panduanNilai : {};
+  const ubahPanduan = (kunci, teks) => ubah({ panduanNilai: { ...panduan, [kunci]: teks } });
   const sinkron = async () => {
     setSibuk(true);
     await k.sinkronSekarang(true);
@@ -133,11 +136,11 @@ export function Bagikan({ k, id }) {
 
         <div class="kolom">
           ${!tersambung &&
-          html`<div class="peringatan" role="alert"><b>Belum tersambung ke Google.</b>Penilai membuka tautan lewat Google Apps Script milik Anda. Sambungkan dulu di <a href=${tautan('/pengaturan')} style="text-decoration:underline">Pengaturan</a>, baru kode QR ini berfungsi.</div>`}
+          html`<div class="peringatan" role="alert"><b>Belum tersambung ke server.</b>Penilai membuka tautan lewat server milik Anda. Sambungkan dulu di <a href=${tautan('/pengaturan')} style="text-decoration:underline">Pengaturan</a>, baru kode QR ini berfungsi.</div>`}
           ${tersambung && belumSinkron &&
-          html`<div class="peringatan" role="alert"><b>Kode QR belum aktif.</b>Eksperimen ini belum dikirim ke Spreadsheet, jadi penilai belum bisa membukanya.
+          html`<div class="peringatan" role="alert"><b>Kode QR belum aktif.</b>Eksperimen ini belum dikirim ke server, jadi penilai belum bisa membukanya.
             <div style="margin-top:10px"><button class="btn solid" onClick=${sinkron} disabled=${sibuk || k.status.sedang}><${Ikon} nama="sinkron" ukuran=${18} />Sinkron sekarang</button></div></div>`}
-          ${aktif && html`<div class="info"><b>Kode QR aktif.</b>Siapa pun yang punya tautan ini bisa menilai tanpa login. Penilaian masuk ke Spreadsheet Anda dan muncul di sini setelah sinkron.</div>`}
+          ${aktif && html`<div class="info"><b>Kode QR aktif.</b>Siapa pun yang punya tautan ini bisa menilai tanpa login. Penilaian masuk ke server Anda dan muncul di sini setelah sinkron.</div>`}
 
           <div class="kartu">
             <div class="label-kecil" style="margin-bottom:4px">Pengaturan penilaian</div>
@@ -149,8 +152,30 @@ export function Bagikan({ k, id }) {
               <span><b>Nama wajib diisi</b><small>Jika mati, penilai boleh anonim.</small></span>
               <input type="checkbox" checked=${!!e.wajibNama} onChange=${(ev) => ubah({ wajibNama: ev.target.checked })} />
             </label>
-            <p class="bantu">Perubahan berlaku bagi penilai setelah tersinkron ke Spreadsheet.</p>
+            <p class="bantu">Perubahan berlaku bagi penilai setelah tersinkron ke server.</p>
           </div>
+
+          <section class="kartu kolom" aria-labelledby="h-petunjuk">
+            <div>
+              <h2 class="label-kecil" id="h-petunjuk" style="margin:0 0 4px">Petunjuk untuk penilai</h2>
+              <p class="bantu" style="margin:0">Jelaskan hasil yang Anda inginkan supaya penilai paham apa yang dinilai. Semua boleh dikosongkan. Eksperimen baru dan duplikat resep ini ikut memakai petunjuk yang sama.</p>
+            </div>
+            <label class="bidang">
+              <span>Catatan chef <small class="teks-kecil">(tampil paling atas, boleh dikosongkan)</small></span>
+              <textarea class="area" rows="3" maxlength=${BATAS_PANDUAN.catatanChef} placeholder="mis. Eksperimen ini gulanya saya kurangi 20 g. Menurut saya teksturnya sudah pas, tapi rasanya masih kurang gurih." value=${e.catatanChef || ''} onInput=${(ev) => ubah({ catatanChef: ev.target.value })}></textarea>
+            </label>
+            <label class="bidang">
+              <span>Petunjuk umum</span>
+              <textarea class="area" rows="2" maxlength=${BATAS_PANDUAN.umum} placeholder=${CONTOH_PANDUAN.umum} value=${panduan.umum || ''} onInput=${(ev) => ubahPanduan('umum', ev.target.value)}></textarea>
+            </label>
+            ${ASPEK.map(
+              (a) => html`<label class="bidang" key=${a.kunci}>
+                <span>${a.label}</span>
+                <input class="input" maxlength=${BATAS_PANDUAN.aspek} placeholder=${CONTOH_PANDUAN[a.kunci]} value=${panduan[a.kunci] || ''} onInput=${(ev) => ubahPanduan(a.kunci, ev.target.value)} />
+              </label>`,
+            )}
+            ${tautanNilai && html`<a class="btn" href=${tautanNilai} target="_blank" rel="noopener"><${Ikon} nama="mata" ukuran=${18} />Lihat seperti penilai</a>`}
+          </section>
 
           <a class="kartu" href=${tautan('/eksperimen/' + id)} style="display:flex;align-items:center;justify-content:space-between;gap:12px">
             <span><b style="display:block">${dariOrangLain} penilai dari tautan</b><span class="teks-kecil">${skor.jumlah ? `Skor rata-rata ${desimal1(skor.rata)} dari ${skor.jumlah} penilaian` : 'Belum ada penilaian masuk'}</span></span>

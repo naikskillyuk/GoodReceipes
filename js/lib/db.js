@@ -188,7 +188,18 @@ export function buatDB(penyimpanan = penyimpananMemori()) {
       kabari();
     },
 
-    /** Baris yang belum terkirim ke Spreadsheet. */
+    /**
+     * Anggap semua baris belum terkirim dan tarik ulang dari awal. Dipakai saat alamat server
+     * diganti (mis. pindah dari Apps Script ke Laravel) supaya seluruh data ikut ke server baru.
+     */
+    tandaiSemuaKotor() {
+      for (const n of NAMA_TABEL) k.kotor[n] = Object.keys(k.tabel[n]);
+      k.meta = { ...k.meta, sinkronTerakhir: 0 };
+      jadwalkanTulis();
+      kabari();
+    },
+
+    /** Baris yang belum terkirim ke server. */
     ambilKotor() {
       const keluar = {};
       for (const n of NAMA_TABEL) {
@@ -273,7 +284,7 @@ export function buatDB(penyimpanan = penyimpananMemori()) {
         meta: { ...dasar.meta, ...k.meta, sinkronTerakhir: 0 },
         pengaturan: pengaturanLama,
       };
-      // Semua baris dianggap belum terkirim agar ikut ke Spreadsheet.
+      // Semua baris dianggap belum terkirim agar ikut ke server.
       for (const n of NAMA_TABEL) k.kotor[n] = Object.keys(k.tabel[n]);
       await tulisSekarang();
       kabari();
@@ -281,13 +292,16 @@ export function buatDB(penyimpanan = penyimpananMemori()) {
 
     /**
      * Kosongkan data di perangkat. Pengaturan koneksi dipertahankan.
-     * Dengan hapusKataSandi (jalur "lupa kata sandi"), kata sandi aplikasi dan kunci rahasia Apps Script
+     * Dengan hapusKataSandi (jalur "lupa kata sandi"), kata sandi aplikasi dan kunci rahasia server
      * ikut dihapus supaya data tidak bisa dipulihkan lewat sinkron tanpa mengetahui kunci itu.
      */
     async hapusSemua({ hapusKataSandi = false } = {}) {
       const pengaturanLama = hapusKataSandi ? { ...k.pengaturan, kunciAplikasi: null, kunci: '' } : k.pengaturan;
+      const pemilik = hapusKataSandi ? null : k.meta.idPengguna;
       k = keadaanKosong();
       k.pengaturan = pengaturanLama;
+      // Data perangkat tetap tercatat milik akun yang sama (kecuali jalur lupa/keluar).
+      if (pemilik) k.meta.idPengguna = pemilik;
       await tulisSekarang();
       kabari();
     },

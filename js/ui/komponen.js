@@ -13,7 +13,7 @@ const jam = (ts) => new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', 
 /** Ringkasan status sinkronisasi untuk ditampilkan. */
 export function infoSinkron(db, status) {
   const p = db.pengaturan;
-  if (!p.scriptUrl || !p.kunci) return { kelas: '', teks: 'Belum tersambung ke Google' };
+  if (!p.scriptUrl || !p.kunci) return { kelas: '', teks: 'Belum tersambung ke server' };
   if (status.sedang) return { kelas: 'jalan', teks: 'Menyinkron…' };
   if (status.galat) return { kelas: 'gagal', teks: status.galat };
   const kotor = db.jumlahKotor();
@@ -86,7 +86,7 @@ export function Kerangka({ k, aktif, plus, children }) {
         <${StatusSinkron} k=${k} />
         ${db.pengaturan.scriptUrl && db.pengaturan.kunci
           ? html`<button class="btn" onClick=${() => k.sinkronSekarang(true)} disabled=${k.status.sedang}><${Ikon} nama="sinkron" ukuran=${16} />Sinkron sekarang</button>`
-          : html`<a class="btn" style="margin-top:8px;width:100%;background:var(--bg);color:var(--hijau);border-color:var(--bg)" href=${tautan('/pengaturan')}>Sambungkan Google</a>`}
+          : html`<a class="btn" style="margin-top:8px;width:100%;background:var(--bg);color:var(--hijau);border-color:var(--bg)" href=${tautan('/pengaturan')}>Sambungkan server</a>`}
         ${db.pengaturan.kunciAplikasi && html`<button class="btn" onClick=${k.kunciSekarang}><${Ikon} nama="gembok" ukuran=${16} />Kunci aplikasi</button>`}
       </div>
     </aside>
@@ -109,26 +109,53 @@ export function Kerangka({ k, aktif, plus, children }) {
   </div>`;
 }
 
-/** Blok warna atas halaman. */
-export function Hero({ warna, label, judul, kembali, kanan, stat, panjang, terang, children }) {
-  return html`<header class=${'hero' + (terang ? ' terang' : '')} style=${warna ? `--warna:${warna}` : ''}>
+/**
+ * Kepala halaman. `warna` (warna kategori) hanya jadi titik penanda di label.
+ * Dengan `foto` (boleh kosong ''): foto besar membulat di atas, tombol melayang di atasnya.
+ */
+export function Hero({ warna, label, judul, kembali, kanan, stat, panjang, terang, foto, children }) {
+  const adaFoto = foto !== undefined;
+  const tombolKembali = kembali && html`<a class="bulat" href=${tautan(kembali)} aria-label="Kembali"><${Ikon} nama="kembali" /></a>`;
+  const labelEl = html`<span class="hero-label">${warna && html`<i class="titik-warna" style=${`--warna:${warna}`} aria-hidden="true"></i>`}${label}</span>`;
+  const judulEl = html`<div class="hero-judul-baris">
+    <h1 class=${panjang || String(judul).length > 14 ? 'panjang' : ''}>${judul}</h1>
+    ${stat}
+  </div>`;
+  if (adaFoto) {
+    return html`<header class="hero ada-foto">
+      <div class=${'hero-gambar' + (foto ? '' : ' kosong')} role="img" aria-label=${foto ? 'Foto ' + judul : 'Belum ada foto'}>
+        <${Foto} src=${foto} alt="" ikon="kamera" ukuranIkon=${40} />
+        <div class="hero-atas">
+          ${tombolKembali || html`<span></span>`}
+          ${kanan && html`<div style="display:flex;gap:8px">${kanan}</div>`}
+        </div>
+      </div>
+      <div class="hero-badan">
+        ${labelEl}
+        ${judulEl}
+        ${children}
+      </div>
+    </header>`;
+  }
+  return html`<header class=${'hero' + (terang ? ' terang' : '')}>
     <div class="hero-atas">
       <div style="display:flex;align-items:center;gap:12px;min-width:0">
-        ${kembali && html`<a class="bulat" href=${tautan(kembali)} aria-label="Kembali"><${Ikon} nama="kembali" /></a>`}
-        <span class="hero-label">${label}</span>
+        ${tombolKembali}
+        ${labelEl}
       </div>
       ${kanan && html`<div style="display:flex;gap:8px">${kanan}</div>`}
     </div>
-    <div class="hero-judul-baris">
-      <h1 class=${panjang || String(judul).length > 14 ? 'panjang' : ''}>${judul}</h1>
-      ${stat}
-    </div>
+    ${judulEl}
     ${children}
   </header>`;
 }
 
-export function Stat({ nilai, label }) {
-  return html`<div class="stat"><b>${nilai}</b><small>${label}</small></div>`;
+/** Ubin angka ringkas. Dengan `ikon`: ikon dalam lingkaran di kiri, seperti ubin gizi di kartu resep. */
+export function Stat({ nilai, label, ikon }) {
+  return html`<div class=${'stat' + (ikon ? ' berikon' : '')}>
+    ${ikon && html`<span class="stat-ikon" aria-hidden="true"><${Ikon} nama=${ikon} ukuran=${18} /></span>`}
+    <span class="stat-teks"><b>${nilai}</b><small>${label}</small></span>
+  </div>`;
 }
 
 export function Tab({ item }) {

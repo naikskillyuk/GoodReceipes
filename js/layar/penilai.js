@@ -5,13 +5,16 @@ import { Hero, Foto, Kosong, LogoMerek } from '../ui/komponen.js';
 import { terapkanMerekDokumen } from '../ui/merek.js';
 import { NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
 import { Ikon } from '../ui/ikon.js';
-import { ASPEK } from '../lib/skor.js';
+import { ASPEK, bacaPanduan } from '../lib/skor.js';
 import { ambilInfoNilai, kirimNilai } from '../lib/sync.js';
 
 export const NILAI_AWAL = () => ({ rasa: 5, tekstur: 5, tampilan: 5, aroma: 5, minatBeli: 5 });
 
-/** Lima penggeser 1-10. Nilai baru dianggap terisi setelah disentuh, agar angka bawaan tidak ikut terhitung. */
-export function PenggeserNilai({ nilai, disentuh, onUbah }) {
+/**
+ * Lima penggeser 1-10. Nilai baru dianggap terisi setelah disentuh, agar angka bawaan tidak ikut terhitung.
+ * `panduan` (opsional): petunjuk dari pemilik per aspek, tampil di bawah nama aspek.
+ */
+export function PenggeserNilai({ nilai, disentuh, onUbah, panduan = {} }) {
   return html`<div class="kolom" style="gap:18px">
     ${ASPEK.map((a) => {
       const sudah = !!disentuh[a.kunci];
@@ -20,6 +23,7 @@ export function PenggeserNilai({ nilai, disentuh, onUbah }) {
           <label class="label" for=${'geser-' + a.kunci}>${a.label}</label>
           <output for=${'geser-' + a.kunci} aria-live="off">${sudah ? nilai[a.kunci] : '–'}</output>
         </div>
+        ${panduan[a.kunci] && html`<p class="petunjuk-aspek" id=${'petunjuk-' + a.kunci}>${panduan[a.kunci]}</p>`}
         <input
           id=${'geser-' + a.kunci}
           type="range"
@@ -27,6 +31,7 @@ export function PenggeserNilai({ nilai, disentuh, onUbah }) {
           max="10"
           step="1"
           value=${nilai[a.kunci]}
+          aria-describedby=${panduan[a.kunci] ? 'petunjuk-' + a.kunci : undefined}
           aria-valuetext=${sudah ? `${nilai[a.kunci]} dari 10` : 'belum diisi'}
           onPointerDown=${() => onUbah(a.kunci, nilai[a.kunci])}
           onKeyDown=${() => onUbah(a.kunci, nilai[a.kunci])}
@@ -38,7 +43,8 @@ export function PenggeserNilai({ nilai, disentuh, onUbah }) {
   </div>`;
 }
 
-/** Alamat Apps Script yang boleh dipakai penilai: milik Google, atau localhost untuk uji. */
+/** Alamat server dari tautan yang boleh dipakai penilai: Apps Script milik Google, atau localhost untuk uji.
+ * Server Laravel ditetapkan lewat scriptUrl di config.js, sehingga tidak perlu ikut di tautan. */
 export function scriptUrlAman(u) {
   try {
     const url = new URL(u);
@@ -125,7 +131,7 @@ export function LayarPenilai({ k, token }) {
     window.scrollTo(0, 0);
   };
 
-  // Merek dari Spreadsheet pemilik resep (bukan dari perangkat penilai).
+  // Merek dari server pemilik resep (bukan dari perangkat penilai).
   const namaMerek = (info && info.namaAplikasi) || NAMA_APLIKASI_BAWAAN;
   const logoMerek = (info && info.logoUrl) || LOGO_BAWAAN;
   useEffect(() => {
@@ -133,8 +139,10 @@ export function LayarPenilai({ k, token }) {
   }, [info, namaMerek, logoMerek]);
 
   const judul = info ? `${info.namaResep}` : 'Penilaian';
+  const panduan = bacaPanduan(info && info.panduan);
+  const catatanChef = info && typeof info.catatanChef === 'string' ? info.catatanChef.trim() : '';
   return html`<div class="penilai">
-    <${Hero} terang label=${html`<span class="merek-hero"><${LogoMerek} src=${logoMerek} ukuran=${32} /><span>${namaMerek}</span></span>`} judul=${tahap === 'memuat' ? 'Memuat…' : judul} panjang=${true}>
+    <${Hero} terang foto=${info && info.fotoUrl ? info.fotoUrl : undefined} label=${html`<span class="merek-hero"><${LogoMerek} src=${logoMerek} ukuran=${32} /><span>${namaMerek}</span></span>`} judul=${tahap === 'memuat' ? 'Memuat…' : judul} panjang=${true}>
       ${info && html`<div style="margin-top:8px;font-weight:700">Beri penilaian · Eksperimen ${info.nomor}</div>`}
     <//>
     <div class="isi">
@@ -143,13 +151,17 @@ export function LayarPenilai({ k, token }) {
       ${tahap === 'siap' && !info.terima && html`<${Kosong} judul="Penilaian sudah ditutup" teks="Pemilik resep tidak lagi menerima penilaian untuk eksperimen ini. Terima kasih sudah mampir." />`}
       ${tahap === 'siap' && info.terima &&
       html`<form class="kolom" onSubmit=${kirim} novalidate style="gap:20px">
-        ${info.fotoUrl && html`<div class="foto-penilai" style="display:flex;align-items:center;justify-content:center;overflow:hidden"><${Foto} src=${info.fotoUrl} alt=${'Foto ' + info.namaResep} /></div>`}
+        ${catatanChef && html`<section class="kartu catatan-chef" aria-labelledby="h-chef">
+          <div class="label-kecil" id="h-chef"><${Ikon} nama="piala" ukuran=${14} /> Catatan dari chef</div>
+          <p>${catatanChef}</p>
+        </section>`}
         <p style="color:var(--ink2);line-height:1.5">Cicipi, lalu nilai dari 1 sampai 10. Jawaban jujur paling membantu pemilik resep.</p>
+        ${panduan.umum && html`<div class="info petunjuk-umum"><b>Yang perlu diperhatikan</b>${panduan.umum}</div>`}
         <label class="bidang" for="nama-penilai">
           <span>Nama Anda ${info.wajibNama ? '' : html`<small class="teks-kecil">(boleh dikosongkan)</small>`}</span>
           <input id="nama-penilai" class="input" maxlength="60" autocomplete="name" value=${nama} onInput=${(e) => setNama(e.target.value)} />
         </label>
-        <${PenggeserNilai} nilai=${nilai} disentuh=${disentuh} onUbah=${ubah} />
+        <${PenggeserNilai} nilai=${nilai} disentuh=${disentuh} onUbah=${ubah} panduan=${panduan} />
         <label class="bidang" for="komentar-penilai">
           <span>Komentar atau saran <small class="teks-kecil">(boleh dikosongkan)</small></span>
           <textarea id="komentar-penilai" class="area" rows="4" maxlength="1000" placeholder="Apa yang enak? Apa yang kurang?" value=${komentar} onInput=${(e) => setKomentar(e.target.value)}></textarea>

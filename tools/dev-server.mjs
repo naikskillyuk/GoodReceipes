@@ -1,11 +1,13 @@
-// Server lokal untuk mencoba aplikasi tanpa akun Google.
+// Server lokal untuk mencoba aplikasi tanpa backend Laravel.
 //
 //   npm run dev        (atau: node tools/dev-server.mjs)
 //
-// Menyajikan berkas aplikasi dan menjalankan apps-script/Code.gs yang sama di
-// memori (disimpan di .dev-data.json). Di Pengaturan aplikasi, isi:
-//   Alamat Apps Script : http://localhost:8080/api
-//   Kunci              : kunci-dev
+// Menyajikan berkas aplikasi dan menjalankan apps-script/Code.gs di memori
+// (disimpan di .dev-data.json), ditambah tiruan akun sederhana:
+//   Server   : http://localhost:8080/api   (di halaman Masuk, "ganti" server)
+//   Login    : apa saja, mis. chef@uji.test
+//   Sandi    : kunci-dev
+// Untuk uji akun sungguhan (email, banyak akun), pakai backend Laravel.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -48,6 +50,34 @@ const server = buatServer(keadaan, {
   },
 });
 
+/** Tiruan aksi akun. Sesi = kunci Code.gs, jadi sinkron tetap memakai tiruan Apps Script. */
+function tiruanAkun(teks) {
+  let req;
+  try {
+    req = JSON.parse(teks);
+  } catch {
+    return null;
+  }
+  const pengguna = (login = 'chef@uji.test') => ({ id: 1, nama: req.nama || 'Chef Uji', username: 'chefuji', email: login.includes('@') ? login : 'chef@uji.test' });
+  switch (req.aksi) {
+    case 'masuk':
+      return req.kataSandi === KUNCI ? { ok: true, sesi: KUNCI, pengguna: pengguna(req.login) } : { ok: false, galat: 'Username/email atau kata sandi salah.' };
+    case 'daftar':
+      return { ok: true, pesan: `(uji) Akun dibuat. Masuk dengan ${req.email} dan kata sandi ${KUNCI}.` };
+    case 'lupaSandi':
+      return { ok: true, pesan: `(uji) Tidak ada email terkirim. Kata sandinya ${KUNCI}.` };
+    case 'aturSandi':
+      return { ok: true, pesan: '(uji) Kata sandi tidak berubah di server uji.' };
+    case 'ubahProfil':
+      return req.kunci === KUNCI ? { ok: true, pengguna: pengguna() } : { ok: false, kode: 'SESI', galat: 'Sesi berakhir.' };
+    case 'gantiSandi':
+    case 'keluar':
+      return { ok: true };
+    default:
+      return null;
+  }
+}
+
 function kirim(res, kode, tipe, isi, tambahan = {}) {
   res.writeHead(kode, { 'Content-Type': tipe, 'Cache-Control': 'no-store', ...tambahan });
   res.end(isi);
@@ -62,7 +92,8 @@ const http_ = http.createServer(async (req, res) => {
     if (req.method === 'POST') {
       const potongan = [];
       for await (const p of req) potongan.push(p);
-      jawab = server.panggil(Buffer.concat(potongan).toString('utf8'));
+      const isi = Buffer.concat(potongan).toString('utf8');
+      jawab = tiruanAkun(isi) || server.panggil(isi);
       // Di Google, foto menjadi tautan Drive. Di sini dilayani dari /foto/.
       if (jawab.url && jawab.id) jawab.url = `/foto/${jawab.id}`;
     } else {
@@ -86,8 +117,15 @@ const http_ = http.createServer(async (req, res) => {
   kirim(res, 200, MIME[path.extname(berkas)] || 'application/octet-stream', fs.readFileSync(berkas));
 });
 
+http_.on('error', (e) => {
+  if (e.code !== 'EADDRINUSE') throw e;
+  console.error(`Port ${PORT} sudah dipakai program lain (mungkin "npm run dev" yang masih jalan di terminal lain).`);
+  console.error(`Tutup program itu, atau pakai port lain:  PORT=8081 npm run dev   (PowerShell: $env:PORT=8081; npm run dev)`);
+  process.exit(1);
+});
+
 http_.listen(PORT, () => {
   console.log(`Aplikasi        : http://localhost:${PORT}`);
-  console.log(`Alamat Apps Script (uji): http://localhost:${PORT}/api`);
-  console.log(`Kunci (uji)     : ${KUNCI}`);
+  console.log(`Server (uji)    : http://localhost:${PORT}/api`);
+  console.log(`Masuk (uji)     : email apa saja, kata sandi ${KUNCI}`);
 });

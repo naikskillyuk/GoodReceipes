@@ -1,11 +1,11 @@
-// Pengaturan: profil, nama dan logo, keamanan, koneksi Google, kategori, cadangan, dan data.
+// Pengaturan: akun, nama dan logo, keamanan, kategori, cadangan, dan data.
 
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, StatusSinkron, unduhBerkas, LogoMerek, FotoInput } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { kompresLogo } from '../ui/gambar.js';
-import { tesKoneksi } from '../lib/sync.js';
+import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
 import { daftarKategori, tambahKategori, pakaiKategori, WARNA_KATEGORI, ambilMerek, simpanMerek, NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
 import { buatKataSandi, cocokKataSandi, validasiKataSandi, tersedia } from '../lib/kunci.js';
 import { muatContoh } from '../lib/seed.js';
@@ -27,7 +27,7 @@ function BarisKategori({ db, kat }) {
   </div>`;
 }
 
-/** Nama dan logo aplikasi. Disimpan ke Spreadsheet sehingga ikut tampil di perangkat lain dan di halaman penilai. */
+/** Nama dan logo aplikasi. Disimpan ke server sehingga ikut tampil di perangkat lain dan di halaman penilai. */
 function KartuTampilan({ k }) {
   const { db } = k;
   const merek = ambilMerek(db);
@@ -69,7 +69,7 @@ function KartuTampilan({ k }) {
       <button class="btn solid" onClick=${simpan} disabled=${!berubah}>Simpan tampilan</button>
       <button class="btn" onClick=${kembalikan} disabled=${bawaan}>Kembalikan bawaan</button>
     </div>
-    <p class="bantu">Tampil di halaman masuk, beranda, kode QR, dan halaman penilai, serta ikut ke perangkat lain lewat Spreadsheet. Ikon dan nama di layar utama HP tidak berubah dari sini; caranya ada di README.</p>
+    <p class="bantu">Tampil di halaman masuk, beranda, kode QR, dan halaman penilai, serta ikut ke perangkat lain lewat server. Ikon dan nama di layar utama HP tidak berubah dari sini; caranya ada di README.</p>
   </section>`;
 }
 
@@ -158,36 +158,113 @@ function KartuKeamanan({ k }) {
         ${PILIHAN_KUNCI_OTOMATIS.map(([menit, teks]) => html`<option value=${String(menit)} selected=${(p.kunciOtomatisMenit ?? 15) === menit}>${teks}</option>`)}
       </select>
     </label>`}
-    <p class="bantu">Kata sandi hanya mengunci tampilan aplikasi di perangkat ini; tidak ikut ke Spreadsheet atau berkas cadangan. Ini bukan enkripsi, jadi tetap kunci layar HP Anda. Penilai yang membuka kode QR tidak perlu masuk.</p>
+    <p class="bantu">Kata sandi hanya mengunci tampilan aplikasi di perangkat ini; tidak ikut ke server atau berkas cadangan. Ini bukan enkripsi, jadi tetap kunci layar HP Anda. Penilai yang membuka kode QR tidak perlu masuk.</p>
     ${dialog && html`<${DialogKataSandi} mode=${dialog} k=${k} onTutup=${() => setDialog('')} />`}
+  </section>`;
+}
+
+/** Ganti kata sandi akun (di server). Perangkat lain yang sedang masuk ikut keluar. */
+function DialogSandiAkun({ k, onTutup }) {
+  const [lama, setLama] = useState('');
+  const [baru, setBaru] = useState('');
+  const [ulang, setUlang] = useState('');
+  const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const kirim = async (e) => {
+    e.preventDefault();
+    if (baru.length < MIN_SANDI) return setGalat(`Kata sandi baru minimal ${MIN_SANDI} karakter.`);
+    if (baru !== ulang) return setGalat('Pengulangan kata sandi tidak sama.');
+    setSibuk(true);
+    setGalat('');
+    try {
+      await gantiSandiAkun(k.db, { lama, baru });
+      tampilToast('Kata sandi akun diganti. Perangkat lain perlu masuk lagi.');
+      onTutup();
+    } catch (err) {
+      setGalat(err.message || 'Gagal mengganti kata sandi.');
+    } finally {
+      setSibuk(false);
+    }
+  };
+  return html`<${Modal} judul="Ganti kata sandi akun" onTutup=${onTutup}>
+    <form class="kolom" onSubmit=${kirim} style="gap:12px" novalidate>
+      <label class="bidang"><span>Kata sandi saat ini</span><input class="input" type="password" autocomplete="current-password" maxlength="100" value=${lama} onInput=${(e) => setLama(e.target.value)} /></label>
+      <label class="bidang"><span>Kata sandi baru</span><input class="input" type="password" autocomplete="new-password" maxlength="100" value=${baru} onInput=${(e) => setBaru(e.target.value)} /><span class="bantu">Minimal ${MIN_SANDI} karakter.</span></label>
+      <label class="bidang"><span>Ulangi kata sandi baru</span><input class="input" type="password" autocomplete="new-password" maxlength="100" value=${ulang} onInput=${(e) => setUlang(e.target.value)} /></label>
+      ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <div class="baris-btn">
+        <button class="btn abu lebar" type="button" onClick=${onTutup}>Batal</button>
+        <button class="btn solid lebar" type="submit" disabled=${sibuk || !lama}>${sibuk ? 'Menyimpan…' : 'Simpan'}</button>
+      </div>
+    </form>
+  <//>`;
+}
+
+/** Akun yang sedang masuk, sinkronisasi, dan tombol keluar. */
+function KartuAkun({ k }) {
+  const { db } = k;
+  const p = db.pengaturan;
+  const akun = p.akun || {};
+  const [nama, setNama] = useState(akun.nama || '');
+  const [sibuk, setSibuk] = useState(false);
+  const [dialog, setDialog] = useState(false);
+  const namaBerubah = nama.trim() !== (akun.nama || '') && nama.trim().length >= 2;
+
+  const simpanNama = async () => {
+    setSibuk(true);
+    try {
+      await ubahNamaAkun(db, nama);
+      tampilToast('Nama disimpan.');
+    } catch (e) {
+      tampilToast(e.message || 'Gagal menyimpan nama.');
+    } finally {
+      setSibuk(false);
+    }
+  };
+  const keluar = async () => {
+    const ya = await tanya({
+      judul: 'Keluar dari akun?',
+      teks: 'Perubahan terakhir dikirim ke server dulu, lalu data di perangkat ini dihapus. Semua data tetap aman di akun Anda dan kembali saat Anda masuk lagi.',
+      ya: 'Keluar',
+      bahaya: true,
+    });
+    if (!ya) return;
+    setSibuk(true);
+    const { hilang } = await keluarAkun(db, { sinkronkan: () => k.penyinkron.sinkronkan() });
+    setSibuk(false);
+    tampilToast(hilang ? `Anda keluar. ${hilang} perubahan belum sempat terkirim.` : 'Anda sudah keluar.');
+  };
+
+  return html`<section class="kartu kolom" aria-labelledby="h-akun">
+    <h2 class="judul-kecil" id="h-akun">Akun</h2>
+    <div class="cari-baris">
+      <label class="bidang" style="flex:1"><span>Nama</span><input class="input" maxlength="60" value=${nama} onInput=${(e) => setNama(e.target.value)} /></label>
+      ${namaBerubah && html`<button class="btn solid" style="align-self:flex-end" disabled=${sibuk} onClick=${simpanNama}>Simpan</button>`}
+    </div>
+    <div class="hasil-baris"><span>Username</span><b class="biasa">${akun.username || '–'}</b></div>
+    <div class="hasil-baris"><span>Email</span><b class="biasa" style="word-break:break-all">${akun.email || '–'}</b></div>
+    <div class="baris-btn">
+      <button class="btn" onClick=${() => setDialog(true)}><${Ikon} nama="gembok" ukuran=${18} />Ganti kata sandi</button>
+      <button class="btn bahaya" disabled=${sibuk} onClick=${keluar}>Keluar</button>
+    </div>
+    <label class="sakelar">
+      <span><b>Sinkron otomatis</b><small>Saat aplikasi dibuka, setelah ada perubahan, dan tiap menit.</small></span>
+      <input type="checkbox" checked=${p.sinkronOtomatis !== false} onChange=${(e) => db.aturPengaturan({ sinkronOtomatis: e.target.checked })} />
+    </label>
+    <div class="baris-pisah">
+      <${StatusSinkron} k=${k} />
+      <button class="btn" disabled=${k.status.sedang} onClick=${() => k.sinkronSekarang(true)}><${Ikon} nama="sinkron" ukuran=${18} />Sinkron sekarang</button>
+    </div>
+    ${dialog && html`<${DialogSandiAkun} k=${k} onTutup=${() => setDialog(false)} />`}
   </section>`;
 }
 
 export function Pengaturan({ k }) {
   const { db } = k;
   const p = db.pengaturan;
-  const [url, setUrl] = useState(p.scriptUrl || '');
-  const [kunci, setKunci] = useState(p.kunci || '');
-  const [lihat, setLihat] = useState(false);
-  const [uji, setUji] = useState({ jenis: '', teks: '' });
   const [katBaru, setKatBaru] = useState('');
   const kategori = daftarKategori(db);
-  const tersambung = !!(p.scriptUrl && p.kunci);
-  const berubah = url.trim() !== (p.scriptUrl || '') || kunci.trim() !== (p.kunci || '');
 
-  const simpanKoneksi = () => {
-    db.aturPengaturan({ scriptUrl: url.trim(), kunci: kunci.trim() });
-    tampilToast('Pengaturan koneksi disimpan.');
-  };
-  const tes = async () => {
-    setUji({ jenis: 'jalan', teks: 'Menguji koneksi…' });
-    try {
-      await tesKoneksi({ scriptUrl: url.trim(), kunci: kunci.trim() });
-      setUji({ jenis: 'ok', teks: 'Terhubung. Alamat dan kunci benar.' });
-    } catch (e) {
-      setUji({ jenis: 'gagal', teks: e.message || 'Gagal terhubung.' });
-    }
-  };
   const ekspor = () => {
     const tgl = new Date().toISOString().slice(0, 10);
     unduhBerkas(`cadangan-eksperimen-resep-${tgl}.json`, db.ekspor());
@@ -197,7 +274,7 @@ export function Pengaturan({ k }) {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    const ya = await tanya({ judul: 'Pulihkan dari cadangan?', teks: 'Seluruh data di perangkat ini diganti dengan isi berkas cadangan, lalu dikirim ke Spreadsheet saat sinkron.', ya: 'Pulihkan', bahaya: true });
+    const ya = await tanya({ judul: 'Pulihkan dari cadangan?', teks: 'Seluruh data di perangkat ini diganti dengan isi berkas cadangan, lalu dikirim ke server saat sinkron.', ya: 'Pulihkan', bahaya: true });
     if (!ya) return;
     try {
       await db.impor(await file.text());
@@ -214,7 +291,7 @@ export function Pengaturan({ k }) {
   const kosongkan = async () => {
     const ya = await tanya({
       judul: 'Kosongkan data di perangkat ini?',
-      teks: 'Semua resep, bahan, dan penilaian di perangkat ini dihapus. Data yang sudah ada di Google Spreadsheet tidak ikut terhapus dan akan kembali saat sinkron berikutnya. Unduh cadangan dulu bila ragu.',
+      teks: 'Semua resep, bahan, dan penilaian di perangkat ini dihapus. Data yang sudah ada di akun Anda di server tidak ikut terhapus dan akan kembali saat sinkron berikutnya. Unduh cadangan dulu bila ragu.',
       ya: 'Kosongkan',
       bahaya: true,
     });
@@ -228,38 +305,9 @@ export function Pengaturan({ k }) {
     <div class="isi">
       <div class="kolom-2">
         <div class="kolom">
-          <section class="kartu kolom" aria-labelledby="h-profil">
-            <h2 class="judul-kecil" id="h-profil">Profil</h2>
-            <label class="bidang"><span>Nama Anda</span><input class="input" maxlength="40" value=${p.namaPemilik || ''} placeholder="Dipakai untuk sapaan dan nama di penilaian Anda" onInput=${(e) => db.aturPengaturan({ namaPemilik: e.target.value })} /></label>
-          </section>
+          <${KartuAkun} k=${k} />
 
           <${KartuTampilan} k=${k} />
-
-          <section class="kartu kolom" aria-labelledby="h-koneksi">
-            <h2 class="judul-kecil" id="h-koneksi">Sambungan ke Google Spreadsheet</h2>
-            <p class="bantu">Data disimpan di perangkat ini lebih dulu, lalu dikirim ke Spreadsheet Anda lewat Google Apps Script. Langkah pemasangannya ada di README.</p>
-            <label class="bidang"><span>Alamat Web App Apps Script</span><input class="input" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck=${false} placeholder="https://script.google.com/macros/s/…/exec" value=${url} onInput=${(e) => setUrl(e.target.value)} /></label>
-            <div class="bidang"><label class="label" for="kunci-rahasia">Kunci rahasia</label>
-              <span class="cari-baris">
-                <input id="kunci-rahasia" class="input" type=${lihat ? 'text' : 'password'} autocomplete="off" autocapitalize="off" spellcheck=${false} value=${kunci} onInput=${(e) => setKunci(e.target.value)} />
-                <button type="button" class="ikon-btn" style="border:1.5px solid var(--garis-input);flex:none" aria-label=${lihat ? 'Sembunyikan kunci' : 'Tampilkan kunci'} aria-pressed=${lihat} onClick=${() => setLihat(!lihat)}><${Ikon} nama="mata" /></button>
-              </span>
-              <span class="bantu">Sama dengan KUNCI di berkas Code.gs. Disimpan hanya di perangkat ini dan tidak ikut cadangan.</span>
-            </div>
-            <div class="baris-btn">
-              <button class="btn solid" onClick=${simpanKoneksi} disabled=${!berubah}>Simpan</button>
-              <button class="btn" onClick=${tes} disabled=${!url.trim() || !kunci.trim()}>Tes koneksi</button>
-            </div>
-            ${uji.teks && html`<p role="status" class=${'status-sinkron ' + uji.jenis}><i></i>${uji.teks}</p>`}
-            <label class="sakelar">
-              <span><b>Sinkron otomatis</b><small>Saat aplikasi dibuka, setelah ada perubahan, dan tiap menit.</small></span>
-              <input type="checkbox" checked=${p.sinkronOtomatis !== false} onChange=${(e) => db.aturPengaturan({ sinkronOtomatis: e.target.checked })} />
-            </label>
-            <div class="baris-pisah">
-              <${StatusSinkron} k=${k} />
-              <button class="btn" disabled=${!tersambung || k.status.sedang || berubah} onClick=${() => k.sinkronSekarang(true)}><${Ikon} nama="sinkron" ukuran=${18} />Sinkron sekarang</button>
-            </div>
-          </section>
 
           ${k.bisaPasang &&
           html`<section class="kartu kolom"><h2 class="judul-kecil">Pasang aplikasi</h2>
@@ -292,7 +340,7 @@ export function Pengaturan({ k }) {
             </div>
           </section>
 
-          <p class="teks-kecil" style="padding:0 6px">${ambilMerek(db).nama} 1.0 · data tersimpan di perangkat ini dan disalin ke Spreadsheet Anda sendiri.</p>
+          <p class="teks-kecil" style="padding:0 6px">${ambilMerek(db).nama} 1.0 · data tersimpan di perangkat ini dan disalin ke akun Anda di server.</p>
         </div>
       </div>
     </div>

@@ -8,6 +8,29 @@ export const ASPEK = [
   { kunci: 'minatBeli', label: 'Minat beli' },
 ];
 
+/** Contoh petunjuk per aspek, dipakai sebagai placeholder. */
+export const CONTOH_PANDUAN = {
+  umum: 'mis. Dicicipi selagi hangat. Ini untuk camilan anak sekolah.',
+  rasa: 'mis. Jangan terlalu asin, manisnya pas',
+  tekstur: 'mis. Harus kriuk dan kering, tidak berminyak',
+  tampilan: 'mis. Warna cokelat keemasan merata',
+  aroma: 'mis. Wangi mentega, tidak bau gosong',
+  minatBeli: 'mis. Mau beli kalau harganya Rp 8.000?',
+};
+
+export const BATAS_PANDUAN = { umum: 500, aspek: 200, catatanChef: 1000 };
+
+/** Petunjuk penilaian yang rapi: hanya kunci yang dikenal, berupa teks, dan dipotong sesuai batas. */
+export function bacaPanduan(v) {
+  const sumber = v && typeof v === 'object' ? v : {};
+  const keluar = {};
+  for (const kunci of ['umum', ...ASPEK.map((a) => a.kunci)]) {
+    const teks = typeof sumber[kunci] === 'string' ? sumber[kunci].trim() : '';
+    if (teks) keluar[kunci] = teks.slice(0, kunci === 'umum' ? BATAS_PANDUAN.umum : BATAS_PANDUAN.aspek);
+  }
+  return keluar;
+}
+
 function rata(angka) {
   const sah = angka.filter((x) => Number.isFinite(x));
   return sah.length ? sah.reduce((a, b) => a + b, 0) / sah.length : NaN;

@@ -22,16 +22,17 @@ export function biayaEksperimen(baris, bahanById, konversiByBahan = {}) {
 /**
  * HPP per resep dan per porsi.
  * biayaLain: [{jenis, nilai, dihitungPer: 'resep' | 'porsi'}]
+ * biayaResepLain: total biaya resep tambahan (resep lain yang dipakai sebagai komponen), per resep.
  */
-export function hitungHPP({ biayaBahan = 0, biayaLain = [], porsi = 1 }) {
+export function hitungHPP({ biayaBahan = 0, biayaResepLain = 0, biayaLain = [], porsi = 1 }) {
   const lain = biayaLain.map((b) => ({
     ...b,
     total: b.dihitungPer === 'porsi' ? Number(b.nilai) * porsi : Number(b.nilai),
   }));
   const totalLain = lain.reduce((jml, b) => jml + (Number.isFinite(b.total) ? b.total : 0), 0);
-  const totalResep = biayaBahan + totalLain;
+  const totalResep = biayaBahan + biayaResepLain + totalLain;
   const hppPorsi = porsi > 0 ? totalResep / porsi : NaN;
-  return { biayaBahan, lain, totalLain, totalResep, hppPorsi, porsi };
+  return { biayaBahan, biayaResepLain, lain, totalLain, totalResep, hppPorsi, porsi };
 }
 
 /** Harga jual minimum agar margin tercapai: HPP / (1 - margin). */

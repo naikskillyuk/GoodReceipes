@@ -227,3 +227,73 @@ test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async (
   assert.equal(repo.ambilMerek(db).nama.length, 40);
   assert.equal(db.semua('Setelan').length, 1, 'selalu satu baris');
 });
+
+test('resep tambahan: HPP resep A ikut menghitung resep B, dan tidak bisa berputar', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
+  const awal = repo.dataHPP(db, brownies);
+  const kat = repo.daftarKategori(db)[0].id;
+  const saus = repo.buatResep(db, { nama: 'Saus cokelat', idKategori: kat });
+  const bahan = db.semua('Bahan')[0];
+  repo.simpanEksperimen(db, {
+    eksperimen: { ...repo.draftEksperimen(db, saus.id).eksperimen, porsi: 200, satuanPorsi: 'gram' },
+    baris: [{ idBahan: bahan.id, jumlah: 1, satuan: bahan.satuanBeli }],
+  });
+  const biayaSaus = repo.biayaBahanEksperimen(db, repo.eksperimenResep(db, saus.id)[0].id).total;
+  assert.ok(biayaSaus > 0);
+
+  assert.ok(repo.pilihanResepTambahan(db, brownies).some((r) => r.id === saus.id));
+  const rt = repo.tambahResepTambahan(db, brownies, saus.id);
+  db.simpan('ResepTambahan', { ...rt, jumlah: 50 }); // 50 gram dari 200 gram
+  let hasil = repo.dataHPP(db, brownies);
+  assert.equal(Math.round(hasil.tambahan.total), Math.round(biayaSaus / 4));
+  assert.equal(Math.round(hasil.hpp.totalResep), Math.round(awal.hpp.totalResep + biayaSaus / 4));
+  assert.equal(hasil.tambahan.bermasalah.length, 0);
+
+  db.simpan('ResepTambahan', { ...db.ambil('ResepTambahan', rt.id), jumlah: 2, satuan: 'resep' });
+  hasil = repo.dataHPP(db, brownies);
+  assert.equal(Math.round(hasil.tambahan.total), Math.round(biayaSaus * 2));
+
+  // Saus tidak boleh memakai brownies (brownies sudah memakai saus).
+  assert.equal(repo.pilihanResepTambahan(db, saus.id).some((r) => r.id === brownies), false);
+  assert.equal(repo.pilihanResepTambahan(db, brownies).some((r) => r.id === saus.id), false, 'tidak ditawarkan dua kali');
+  // Bila tetap terjadi (mis. dari dua perangkat), perhitungan tidak berputar selamanya.
+  db.simpan('ResepTambahan', { idResep: saus.id, idResepKomponen: brownies, jumlah: 1, satuan: 'porsi', urutan: 0 });
+  hasil = repo.dataHPP(db, brownies);
+  assert.ok(Number.isFinite(hasil.hpp.totalResep));
+
+  // Menghapus resep saus melepasnya dari HPP brownies.
+  repo.hapusResep(db, saus.id);
+  assert.equal(repo.dataHPP(db, brownies).tambahan.rincian.length, 0);
+  assert.equal(Math.round(repo.dataHPP(db, brownies).hpp.totalResep), Math.round(awal.hpp.totalResep));
+});
+
+test('ganti server: semua baris dikirim ulang dan ditarik dari awal', async () => {
+  const db = await dbBaru();
+  muatContoh(db);
+  for (const [t, baris] of Object.entries(db.ambilKotor())) for (const r of baris) db.tandaiBersih(t, r.id, r.diubah);
+  db.aturMeta({ sinkronTerakhir: 123 });
+  assert.equal(db.jumlahKotor(), 0);
+  db.tandaiSemuaKotor();
+  assert.ok(db.jumlahKotor() > 50);
+  assert.equal(db.meta.sinkronTerakhir, 0);
+});
+
+test('petunjuk penilaian ikut ke eksperimen baru dan duplikat, catatan chef tidak', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
+  const daftar = repo.eksperimenResep(db, brownies);
+  const terakhir = daftar[daftar.length - 1];
+  db.simpan('Eksperimen', { ...terakhir, panduanNilai: { tekstur: 'Kriuk' }, catatanChef: 'Catatan lama' });
+  const baru = repo.draftEksperimen(db, brownies);
+  assert.deepEqual(baru.eksperimen.panduanNilai, { tekstur: 'Kriuk' });
+  assert.equal(baru.eksperimen.catatanChef, '');
+  const dup = repo.draftEksperimen(db, brownies, terakhir.id);
+  assert.deepEqual(dup.eksperimen.panduanNilai, { tekstur: 'Kriuk' });
+  assert.equal(dup.eksperimen.catatanChef, '');
+  // Kolom baru ikut terkirim dan terbaca kembali dengan tipe yang benar.
+  const kirim = keBaris('Eksperimen', db.ambil('Eksperimen', terakhir.id));
+  assert.equal(typeof kirim.panduanNilai, 'string');
+  assert.deepEqual(dariBaris('Eksperimen', kirim).panduanNilai, { tekstur: 'Kriuk' });
+  assert.equal(dariBaris('Eksperimen', kirim).catatanChef, 'Catatan lama');
+});

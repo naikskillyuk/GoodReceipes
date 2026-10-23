@@ -4,7 +4,9 @@ import { html } from '../../vendor/preact-htm.js';
 import { Kosong, InputRupiah, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan } from '../ui/router.js';
-import { dataHPP, eksperimenResep, targetResep, biayaLainResep } from '../lib/repo.js';
+import {
+  dataHPP, eksperimenResep, targetResep, biayaLainResep, pilihanResepTambahan, tambahResepTambahan,
+} from '../lib/repo.js';
 import { hargaMinimum, bulatkanHarga, analisisPenjualan } from '../lib/hpp.js';
 import { rupiah, angka, persen, tampilJumlah } from '../lib/util.js';
 
@@ -32,7 +34,12 @@ export function PanelHPP({ k, resep }) {
 
   const data = dataHPP(db, resep.id);
   const target = { ...TARGET_AWAL, ...(data.target || {}) };
-  const { hpp, biaya, eksperimen: dipakai, porsi } = data;
+  const { hpp, biaya, tambahan, eksperimen: dipakai, porsi } = data;
+  const pilihan = pilihanResepTambahan(db, resep.id);
+  const ubahTambahan = (rt, patch) => {
+    const { id, idResep, idResepKomponen, jumlah, satuan, urutan } = rt;
+    db.simpan('ResepTambahan', { id, idResep, idResepKomponen, jumlah, satuan, urutan, ...patch });
+  };
   const hppPorsi = hpp.hppPorsi;
 
   const aturTarget = (patch) => {
@@ -81,6 +88,10 @@ export function PanelHPP({ k, resep }) {
             <td>Bahan (Eksperimen ${dipakai ? dipakai.nomor : '–'})</td>
             <td>${rupiah(hpp.biayaBahan)}</td>
           </tr>
+          ${tambahan.rincian.map((t) => html`<tr key=${t.id}>
+            <td>${t.resep ? t.resep.nama : 'Resep terhapus'}<small class="teks-kecil"> · ${tampilJumlah(Number(t.jumlah) || 0)} ${t.satuan === 'resep' ? 'resep' : t.satuanPorsi || 'porsi'}</small></td>
+            <td>${rupiah(t.biaya)}</td>
+          </tr>`)}
           ${hpp.lain.map((b) => html`<tr key=${b.id}>
             <td>${b.jenis}${b.dihitungPer === 'porsi' ? html`<small class="teks-kecil"> · ${rupiah(Number(b.nilai))} × ${angka(porsi)}</small>` : ''}</td>
             <td>${rupiah(b.total)}</td>
@@ -90,6 +101,40 @@ export function PanelHPP({ k, resep }) {
           <tr><td>Total per resep</td><td>${rupiah(hpp.totalResep)}</td></tr>
         </tfoot>
       </table>
+    </div>
+
+    <div class="kartu">
+      <div class="label-kecil" style="margin-bottom:4px">Resep tambahan</div>
+      <p class="bantu" style="margin:0 0 10px">Resep lain yang ikut dipakai di resep ini, mis. saus atau isian. Biayanya diambil dari bahan eksperimen yang dihitung di resep itu (tanpa biaya lainnya).</p>
+      ${tambahan.bermasalah.length > 0 &&
+      html`<div class="peringatan" role="alert" style="margin-bottom:10px">
+        <b>Ada resep tambahan yang biayanya belum lengkap:</b>
+        ${tambahan.bermasalah.map((t) => `${t.resep ? t.resep.nama : 'resep terhapus'} (${t.alasan})`).join(', ')}.
+      </div>`}
+      <div class="kolom">
+        ${tambahan.rincian.map(
+          (t) => html`<div class="biaya-lain-baris" key=${t.id}>
+            ${t.resep
+              ? html`<a class="bl-nama" href=${tautan(`/resep/${t.resep.id}/hpp`)} style="font-weight:700;text-decoration:underline">${t.resep.nama}</a>`
+              : html`<span class="bl-nama">Resep terhapus</span>`}
+            <${InputAngka} kelas="input kecil bl-nilai" nilai=${t.jumlah} aria-label=${'Jumlah ' + (t.resep ? t.resep.nama : '')} onUbah=${(n) => Number.isFinite(n) && ubahTambahan(t, { jumlah: n })} />
+            <select class="pilih kecil bl-per" aria-label=${'Satuan ' + (t.resep ? t.resep.nama : '')} value=${t.satuan} onChange=${(e) => ubahTambahan(t, { satuan: e.target.value })}>
+              <option value="porsi" selected=${t.satuan !== 'resep'}>${t.satuanPorsi || 'porsi'}</option>
+              <option value="resep" selected=${t.satuan === 'resep'}>resep penuh</option>
+            </select>
+            <span style="min-width:84px;text-align:right;font-weight:700">${rupiah(t.biaya)}</span>
+            <button class="ikon-btn" aria-label=${'Hapus ' + (t.resep ? t.resep.nama : 'resep tambahan')} onClick=${() => db.hapus('ResepTambahan', t.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
+            ${t.resep && Number.isFinite(t.perPorsi) &&
+            html`<small class="teks-kecil" style="flex-basis:100%">${rupiah(t.perPorsi)} per ${t.satuanPorsi || 'porsi'} · ${rupiah(t.perResep)} per resep (Eksperimen ${t.eksperimen.nomor})</small>`}
+          </div>`,
+        )}
+        ${pilihan.length > 0
+          ? html`<select class="pilih kecil" aria-label="Tambah resep tambahan" value="" onChange=${(e) => e.target.value && tambahResepTambahan(db, resep.id, e.target.value)}>
+              <option value="" selected>+ Tambah resep lain…</option>
+              ${pilihan.map((r) => html`<option value=${r.id}>${r.nama}</option>`)}
+            </select>`
+          : tambahan.rincian.length === 0 && html`<p class="bantu" style="margin:0">Belum ada resep lain yang bisa ditambahkan.</p>`}
+      </div>
     </div>
 
     <div class="kartu">

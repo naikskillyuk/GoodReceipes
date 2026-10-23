@@ -1,4 +1,5 @@
-// Layar Masuk: dibuka bila pemilik memasang kata sandi. Penilai lewat kode QR tidak pernah melihatnya.
+// Kunci layar perangkat: dibuka bila pemilik memasang kata sandi perangkat (di luar login akun).
+// Penilai lewat kode QR tidak pernah melihatnya.
 
 import { html, useState, useEffect, useRef, useMemo } from '../../vendor/preact-htm.js';
 import { LogoMerek } from '../ui/komponen.js';
@@ -6,7 +7,7 @@ import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { ambilMerek } from '../lib/repo.js';
 import { cocokKataSandi, buatPembatas, tersedia } from '../lib/kunci.js';
-import { tesKoneksi } from '../lib/sync.js';
+import { masukAkun, keluarAkun, alamatServer } from '../lib/akun.js';
 
 function penyimpananAman() {
   try {
@@ -18,58 +19,55 @@ function penyimpananAman() {
   }
 }
 
-/** Jalur darurat bila kata sandi lupa: buktikan dengan kunci Apps Script, atau kosongkan data perangkat ini. */
+/** Jalur darurat bila kata sandi perangkat lupa: buktikan dengan kata sandi akun, atau keluar dari akun. */
 function LupaKataSandi({ db, onTutup, onSelesai }) {
-  const p = db.pengaturan;
-  const scriptUrl = p.scriptUrl || (window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
-  const [kunci, setKunci] = useState('');
+  const akun = db.pengaturan.akun || {};
+  const [sandi, setSandi] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState('');
 
-  const pakaiKunci = async (e) => {
+  const pakaiAkun = async (e) => {
     e.preventDefault();
-    if (!kunci.trim() || sibuk) return;
+    if (!sandi || sibuk) return;
     setSibuk(true);
     setGalat('');
     try {
-      await tesKoneksi({ scriptUrl, kunci: kunci.trim() });
+      await masukAkun(db, alamatServer(db), { login: akun.username || akun.email || '', kataSandi: sandi });
       db.aturPengaturan({ kunciAplikasi: null });
-      tampilToast('Kata sandi dihapus. Buat yang baru di Pengaturan > Keamanan.');
+      tampilToast('Kata sandi perangkat dihapus. Buat yang baru di Pengaturan > Keamanan.');
       onSelesai();
     } catch (err) {
-      setGalat(err.message || 'Kunci tidak diterima.');
+      setGalat(err.message || 'Kata sandi akun tidak diterima.');
     } finally {
       setSibuk(false);
     }
   };
 
-  const kosongkan = async () => {
+  const keluar = async () => {
     const ya = await tanya({
-      judul: 'Kosongkan data perangkat ini?',
-      teks: 'Semua resep di perangkat ini dihapus, begitu juga kata sandi dan kunci Apps Script yang tersimpan di sini. Data di Google Spreadsheet tetap aman dan bisa dipulihkan setelah Anda memasukkan kunci itu lagi di Pengaturan.',
-      ya: 'Kosongkan',
+      judul: 'Keluar dari akun di perangkat ini?',
+      teks: 'Data di perangkat ini dan kata sandi perangkat dihapus. Data yang sudah tersinkron tetap aman di akun Anda dan kembali saat Anda masuk lagi.',
+      ya: 'Keluar',
       bahaya: true,
     });
     if (!ya) return;
-    await db.hapusSemua({ hapusKataSandi: true });
-    tampilToast('Data perangkat ini dikosongkan.');
+    await keluarAkun(db);
+    tampilToast('Anda sudah keluar.');
     onSelesai();
   };
 
   return html`<${Modal} judul="Lupa kata sandi" onTutup=${onTutup}>
-    ${scriptUrl
-      ? html`<form class="kolom" onSubmit=${pakaiKunci} style="gap:10px">
-          <p class="bantu" style="font-size:13px;line-height:18px">Buktikan bahwa Anda pemilik dengan <b>kunci rahasia</b> yang sama dengan KUNCI di Code.gs. Data Anda tetap utuh dan kata sandi dihapus.</p>
-          <label class="bidang"><span>Kunci rahasia Apps Script</span>
-            <input class="input" type="password" autocomplete="off" autocapitalize="off" spellcheck=${false} value=${kunci} onInput=${(e) => setKunci(e.target.value)} aria-invalid=${galat ? 'true' : null} />
-          </label>
-          ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
-          <button class="btn solid lebar" type="submit" disabled=${!kunci.trim() || sibuk}>${sibuk ? 'Memeriksa…' : 'Hapus kata sandi'}</button>
-        </form>`
-      : html`<p class="bantu" style="font-size:13px;line-height:18px">Perangkat ini belum tersambung ke Google, jadi tidak ada kunci untuk membuktikan pemilik.</p>`}
+    <form class="kolom" onSubmit=${pakaiAkun} style="gap:10px">
+      <p class="bantu" style="font-size:13px;line-height:18px">Masukkan <b>kata sandi akun</b> ${akun.username ? html`<b>${akun.username}</b>` : ''} (yang dipakai saat masuk). Data Anda tetap utuh dan kata sandi perangkat dihapus.</p>
+      <label class="bidang"><span>Kata sandi akun</span>
+        <input class="input" type="password" autocomplete="current-password" autocapitalize="off" spellcheck=${false} value=${sandi} onInput=${(e) => setSandi(e.target.value)} aria-invalid=${galat ? 'true' : null} />
+      </label>
+      ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <button class="btn solid lebar" type="submit" disabled=${!sandi || sibuk}>${sibuk ? 'Memeriksa…' : 'Hapus kata sandi perangkat'}</button>
+    </form>
     <div class="pemisah-atau"><span>atau</span></div>
-    <p class="bantu" style="font-size:13px;line-height:18px">Mulai dari awal di perangkat ini. Data yang sudah sempat dikirim ke Spreadsheet tidak ikut hilang.</p>
-    <button class="btn bahaya lebar" type="button" onClick=${kosongkan}>Kosongkan data perangkat ini</button>
+    <p class="bantu" style="font-size:13px;line-height:18px">Lupa juga kata sandi akun? Keluar dulu, lalu pakai "Lupa kata sandi" di halaman Masuk.</p>
+    <button class="btn bahaya lebar" type="button" onClick=${keluar}>Keluar dari akun</button>
   <//>`;
 }
 

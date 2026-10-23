@@ -10,6 +10,8 @@ import { PesanHost, tampilToast } from './ui/pesan.js';
 import { Kosong } from './ui/komponen.js';
 import { terapkanMerekDokumen } from './ui/merek.js';
 import { Masuk } from './layar/masuk.js';
+import { LayarAkun, AturSandi } from './layar/akun.js';
+import { sudahMasuk, sesiBerakhir } from './lib/akun.js';
 import { Beranda } from './layar/beranda.js';
 import { DaftarResep } from './layar/daftar-resep.js';
 import { FormResep } from './layar/form-resep.js';
@@ -68,7 +70,10 @@ function App({ db, penyinkron, peringatan, pasangan }) {
   const keadaanKunci = useRef({});
   keadaanKunci.current = { terbuka };
   const rutePenilai = rute.bagian[0] === 'nilai';
-  const perluMasuk = !!db.pengaturan.kunciAplikasi && !terbuka && !rutePenilai;
+  const ruteAturSandi = rute.bagian[0] === 'atur-sandi';
+  // Urutan: penilai dan tautan atur kata sandi selalu terbuka; lalu wajib masuk akun; lalu kunci layar perangkat.
+  const perluAkun = !rutePenilai && !ruteAturSandi && !sudahMasuk(db);
+  const perluMasuk = !perluAkun && !!db.pengaturan.kunciAplikasi && !terbuka && !rutePenilai && !ruteAturSandi;
 
   const bukaKunci = () => {
     sesi.sentuh({ paksa: true });
@@ -102,7 +107,7 @@ function App({ db, penyinkron, peringatan, pasangan }) {
     };
   }, []);
 
-  // Nama dan logo aplikasi di judul dan ikon tab (layar penilai memakai merek dari Spreadsheet, bukan dari perangkat ini).
+  // Nama dan logo aplikasi di judul dan ikon tab (layar penilai memakai merek dari server, bukan dari perangkat ini).
   const merek = ambilMerek(db);
   useEffect(() => {
     if (!rutePenilai) terapkanMerekDokumen({ nama: merek.nama, logo: merek.logo });
@@ -116,6 +121,8 @@ function App({ db, penyinkron, peringatan, pasangan }) {
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', berubah);
+    // Alamat bisa sudah berubah sebelum pendengar ini terpasang (efek berjalan setelah tampilan pertama).
+    setRute(bacaHash());
     return () => window.removeEventListener('hashchange', berubah);
   }, []);
 
@@ -124,7 +131,10 @@ function App({ db, penyinkron, peringatan, pasangan }) {
       const r = await penyinkron.sinkronkan();
       if (tampil) tampilToast(r.terkirim || r.diterima || r.foto ? `Tersinkron: ${r.terkirim} dikirim, ${r.diterima} diterima.` : 'Sudah yang terbaru.');
     } catch (e) {
-      if (tampil) tampilToast(e.message || 'Sinkronisasi gagal.');
+      if (e.kode === 'SESI') {
+        sesiBerakhir(db);
+        tampilToast(e.message);
+      } else if (tampil) tampilToast(e.message || 'Sinkronisasi gagal.');
     }
   };
 
@@ -173,7 +183,13 @@ function App({ db, penyinkron, peringatan, pasangan }) {
   }
   return html`
     ${peringatan && html`<div class="peringatan" style="margin:8px;border-radius:16px" role="alert">${peringatan}</div>`}
-    ${perluMasuk ? html`<${Masuk} k=${k} onBuka=${bukaKunci} />` : html`<${Layar} k=${k} />`}
+    ${ruteAturSandi
+      ? html`<${AturSandi} k=${k} />`
+      : perluAkun
+        ? html`<${LayarAkun} k=${k} />`
+        : perluMasuk
+          ? html`<${Masuk} k=${k} onBuka=${bukaKunci} />`
+          : html`<${Layar} k=${k} />`}
     <${PesanHost} />
   `;
 }
@@ -192,7 +208,10 @@ async function mulai() {
   }
   if (bacaHash().bagian[0] !== 'nilai') pastikanKategoriAwal(db);
   const tetap = window.APP_CONFIG && window.APP_CONFIG.scriptUrl;
-  if (tetap && !db.pengaturan.scriptUrl) db.aturPengaturan({ scriptUrl: tetap });
+  // Alamat server dari config.js berlaku selama belum masuk (alamat manual hanya untuk uji).
+  if (tetap && db.pengaturan.scriptUrl !== tetap && !(db.pengaturan.akun && db.pengaturan.kunci)) db.aturPengaturan({ scriptUrl: tetap });
+  // Versi tanpa akun menyimpan kunci rahasia server di sini; tanpa data akun, itu bukan sesi yang sah.
+  if (db.pengaturan.kunci && !(db.pengaturan.akun && db.pengaturan.akun.id)) db.aturPengaturan({ kunci: '' });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
   let tawaran = null;

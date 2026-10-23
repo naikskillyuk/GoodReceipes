@@ -104,7 +104,9 @@ test('penilaian lewat tautan QR: info, kirim, lalu masuk ke aplikasi pemilik', a
   assert.equal(info.nomor, 3);
   assert.equal(info.terima, true);
   assert.equal(info.wajibNama, false);
-  assert.deepEqual(Object.keys(info).sort(), ['fotoUrl', 'logoUrl', 'namaAplikasi', 'namaResep', 'nomor', 'ok', 'terima', 'wajibNama']); // tidak membocorkan id/kunci
+  assert.deepEqual(Object.keys(info).sort(), ['catatanChef', 'fotoUrl', 'logoUrl', 'namaAplikasi', 'namaResep', 'nomor', 'ok', 'panduan', 'terima', 'wajibNama']); // tidak membocorkan id/kunci
+  assert.deepEqual(info.panduan, {});
+  assert.equal(info.catatanChef, '');
 
   await kirimNilai(URL_UJI, dengan.tokenNilai, { nama: 'Tamu', rasa: 9, tekstur: 8, tampilan: 7, aroma: 10, minatBeli: 9, komentar: 'Enak sekali' }, { fetchFn });
   await a.sinkron.sinkronkan();
@@ -185,7 +187,8 @@ test('unggah foto: data lokal menjadi tautan Drive dan tersimpan di baris', asyn
   const { brownies } = muatContoh(a.db);
   const eks = repo.eksperimenResep(a.db, brownies)[2];
   const png = 'data:image/png;base64,' + Buffer.from('gambar-uji').toString('base64');
-  a.db.simpan('Eksperimen', { ...a.db.ambil('Eksperimen', eks.id), fotoHasilLokal: png });
+  // Seperti patchFoto di aplikasi: foto baru mengosongkan tautan foto lama.
+  a.db.simpan('Eksperimen', { ...a.db.ambil('Eksperimen', eks.id), fotoHasilLokal: png, fotoHasilUrl: '' });
   const hasil = await a.sinkron.sinkronkan();
   assert.equal(hasil.foto, 1);
   const sesudah = a.db.ambil('Eksperimen', eks.id);
@@ -342,4 +345,20 @@ test('foto diganti atau dihapus di perangkat lain: salinan lokal lama tidak meni
   await b.sinkron.sinkronkan();
   await a.sinkron.sinkronkan();
   assert.equal(repo.fotoSrc(a.db.ambil('Eksperimen', eks.id), 'fotoHasilLokal', 'fotoHasilUrl'), '');
+});
+
+test('petunjuk penilaian dan catatan chef sampai ke penilai', async () => {
+  const server = baruServer();
+  const a = await perangkat(server);
+  const { brownies } = muatContoh(a.db);
+  const eks = repo.pastikanToken(a.db, repo.eksperimenResep(a.db, brownies)[2].id);
+  a.db.simpan('Eksperimen', {
+    ...eks,
+    panduanNilai: { tekstur: 'Harus kriuk kering', rasa: 'Jangan terlalu asin', umum: '', lain: 'diabaikan' },
+    catatanChef: 'Gula dikurangi 20 g.',
+  });
+  await a.sinkron.sinkronkan();
+  const info = await ambilInfoNilai(URL_UJI, eks.tokenNilai, { fetchFn: a.fetchFn });
+  assert.deepEqual(info.panduan, { rasa: 'Jangan terlalu asin', tekstur: 'Harus kriuk kering' });
+  assert.equal(info.catatanChef, 'Gula dikurangi 20 g.');
 });

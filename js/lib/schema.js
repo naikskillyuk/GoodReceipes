@@ -1,7 +1,7 @@
-// Skema tabel. Satu tabel di sini = satu tab di Google Spreadsheet.
+// Skema tabel. Satu tabel di sini = satu tabel di database server (lihat backend/config/goodrecipes.php).
 //
 // Tipe kolom: t = teks, n = angka, b = ya/tidak, j = JSON (daftar/objek, disimpan sebagai teks).
-// Kolom di `lokal` hanya ada di perangkat (mis. foto mentah) dan tidak dikirim ke Spreadsheet.
+// Kolom di `lokal` hanya ada di perangkat (mis. foto mentah) dan tidak dikirim ke server.
 // Setiap baris juga punya `diubah` (waktu ubah, ms) dan `dihapus` (penanda hapus).
 
 export const TABEL = {
@@ -20,6 +20,8 @@ export const TABEL = {
       id: 't', idResep: 't', nomor: 'n', idAsalDuplikat: 't', porsi: 'n', satuanPorsi: 't',
       suhuC: 'n', waktuMenit: 'n', langkah: 'j', catatanKegagalan: 't', fotoHasilUrl: 't',
       tokenNilai: 't', terimaNilai: 'b', wajibNama: 'b', dibuat: 'n',
+      // Petunjuk untuk penilai {umum, rasa, tekstur, tampilan, aroma, minatBeli} dan catatan chef (opsional).
+      panduanNilai: 'j', catatanChef: 't',
     },
     lokal: ['fotoHasilLokal'],
   },
@@ -49,6 +51,12 @@ export const TABEL = {
   BiayaLain: {
     awalan: 'byl',
     kolom: { id: 't', idResep: 't', jenis: 't', nilai: 'n', dihitungPer: 't', urutan: 'n' },
+  },
+  // Resep lain yang dipakai sebagai komponen saat menghitung HPP (mis. saus B di dalam makanan A).
+  // satuan: 'porsi' (satuan hasil jadi resep komponen, mis. porsi atau gram) atau 'resep' (satu kali masak).
+  ResepTambahan: {
+    awalan: 'rtb',
+    kolom: { id: 't', idResep: 't', idResepKomponen: 't', jumlah: 'n', satuan: 't', urutan: 'n' },
   },
   Target: {
     awalan: 'tgt',
@@ -97,7 +105,7 @@ function bacaBool(v) {
   return v === true || v === 1 || /^(true|1|ya)$/i.test(String(v));
 }
 
-/** Baris dari Spreadsheet (semua bisa berupa teks) -> baris bertipe. */
+/** Baris dari server (bisa berupa teks) -> baris bertipe. */
 export function dariBaris(tabel, mentah) {
   const def = TABEL[tabel];
   const baris = {};

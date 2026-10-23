@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const { chromium } = await import('playwright-core');
+const { masukUji, cariBrowser } = await import('./bantu.mjs');
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = 8800 + Math.floor(Math.random() * 500);
 const BASE = `http://localhost:${PORT}`;
@@ -49,12 +50,15 @@ const sisaLebar = (page) => page.evaluate(() => document.documentElement.scrollW
 let halaman = null;
 try {
   await tungguServer();
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: await cariBrowser(), args: ['--no-sandbox'] });
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
   halaman = page;
   pantau(page, 'pemilik');
   console.log('Nama, logo, dan kata sandi:');
+
+  tahap('masuk ke akun uji');
+  await masukUji(page, BASE);
 
   tahap('tampilan bawaan: nama dan logo bawaan di beranda dan judul tab');
   await page.goto(BASE + '/');
@@ -62,11 +66,9 @@ try {
   assert.equal(await page.title(), 'Eksperimen Resep');
   assert.equal(await page.getByRole('button', { name: 'Kunci aplikasi' }).count(), 0, 'tanpa kata sandi tidak ada tombol kunci');
 
-  tahap('sambungkan ke Google dan muat data contoh');
+  tahap('muat data contoh');
   await page.goto(BASE + '/#/pengaturan');
-  await page.getByPlaceholder('https://script.google.com/macros/s/…/exec').fill(BASE + '/api');
-  await page.locator('input[type=password]').fill('kunci-dev');
-  await page.getByRole('button', { name: 'Simpan', exact: true }).click();
+  await page.getByRole('heading', { name: 'Pengaturan', level: 1 }).waitFor();
   await page.getByRole('button', { name: 'Muat data contoh' }).click();
   const idEks = await page.evaluate(async () => {
     const repo = await import('/js/lib/repo.js');
@@ -121,7 +123,7 @@ try {
   await foto(page, '3-beranda-laptop');
   await page.setViewportSize({ width: 390, height: 844 });
 
-  tahap('sinkron: merek dan logo sampai ke Spreadsheet');
+  tahap('sinkron: merek dan logo sampai ke server');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   const tautan = await page.evaluate(async (id) => {
     const t = window.__app.db.ambil('Eksperimen', id).tokenNilai;
@@ -197,7 +199,7 @@ try {
   await page.goto(BASE + '/#/');
   await page.locator('#kata-sandi').waitFor();
 
-  tahap('penilai di perangkat lain melihat nama dan logo dari Spreadsheet');
+  tahap('penilai di perangkat lain melihat nama dan logo dari server');
   const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await ctx2.route('https://drive.google.com/**', (r) => r.fulfill({ contentType: 'image/png', body: PNG }));
   const rater = await ctx2.newPage();
@@ -206,22 +208,22 @@ try {
   await rater.getByRole('button', { name: /Kirim penilaian/ }).waitFor();
   await rater.locator('.merek-hero', { hasText: 'Dapur Bu Sari' }).waitFor();
   await rater.getByText(/^Beri penilaian · Eksperimen/).waitFor();
-  assert.equal(await rater.title(), 'Beri penilaian · Dapur Bu Sari');
+  await rater.waitForFunction(() => document.title === 'Beri penilaian · Dapur Bu Sari');
   const srcLogo = await rater.locator('.merek-hero img').getAttribute('src');
-  assert.match(srcLogo, /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/, 'logo memakai tautan dari Spreadsheet, bukan salinan lokal');
+  assert.match(srcLogo, /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/, 'logo memakai tautan dari server, bukan salinan lokal');
   assert.ok(await rater.locator('.merek-hero img').evaluate((i) => i.complete && i.naturalWidth > 0), 'logo penilai termuat');
   await foto(rater, '6-penilai');
   await ctx2.close();
 
-  tahap('lupa kata sandi: kunci Apps Script yang salah ditolak, yang benar menghapus kata sandi tanpa menghapus data');
+  tahap('lupa kata sandi perangkat: kata sandi akun yang salah ditolak, yang benar menghapus kata sandi tanpa menghapus data');
   await page.getByRole('button', { name: 'Lupa kata sandi?' }).click();
   const lupa = page.getByRole('dialog', { name: 'Lupa kata sandi' });
   await foto(page, '7-lupa');
-  await lupa.getByLabel('Kunci rahasia Apps Script').fill('kunci-yang-salah');
-  await lupa.getByRole('button', { name: 'Hapus kata sandi' }).click();
+  await lupa.getByLabel('Kata sandi akun').fill('kunci-yang-salah');
+  await lupa.getByRole('button', { name: 'Hapus kata sandi perangkat' }).click();
   await lupa.getByRole('alert').waitFor();
-  await lupa.getByLabel('Kunci rahasia Apps Script').fill('kunci-dev');
-  await lupa.getByRole('button', { name: 'Hapus kata sandi' }).click();
+  await lupa.getByLabel('Kata sandi akun').fill('kunci-dev');
+  await lupa.getByRole('button', { name: 'Hapus kata sandi perangkat' }).click();
   await page.locator('#kata-sandi').waitFor({ state: 'detached' });
   await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
   assert.equal(await page.evaluate(() => window.__app.db.pengaturan.kunciAplikasi), null);
@@ -246,7 +248,7 @@ try {
   await d3.getByRole('button', { name: 'Matikan' }).click();
   await page.getByText('Aplikasi terbuka tanpa kata sandi').waitFor();
 
-  tahap('ubah kata sandi lalu kosongkan data lewat "lupa": kata sandi dan kunci Apps Script ikut hilang, data kembali lewat sinkron');
+  tahap('ubah kata sandi lalu keluar lewat "lupa": kata sandi dan sesi ikut hilang, data kembali setelah masuk lagi');
   await page.getByRole('button', { name: 'Buat kata sandi' }).click();
   const d4 = page.getByRole('dialog', { name: 'Buat kata sandi' });
   await d4.getByLabel(/^Kata sandi/).fill(KATA_SANDI);
@@ -264,19 +266,17 @@ try {
   await tombolMasuk.click();
   await page.getByText('Kata sandi salah.').waitFor();
   await page.getByRole('button', { name: 'Lupa kata sandi?' }).click();
-  await page.getByRole('dialog', { name: 'Lupa kata sandi' }).getByRole('button', { name: 'Kosongkan data perangkat ini' }).click();
-  await page.getByRole('dialog', { name: 'Kosongkan data perangkat ini?' }).getByRole('button', { name: 'Kosongkan' }).click();
-  await page.getByRole('heading', { name: 'Pengaturan', level: 1 }).waitFor();
+  await page.getByRole('dialog', { name: 'Lupa kata sandi' }).getByRole('button', { name: 'Keluar dari akun' }).click();
+  await page.getByRole('dialog', { name: 'Keluar dari akun di perangkat ini?' }).getByRole('button', { name: 'Keluar' }).click();
+  await page.locator('#login-akun').waitFor();
   const sisa = await page.evaluate(() => ({ resep: window.__app.db.semua('Resep').length, kunci: window.__app.db.pengaturan.kunci, kunciAplikasi: window.__app.db.pengaturan.kunciAplikasi }));
   assert.deepEqual(sisa, { resep: 0, kunci: '', kunciAplikasi: null });
-  await page.goto(BASE + '/#/pengaturan');
-  await page.locator('input[type=password]').first().fill('kunci-dev');
-  await page.getByRole('button', { name: 'Simpan', exact: true }).click();
+  await masukUji(page, BASE);
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await page.goto(BASE + '/#/');
   await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
-  assert.ok((await page.evaluate(() => window.__app.db.semua('Resep').length)) > 0, 'resep kembali dari Spreadsheet');
-  assert.equal(await page.evaluate(() => /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/.test(window.__app.db.ambil('Setelan', 'stl_merek').logoUrl)), true, 'logo kembali lewat tautan Drive');
+  assert.ok((await page.evaluate(() => window.__app.db.semua('Resep').length)) > 0, 'resep kembali dari server');
+  assert.equal(await page.evaluate(() => /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/.test(window.__app.db.ambil('Setelan', 'stl_merek').logoUrl)), true, 'logo kembali lewat tautan server');
 
   tahap('kembalikan bawaan: nama dan logo kembali seperti semula');
   await page.goto(BASE + '/#/pengaturan');
@@ -290,6 +290,8 @@ try {
 
   tahap('nama sangat panjang tidak merusak tata letak di halaman masuk, beranda, pengaturan, dan QR');
   await page.goto(BASE + '/#/pengaturan');
+  // Tunggu sinkron otomatis selesai, supaya formulir tidak diisi ulang saat sedang diketik.
+  await page.waitForFunction(() => window.__app.db.jumlahKotor() === 0 && !window.__app.penyinkron.status.sedang, null, { timeout: 15000 });
   await page.getByLabel('Nama aplikasi').fill('Dapur Keluarga Besar Sejahtera Bersama Selalu');
   assert.equal((await page.getByLabel('Nama aplikasi').inputValue()).length, 40, 'nama dibatasi 40 karakter');
   await page.getByLabel('Nama aplikasi').fill('Dapurkeluargabesarsejahterabersamaselalu1');

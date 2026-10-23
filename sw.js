@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke Google Apps Script tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-0714ecc060';
+const VERSI = 'resep-85763f0e9f';
 const FILE = [
   // <daftar-file>
   'config.js',
@@ -16,6 +16,7 @@ const FILE = [
   'icons/icon-maskable-512.png',
   'icons/icon.svg',
   'index.html',
+  'js/layar/akun.js',
   'js/layar/bagikan.js',
   'js/layar/bahan.js',
   'js/layar/beranda.js',
@@ -30,6 +31,7 @@ const FILE = [
   'js/layar/pengaturan.js',
   'js/layar/penilai.js',
   'js/layar/ulasan.js',
+  'js/lib/akun.js',
   'js/lib/db.js',
   'js/lib/hpp.js',
   'js/lib/kunci.js',
@@ -49,6 +51,7 @@ const FILE = [
   'js/ui/router.js',
   'manifest.webmanifest',
   'vendor/LISENSI.md',
+  'vendor/fonts/fraunces-italic.woff2',
   'vendor/fonts/fraunces.woff2',
   'vendor/fonts/plus-jakarta-sans.woff2',
   'vendor/preact-htm.js',
