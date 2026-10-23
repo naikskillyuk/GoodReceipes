@@ -14,7 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         then: fn () => Illuminate\Support\Facades\Route::group([], __DIR__.'/../routes/web.php'),
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Di Vercel, PHP hanya melihat proksi (127.0.0.1). IP pengunjung ada di X-Forwarded-For,
+        // yang ditimpa Vercel sehingga tidak bisa dipalsukan. Tanpa ini, batas percobaan masuk
+        // dan daftar berlaku untuk semua pengunjung sekaligus.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Galat di /api (mis. database mati, batas permintaan) dijawab dengan format yang dipahami aplikasi.
