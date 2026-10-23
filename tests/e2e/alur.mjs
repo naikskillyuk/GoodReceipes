@@ -55,10 +55,15 @@ try {
   pantau(page, 'pemilik');
   console.log('Alur pemilik:');
 
-  tahap('tanpa akun: layar Masuk tampil lebih dulu; kata sandi salah ditolak');
+  tahap('tanpa akun: layar sambutan dengan tombol Login; formulir muncul setelah ditekan; kata sandi salah ditolak');
   await page.goto(BASE + '/');
-  await page.locator('#login-akun').waitFor();
+  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  assert.equal(await page.locator('#login-akun').count(), 0, 'formulir belum tampil sebelum Login ditekan');
   assert.equal(await page.locator('.sisi').count(), 0, 'menu aplikasi belum tampil sebelum masuk');
+  assert.equal(await page.getByText(/Daftar/).count(), 0, 'tidak ada pendaftaran sendiri');
+  await page.getByRole('button', { name: 'Login', exact: true }).click();
+  await page.locator('#login-akun').waitFor();
+  await page.getByRole('button', { name: 'Lupa password?' }).waitFor();
   await page.getByText('Mode uji · server: localhost:8000').waitFor(); // tanpa config.js: Laravel lokal
   await page.getByRole('button', { name: 'ganti', exact: true }).click();
   await page.getByLabel('Alamat server (API)').fill(BASE + '/api');
@@ -67,12 +72,13 @@ try {
   await page.locator('#sandi-akun').fill('salah-sekali');
   await page.getByRole('button', { name: 'Masuk', exact: true }).click();
   await page.getByText('Username/email atau kata sandi salah.').waitFor();
-  await page.getByRole('button', { name: 'Daftar akun baru' }).click();
-  await page.getByLabel('Nama Anda').fill('Chef Uji');
-  await page.getByLabel('Email').fill('chef@uji.test');
-  await page.getByRole('button', { name: 'Daftar', exact: true }).click();
-  await page.getByText(/Akun dibuat/).waitFor();
-  assert.equal(await page.locator('#login-akun').inputValue(), 'chef@uji.test', 'setelah daftar kembali ke Masuk dengan email terisi');
+  await page.getByRole('button', { name: 'Lupa password?' }).click();
+  await page.locator('#login-lupa').fill('chef@uji.test');
+  await page.getByRole('button', { name: 'Kirim tautan' }).click();
+  await page.getByText(/Tidak ada email terkirim/).waitFor();
+  assert.equal(await page.locator('#login-akun').inputValue(), 'chef@uji.test', 'setelah lupa sandi kembali ke Login dengan login terisi');
+  await page.getByRole('button', { name: 'Tutup' }).click();
+  await page.getByRole('button', { name: 'Login', exact: true }).waitFor();
 
   tahap('masuk dengan akun uji');
   await masukUji(page, BASE);

@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\Mail;
 
 // ---------------------------------------------------------------- akun pembeli
 
-// php artisan resep:buat-akun "Nama Pembeli" email@contoh.com [--sandi=...] [--kirim-email]
-Artisan::command('resep:buat-akun {nama} {email} {--sandi= : Kata sandi (kosong = dibuat acak)} {--kirim-email : Kirim username dan kata sandi ke email pembeli}', function (Akun $akun) {
+// php artisan resep:buat-akun "Nama Pembeli" email@contoh.com [--sandi=...] [--kirim-email] [--jumlah=150000] [--metode=QRIS] [--belum-lunas]
+// Biasanya akun dibuat dari halaman /admin; perintah ini untuk keadaan darurat dan tes.
+Artisan::command('resep:buat-akun {nama} {email} {--sandi= : Kata sandi (kosong = dibuat acak)} {--kirim-email : Kirim username dan kata sandi ke email pembeli} {--jumlah=0 : Jumlah pembelian (Rp)} {--metode= : Metode pembayaran} {--belum-lunas : Catat pembelian sebagai belum lunas (akun belum bisa masuk)}', function (Akun $akun) {
     $email = strtolower(trim($this->argument('email')));
     if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $this->error('Email tidak valid.');
@@ -22,7 +23,11 @@ Artisan::command('resep:buat-akun {nama} {email} {--sandi= : Kata sandi (kosong 
         return 1;
     }
     $sandi = $this->option('sandi') ?: $akun->sandiAcak();
-    $user = $akun->buat(trim($this->argument('nama')), $email, $sandi);
+    $user = $akun->buat(trim($this->argument('nama')), $email, $sandi, [
+        'jumlah' => max(0, (int) $this->option('jumlah')),
+        'metode' => (string) $this->option('metode'),
+        'lunas' => ! $this->option('belum-lunas'),
+    ]);
     if ($this->option('kirim-email')) {
         Mail::to($email)->send(new App\Mail\AkunBaru($user, $sandi));
     }
@@ -55,12 +60,38 @@ Artisan::command('resep:akun-aktif {login} {status : ya atau tidak}', function (
 // php artisan resep:daftar-akun
 Artisan::command('resep:daftar-akun', function () {
     $this->table(
-        ['ID', 'Username', 'Nama', 'Email', 'Aktif', 'Dibuat'],
-        App\Models\User::orderBy('id')->get()->map(fn ($u) => [
-            $u->id, $u->username, $u->name, $u->email, $u->aktif ? 'ya' : 'tidak', $u->created_at?->format('Y-m-d'),
+        ['ID', 'Username', 'Nama', 'Email', 'Aktif', 'Lunas', 'Jumlah', 'Dibuat'],
+        App\Models\User::with('pembelian')->orderBy('id')->get()->map(fn ($u) => [
+            $u->id, $u->username, $u->name, $u->email, $u->aktif ? 'ya' : 'tidak',
+            $u->pembelian?->lunas ? 'ya' : 'tidak', number_format((int) $u->pembelian?->jumlah, 0, ',', '.'),
+            $u->created_at?->format('Y-m-d'),
         ])->all(),
     );
 })->purpose('Tampilkan semua akun pembeli');
+
+// ---------------------------------------------------------------- admin
+
+// php artisan resep:buat-admin "Nama Admin" admin@contoh.com [--sandi=...]
+// Membuat admin baru, atau mengganti kata sandi admin yang emailnya sudah ada.
+Artisan::command('resep:buat-admin {nama} {email} {--sandi= : Kata sandi (kosong = ditanyakan)}', function () {
+    $email = strtolower(trim($this->argument('email')));
+    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $this->error('Email tidak valid.');
+
+        return 1;
+    }
+    $sandi = $this->option('sandi') ?: $this->secret('Kata sandi admin (minimal 10 karakter)');
+    if (! is_string($sandi) || mb_strlen($sandi) < 10) {
+        $this->error('Kata sandi admin minimal 10 karakter.');
+
+        return 1;
+    }
+    $admin = App\Models\Admin::updateOrCreate(['email' => $email], ['nama' => trim($this->argument('nama')), 'password' => $sandi]);
+    $this->info(($admin->wasRecentlyCreated ? 'Admin dibuat' : 'Kata sandi admin diganti').": {$admin->email}");
+    $this->line('Masuk di: '.rtrim((string) config('app.url'), '/').'/admin');
+
+    return 0;
+})->purpose('Buat admin untuk halaman /admin, atau ganti kata sandinya');
 
 // ---------------------------------------------------------------- Supabase Storage
 

@@ -10,8 +10,11 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        // Halaman lain tanpa sesi/cookie (aplikasi ini tidak butuh login web).
-        then: fn () => Illuminate\Support\Facades\Route::group([], __DIR__.'/../routes/web.php'),
+        // Halaman lain tanpa sesi/cookie; hanya /admin yang memakai sesi web (cookie + CSRF).
+        then: function () {
+            Illuminate\Support\Facades\Route::group([], __DIR__.'/../routes/web.php');
+            Illuminate\Support\Facades\Route::middleware('web')->group(__DIR__.'/../routes/admin.php');
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Di Vercel, PHP hanya melihat proksi (127.0.0.1). IP pengunjung ada di X-Forwarded-For,

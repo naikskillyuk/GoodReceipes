@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "",
-  "buildCommand": "node tools/perbarui-sw.mjs && rm -rf _situs && mkdir _situs && cp -r index.html config.js manifest.webmanifest sw.js css js vendor icons contoh _situs/",
+  "buildCommand": "node tools/perbarui-sw.mjs && rm -rf _situs && mkdir _situs && cp -r index.html config.js manifest.webmanifest sw.js css js vendor icons gambar contoh _situs/",
   "outputDirectory": "_situs",
   "headers": [
     {

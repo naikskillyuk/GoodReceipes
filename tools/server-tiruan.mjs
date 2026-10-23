@@ -144,8 +144,6 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         return kirimNilai(req);
       case 'masuk':
         return req.kataSandi === kunci ? { ok: true, sesi: kunci, pengguna: pengguna(req, String(req.login || '')) } : { ok: false, galat: 'Username/email atau kata sandi salah.' };
-      case 'daftar':
-        return { ok: true, pesan: `(uji) Akun dibuat. Masuk dengan ${req.email} dan kata sandi ${kunci}.` };
       case 'lupaSandi':
         return { ok: true, pesan: `(uji) Tidak ada email terkirim. Kata sandinya ${kunci}.` };
       case 'aturSandi':
@@ -163,6 +161,10 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       case 'ubahProfil':
         return { ok: true, pengguna: pengguna(req) };
       case 'gantiSandi':
+        // Seperti Laravel, tetapi kata sandi uji tidak benar-benar berubah.
+        if (req.lama !== kunci) return { ok: false, galat: 'Kata sandi lama salah.' };
+        if (typeof req.baru !== 'string' || req.baru.length < 8) return { ok: false, galat: 'Kata sandi baru minimal 8 karakter.' };
+        return { ok: true };
       case 'keluar':
         return { ok: true };
       default:

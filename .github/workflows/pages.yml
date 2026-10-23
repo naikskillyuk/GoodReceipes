@@ -31,7 +31,7 @@ jobs:
       - name: Kumpulkan hanya berkas aplikasi
         run: |
           mkdir _situs
-          cp -r index.html config.js manifest.webmanifest sw.js css js vendor icons contoh _situs/
+          cp -r index.html config.js manifest.webmanifest sw.js css js vendor icons gambar contoh _situs/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _situs

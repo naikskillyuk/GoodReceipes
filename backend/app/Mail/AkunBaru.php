@@ -7,14 +7,16 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
-/** Email setelah daftar: berisi username dan kata sandi pertama. */
+/** Email berisi username dan kata sandi: akun baru dari admin, atau kata sandi yang diatur ulang admin. */
 class AkunBaru extends Mailable
 {
-    public function __construct(public User $user, public string $sandi) {}
+    public function __construct(public User $user, public string $sandi, public bool $reset = false) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Akun '.config('app.name').' Anda sudah siap');
+        return new Envelope(subject: $this->reset
+            ? 'Kata sandi baru akun '.config('app.name').' Anda'
+            : 'Akun '.config('app.name').' Anda sudah siap');
     }
 
     public function content(): Content
@@ -24,6 +26,7 @@ class AkunBaru extends Mailable
             'username' => $this->user->username,
             'email' => $this->user->email,
             'sandi' => $this->sandi,
+            'reset' => $this->reset,
             'url' => config('goodrecipes.frontend_url'),
         ]);
     }

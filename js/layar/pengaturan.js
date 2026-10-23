@@ -91,7 +91,7 @@ function DialogKataSandi({ mode, k, onTutup }) {
   const [sibuk, setSibuk] = useState(false);
   const perluLama = mode !== 'buat';
   const perluBaru = mode !== 'matikan';
-  const judul = { buat: 'Buat kata sandi', ubah: 'Ubah kata sandi', matikan: 'Matikan kata sandi' }[mode];
+  const judul = { buat: 'Buat kata sandi perangkat', ubah: 'Ubah kata sandi perangkat', matikan: 'Matikan kata sandi perangkat' }[mode];
 
   const kirim = async (e) => {
     e.preventDefault();
@@ -142,15 +142,15 @@ function KartuKeamanan({ k }) {
   const [dialog, setDialog] = useState('');
   const bisa = tersedia();
   return html`<section class="kartu kolom" aria-labelledby="h-keamanan">
-    <h2 class="judul-kecil" id="h-keamanan">Keamanan</h2>
+    <h2 class="judul-kecil" id="h-keamanan">Kunci perangkat</h2>
     <p role="status" class=${'status-sinkron ' + (aktif ? 'ok' : '')}><i></i>${aktif ? 'Kata sandi aktif di perangkat ini' : 'Aplikasi terbuka tanpa kata sandi'}</p>
     ${!bisa && html`<p class="peringatan" role="alert">Browser ini hanya mengizinkan kata sandi lewat koneksi aman (HTTPS).</p>`}
     <div class="baris-btn">
       ${aktif
         ? html`<button class="btn solid" onClick=${k.kunciSekarang}><${Ikon} nama="gembok" ukuran=${18} />Kunci sekarang</button>
-            <button class="btn" onClick=${() => setDialog('ubah')}>Ubah kata sandi</button>
+            <button class="btn" onClick=${() => setDialog('ubah')}>Ubah sandi perangkat</button>
             <button class="btn bahaya" onClick=${() => setDialog('matikan')}>Matikan</button>`
-        : html`<button class="btn solid" onClick=${() => setDialog('buat')} disabled=${!bisa}><${Ikon} nama="gembok" ukuran=${18} />Buat kata sandi</button>`}
+        : html`<button class="btn solid" onClick=${() => setDialog('buat')} disabled=${!bisa}><${Ikon} nama="gembok" ukuran=${18} />Buat kata sandi perangkat</button>`}
     </div>
     ${aktif &&
     html`<label class="bidang"><span>Kunci otomatis</span>
@@ -158,7 +158,7 @@ function KartuKeamanan({ k }) {
         ${PILIHAN_KUNCI_OTOMATIS.map(([menit, teks]) => html`<option value=${String(menit)} selected=${(p.kunciOtomatisMenit ?? 15) === menit}>${teks}</option>`)}
       </select>
     </label>`}
-    <p class="bantu">Kata sandi hanya mengunci tampilan aplikasi di perangkat ini; tidak ikut ke server atau berkas cadangan. Ini bukan enkripsi, jadi tetap kunci layar HP Anda. Penilai yang membuka kode QR tidak perlu masuk.</p>
+    <p class="bantu">Kata sandi tambahan untuk membuka aplikasi di perangkat ini saja, terpisah dari kata sandi akun. Tidak ikut ke server atau berkas cadangan. Ini bukan enkripsi, jadi tetap kunci layar HP Anda. Penilai yang membuka kode QR tidak perlu masuk.</p>
     ${dialog && html`<${DialogKataSandi} mode=${dialog} k=${k} onTutup=${() => setDialog('')} />`}
   </section>`;
 }
@@ -192,6 +192,7 @@ function DialogSandiAkun({ k, onTutup }) {
       <label class="bidang"><span>Kata sandi baru</span><input class="input" type="password" autocomplete="new-password" maxlength="100" value=${baru} onInput=${(e) => setBaru(e.target.value)} /><span class="bantu">Minimal ${MIN_SANDI} karakter.</span></label>
       <label class="bidang"><span>Ulangi kata sandi baru</span><input class="input" type="password" autocomplete="new-password" maxlength="100" value=${ulang} onInput=${(e) => setUlang(e.target.value)} /></label>
       ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <p class="bantu" style="font-size:13px;line-height:18px">Ini kata sandi untuk masuk ke akun, di semua perangkat. Lupa kata sandi saat ini? Keluar dari akun, lalu pakai "Lupa kata sandi?" di halaman Masuk.</p>
       <div class="baris-btn">
         <button class="btn abu lebar" type="button" onClick=${onTutup}>Batal</button>
         <button class="btn solid lebar" type="submit" disabled=${sibuk || !lama}>${sibuk ? 'Menyimpan…' : 'Simpan'}</button>
@@ -244,7 +245,7 @@ function KartuAkun({ k }) {
     <div class="hasil-baris"><span>Username</span><b class="biasa">${akun.username || '–'}</b></div>
     <div class="hasil-baris"><span>Email</span><b class="biasa" style="word-break:break-all">${akun.email || '–'}</b></div>
     <div class="baris-btn">
-      <button class="btn" onClick=${() => setDialog(true)}><${Ikon} nama="gembok" ukuran=${18} />Ganti kata sandi</button>
+      <button class="btn" onClick=${() => setDialog(true)}><${Ikon} nama="gembok" ukuran=${18} />Ganti kata sandi akun</button>
       <button class="btn bahaya" disabled=${sibuk} onClick=${keluar}>Keluar</button>
     </div>
     <label class="sakelar">

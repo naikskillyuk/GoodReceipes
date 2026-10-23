@@ -18,7 +18,8 @@ use Throwable;
  * Satu alamat /api. Isi permintaan: JSON {aksi, kunci?, ...}, dikirim sebagai text/plain agar
  * browser tidak mengirim preflight CORS.
  *
- * - Tanpa login : daftar, masuk, lupaSandi, aturSandi (akun) dan infoNilai, kirimNilai (penilai QR).
+ * - Tanpa login : masuk, lupaSandi, aturSandi (akun) dan infoNilai, kirimNilai (penilai QR).
+ *   Akun dibuat oleh admin di /admin; tidak ada pendaftaran sendiri.
  * - Dengan login: `kunci` berisi token sesi dari aksi `masuk`.
  */
 class ApiController extends Controller
@@ -48,13 +49,12 @@ class ApiController extends Controller
             }
 
             // Akun tanpa login, dengan batas percobaan per alamat IP (dan per akun untuk masuk).
-            if (in_array($aksi, ['daftar', 'masuk', 'lupaSandi', 'aturSandi'], true)) {
+            if (in_array($aksi, ['masuk', 'lupaSandi', 'aturSandi'], true)) {
                 $kunciBatas = $this->kunciBatas($request, $aksi, $req);
                 if ($tolak = $this->periksaBatas($aksi, $kunciBatas)) {
                     return $this->keluar($tolak);
                 }
                 $hasil = match ($aksi) {
-                    'daftar' => $akun->daftar($req['nama'] ?? '', $req['email'] ?? ''),
                     'masuk' => $akun->masuk($req['login'] ?? '', $req['kataSandi'] ?? '', $req['perangkat'] ?? ''),
                     'lupaSandi' => $akun->lupaSandi($req['login'] ?? ''),
                     'aturSandi' => $akun->aturSandi($req['email'] ?? '', $req['tokenReset'] ?? '', $req['kataSandi'] ?? ''),
@@ -102,7 +102,7 @@ class ApiController extends Controller
         }
     }
 
-    private const BATAS = ['daftar' => 5, 'masuk' => 10, 'lupaSandi' => 5, 'aturSandi' => 10];
+    private const BATAS = ['masuk' => 10, 'lupaSandi' => 5, 'aturSandi' => 10];
 
     /** Kunci penghitung percobaan: per alamat IP, dan untuk masuk juga per akun. */
     private function kunciBatas(Request $request, string $aksi, array $req): array

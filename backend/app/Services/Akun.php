@@ -14,8 +14,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Akun pengguna: daftar (username + kata sandi dikirim ke email), masuk, sesi per perangkat,
- * ganti kata sandi, dan lupa kata sandi lewat tautan email.
+ * Akun pengguna: dibuat oleh admin (username + kata sandi dikirim ke email), masuk, sesi per
+ * perangkat, ganti kata sandi, dan lupa kata sandi lewat tautan email.
  */
 class Akun
 {
@@ -24,44 +24,58 @@ class Akun
     // Tanpa huruf/angka yang mirip (0/O, 1/l/I) supaya mudah diketik dari email.
     private const HURUF_SANDI = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-    /** Buat akun dan kirim username + kata sandi ke emailnya. */
-    public function daftar(mixed $nama, mixed $email): array
+    /**
+     * Buat akun beserta catatan pembeliannya (dipakai halaman admin dan perintah artisan).
+     *
+     * @param  array{tanggal?: string, jumlah?: int, metode?: string, lunas?: bool, catatan?: string}  $pembelian
+     */
+    public function buat(string $nama, string $email, string $sandi, array $pembelian = []): User
     {
-        $nama = $this->teks($nama, 60);
-        $email = Str::lower($this->teks($email, 190));
-        if (mb_strlen($nama) < 2) {
-            return ['ok' => false, 'galat' => 'Isi nama Anda (minimal 2 huruf).'];
-        }
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['ok' => false, 'galat' => 'Alamat email tidak valid.'];
-        }
-        if (User::where('email', $email)->exists()) {
-            return ['ok' => false, 'galat' => 'Email ini sudah terdaftar. Silakan masuk, atau pakai "Lupa kata sandi".'];
-        }
+        return DB::transaction(function () use ($nama, $email, $sandi, $pembelian) {
+            $user = User::create([
+                'name' => $nama,
+                'username' => $this->usernameBaru($nama),
+                'email' => Str::lower($email),
+                'password' => $sandi,
+                'aktif' => true,
+            ]);
+            $user->pembelian()->create([
+                'tanggal' => $pembelian['tanggal'] ?? now()->toDateString(),
+                'jumlah' => (int) ($pembelian['jumlah'] ?? 0),
+                'metode' => (string) ($pembelian['metode'] ?? ''),
+                'lunas' => (bool) ($pembelian['lunas'] ?? true),
+                'catatan' => (string) ($pembelian['catatan'] ?? ''),
+            ]);
 
-        $sandi = $this->sandiAcak();
-        $user = $this->buat($nama, $email, $sandi);
-        try {
-            Mail::to($email)->send(new AkunBaru($user, $sandi));
-        } catch (Throwable $e) {
-            report($e);
-            $user->delete();
-            throw new RuntimeException('Email belum bisa dikirim. Periksa alamat email Anda atau coba lagi nanti.');
-        }
-
-        return ['ok' => true, 'pesan' => "Akun dibuat. Username dan kata sandi sudah dikirim ke {$email}."];
+            return $user;
+        });
     }
 
-    /** Dipakai juga oleh perintah artisan untuk membuat akun pembeli secara manual. */
-    public function buat(string $nama, string $email, string $sandi): User
+    /** Kirim username dan kata sandi ke email akun. Mengembalikan false bila email gagal dikirim. */
+    public function kirimDataAkun(User $user, string $sandi, bool $reset = false): bool
     {
-        return DB::transaction(fn () => User::create([
-            'name' => $nama,
-            'username' => $this->usernameBaru($nama),
-            'email' => Str::lower($email),
-            'password' => $sandi,
-            'aktif' => true,
-        ]));
+        try {
+            Mail::to($user->email)->send(new AkunBaru($user, $sandi, $reset));
+
+            return true;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
+
+    /** Pesan untuk akun yang tidak boleh masuk, atau null bila boleh. */
+    public function alasanDitolak(User $user): ?string
+    {
+        if (! $user->aktif) {
+            return 'Akun ini sedang tidak aktif. Hubungi penjual aplikasi.';
+        }
+        if (! $user->pembelian?->lunas) {
+            return 'Pembayaran akun ini belum lunas. Hubungi penjual aplikasi.';
+        }
+
+        return null;
     }
 
     /** Masuk dengan email atau username. Mengembalikan token sesi baru. */
@@ -72,8 +86,8 @@ class Akun
         if (! $user || ! Hash::check($sandi, $user->password)) {
             return ['ok' => false, 'galat' => 'Username/email atau kata sandi salah.'];
         }
-        if (! $user->aktif) {
-            return ['ok' => false, 'kode' => 'NONAKTIF', 'galat' => 'Akun ini sedang tidak aktif. Hubungi penjual aplikasi.'];
+        if ($alasan = $this->alasanDitolak($user)) {
+            return ['ok' => false, 'kode' => 'NONAKTIF', 'galat' => $alasan];
         }
         if (! $user->email_verified_at) {
             // Kata sandi pertama dikirim lewat email, jadi berhasil masuk = email terbukti miliknya.
@@ -108,8 +122,8 @@ class Akun
         if (! $sesi) {
             return null;
         }
-        $user = User::find($sesi->user_id);
-        if (! $user || ! $user->aktif) {
+        $user = User::with('pembelian')->find($sesi->user_id);
+        if (! $user || ! $user->bolehMasuk()) {
             return null;
         }
         // Catat pemakaian paling sering tiap 10 menit, supaya tidak menulis di setiap sinkron.

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SERTAKAN = ['index.html', 'config.js', 'manifest.webmanifest'];
-const FOLDER = ['css', 'js', 'vendor', 'icons'];
+const FOLDER = ['css', 'js', 'vendor', 'icons', 'gambar'];
 
 function kumpulkan(dir) {
   return fs.readdirSync(path.join(AKAR, dir), { withFileTypes: true }).flatMap((d) => {

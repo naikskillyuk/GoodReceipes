@@ -36,10 +36,6 @@ function namaPerangkat() {
   return `${browser} di ${os}`;
 }
 
-export function daftarAkun(url, { nama, email }, opsi) {
-  return panggilApi(url, { aksi: 'daftar', nama: nama.trim(), email: email.trim() }, opsi);
-}
-
 export function mintaAturUlang(url, login, opsi) {
   return panggilApi(url, { aksi: 'lupaSandi', login: login.trim() }, opsi);
 }

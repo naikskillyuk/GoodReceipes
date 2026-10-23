@@ -133,8 +133,8 @@ try {
   tahap('buat kata sandi: aturan panjang dan pengulangan diperiksa, lalu aplikasi tetap terbuka');
   await page.goto(BASE + '/#/pengaturan');
   await page.getByText('Aplikasi terbuka tanpa kata sandi').waitFor();
-  await page.getByRole('button', { name: 'Buat kata sandi' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Buat kata sandi' });
+  await page.getByRole('button', { name: 'Buat kata sandi perangkat' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Buat kata sandi perangkat' });
   await dialog.getByLabel(/^Kata sandi/).fill('abc');
   await dialog.getByLabel('Ulangi kata sandi').fill('abc');
   await dialog.getByRole('button', { name: 'Simpan' }).click();
@@ -230,8 +230,8 @@ try {
 
   tahap('matikan kata sandi: butuh kata sandi saat ini');
   await page.goto(BASE + '/#/pengaturan');
-  await page.getByRole('button', { name: 'Buat kata sandi' }).click();
-  const d2 = page.getByRole('dialog', { name: 'Buat kata sandi' });
+  await page.getByRole('button', { name: 'Buat kata sandi perangkat' }).click();
+  const d2 = page.getByRole('dialog', { name: 'Buat kata sandi perangkat' });
   await d2.getByLabel(/^Kata sandi/).fill(KATA_SANDI);
   await d2.getByLabel('Ulangi kata sandi').fill(KATA_SANDI);
   await d2.getByRole('button', { name: 'Simpan' }).click();
@@ -239,7 +239,7 @@ try {
   await page.getByLabel('Kunci otomatis').selectOption('1');
   assert.equal(await page.evaluate(() => window.__app.db.pengaturan.kunciOtomatisMenit), 1);
   await page.getByRole('button', { name: 'Matikan', exact: true }).click();
-  const d3 = page.getByRole('dialog', { name: 'Matikan kata sandi' });
+  const d3 = page.getByRole('dialog', { name: 'Matikan kata sandi perangkat' });
   await d3.getByLabel('Kata sandi saat ini').fill('salah-salah');
   await d3.getByRole('button', { name: 'Matikan' }).click();
   await d3.getByText('Kata sandi saat ini salah.').waitFor();
@@ -248,13 +248,13 @@ try {
   await page.getByText('Aplikasi terbuka tanpa kata sandi').waitFor();
 
   tahap('ubah kata sandi lalu keluar lewat "lupa": kata sandi dan sesi ikut hilang, data kembali setelah masuk lagi');
-  await page.getByRole('button', { name: 'Buat kata sandi' }).click();
-  const d4 = page.getByRole('dialog', { name: 'Buat kata sandi' });
+  await page.getByRole('button', { name: 'Buat kata sandi perangkat' }).click();
+  const d4 = page.getByRole('dialog', { name: 'Buat kata sandi perangkat' });
   await d4.getByLabel(/^Kata sandi/).fill(KATA_SANDI);
   await d4.getByLabel('Ulangi kata sandi').fill(KATA_SANDI);
   await d4.getByRole('button', { name: 'Simpan' }).click();
-  await page.getByRole('button', { name: 'Ubah kata sandi' }).click();
-  const d5 = page.getByRole('dialog', { name: 'Ubah kata sandi' });
+  await page.getByRole('button', { name: 'Ubah sandi perangkat' }).click();
+  const d5 = page.getByRole('dialog', { name: 'Ubah kata sandi perangkat' });
   await d5.getByLabel('Kata sandi saat ini').fill(KATA_SANDI);
   await d5.getByLabel('Kata sandi baru').fill('kata-sandi-baru');
   await d5.getByLabel('Ulangi kata sandi').fill('kata-sandi-baru');
@@ -267,7 +267,7 @@ try {
   await page.getByRole('button', { name: 'Lupa kata sandi?' }).click();
   await page.getByRole('dialog', { name: 'Lupa kata sandi' }).getByRole('button', { name: 'Keluar dari akun' }).click();
   await page.getByRole('dialog', { name: 'Keluar dari akun di perangkat ini?' }).getByRole('button', { name: 'Keluar' }).click();
-  await page.locator('#login-akun').waitFor();
+  await page.getByRole('button', { name: 'Login', exact: true }).waitFor();
   const sisa = await page.evaluate(() => ({ resep: window.__app.db.semua('Resep').length, kunci: window.__app.db.pengaturan.kunci, kunciAplikasi: window.__app.db.pengaturan.kunciAplikasi }));
   assert.deepEqual(sisa, { resep: 0, kunci: '', kunciAplikasi: null });
   await masukUji(page, BASE);
@@ -276,6 +276,24 @@ try {
   await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
   assert.ok((await page.evaluate(() => window.__app.db.semua('Resep').length)) > 0, 'resep kembali dari server');
   assert.equal(await page.evaluate(() => /^\/foto\//.test(window.__app.db.ambil('Setelan', 'stl_merek').logoUrl)), true, 'logo kembali lewat tautan server');
+
+  tahap('ganti kata sandi akun: terpisah dari kunci perangkat; kata sandi saat ini yang salah ditolak');
+  await page.goto(BASE + '/#/pengaturan');
+  await page.getByRole('heading', { name: 'Kunci perangkat' }).waitFor();
+  await page.getByRole('button', { name: 'Ganti kata sandi akun' }).click();
+  const dAkun = page.getByRole('dialog', { name: 'Ganti kata sandi akun' });
+  await dAkun.getByLabel('Kata sandi saat ini').fill('bukan-sandi-ini');
+  await dAkun.getByLabel(/^Kata sandi baru/).fill('sandi-akun-baru');
+  await dAkun.getByLabel('Ulangi kata sandi baru').fill('sandi-akun-beda');
+  await dAkun.getByRole('button', { name: 'Simpan' }).click();
+  await dAkun.getByText('Pengulangan kata sandi tidak sama.').waitFor();
+  await dAkun.getByLabel('Ulangi kata sandi baru').fill('sandi-akun-baru');
+  await dAkun.getByRole('button', { name: 'Simpan' }).click();
+  await dAkun.getByText('Kata sandi lama salah.').waitFor();
+  await dAkun.getByLabel('Kata sandi saat ini').fill('kunci-dev');
+  await dAkun.getByRole('button', { name: 'Simpan' }).click();
+  await page.getByText('Kata sandi akun diganti. Perangkat lain perlu masuk lagi.').waitFor();
+  await dAkun.waitFor({ state: 'detached' });
 
   tahap('kembalikan bawaan: nama dan logo kembali seperti semula');
   await page.goto(BASE + '/#/pengaturan');
@@ -295,8 +313,8 @@ try {
   assert.equal((await page.getByLabel('Nama aplikasi').inputValue()).length, 40, 'nama dibatasi 40 karakter');
   await page.getByLabel('Nama aplikasi').fill('Dapurkeluargabesarsejahterabersamaselalu1');
   await page.getByRole('button', { name: 'Simpan tampilan' }).click();
-  await page.getByRole('button', { name: 'Buat kata sandi' }).click();
-  const d6 = page.getByRole('dialog', { name: 'Buat kata sandi' });
+  await page.getByRole('button', { name: 'Buat kata sandi perangkat' }).click();
+  const d6 = page.getByRole('dialog', { name: 'Buat kata sandi perangkat' });
   await d6.getByLabel(/^Kata sandi/).fill(KATA_SANDI);
   await d6.getByLabel('Ulangi kata sandi').fill(KATA_SANDI);
   await d6.getByRole('button', { name: 'Simpan' }).click();

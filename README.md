@@ -1,6 +1,6 @@
 # Good Receipes
 
-Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Data tersimpan di perangkat Anda lebih dulu (tetap jalan tanpa internet), lalu disalin ke **akun pengguna** di server: backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: setiap pembeli mendaftar sendiri dan datanya terpisah dari pembeli lain.
+Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Data tersimpan di perangkat Anda lebih dulu (tetap jalan tanpa internet), lalu disalin ke **akun pengguna** di server: backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: akun pembeli dibuat lewat halaman admin setelah membayar, dan data setiap pembeli terpisah.
 
 ## Yang bisa dilakukan
 
@@ -11,7 +11,7 @@ Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, 
 - **Resep tambahan di HPP**: HPP makanan A bisa ikut menghitung resep lain, mis. saus atau isian B (per porsi/gram hasil jadi B, atau per resep penuh). Bisa bertingkat (B memakai C) dan dicegah saling memakai.
 - **HPP dan harga**: HPP per resep dan per porsi, harga jual minimum dari margin yang diinginkan, laba per porsi, titik impas (BEP), dan target penjualan per bulan.
 - **Marketing**: ide konten dan ide pemasaran per resep, dengan status dan rencana pekan ini.
-- **Akun pengguna**: daftar dengan nama dan email, lalu username dan kata sandi dikirim ke email. Masuk dengan username atau email, ganti kata sandi, lupa kata sandi lewat tautan email, dan keluar. Data setiap akun terpisah.
+- **Akun pengguna**: dibuat admin; username dan kata sandi dikirim ke email pembeli. Halaman pembuka dengan foto dan tombol **Login**. Masuk dengan username atau email, ganti kata sandi, lupa kata sandi lewat tautan email, dan keluar. Data setiap akun terpisah.
 - **Petunjuk untuk penilai**: tulis apa yang dinilai per aspek (mis. Tekstur: "harus kriuk dan kering", Rasa: "jangan terlalu asin") dan **catatan chef**; penilai melihatnya saat membuka QR.
 - **Kunci layar perangkat** (opsional): kata sandi tambahan untuk membuka aplikasi di perangkat ini, dengan kunci otomatis saat lama tidak dipakai.
 - **Nama dan logo aplikasi** yang bisa diganti sendiri dan tampil di beranda, halaman masuk, kode QR, dan halaman penilai.
@@ -25,7 +25,7 @@ Butuh Node.js 20 atau lebih baru. Tidak ada paket yang perlu dipasang untuk menj
 npm run dev
 ```
 
-Buka http://localhost:8080. Server uji ini memakai tiruan backend Laravel di memori (`tools/server-tiruan.mjs`, tanpa database dan tanpa email). Di `localhost`, `config.js` sengaja tidak memakai server produksi. Di halaman **Masuk**, isi alamat server `http://localhost:8080/api`, lalu masuk dengan email apa saja dan kata sandi `kunci-dev`. Untuk mencoba akun sungguhan (pendaftaran, email, banyak akun), pakai backend Laravel di bawah. Data uji disimpan di `.dev-data.json` (hapus berkas ini atau jalankan `node tools/dev-server.mjs --reset` untuk mengosongkan).
+Buka http://localhost:8080. Server uji ini memakai tiruan backend Laravel di memori (`tools/server-tiruan.mjs`, tanpa database dan tanpa email). Di `localhost`, `config.js` sengaja tidak memakai server produksi. Di halaman **Masuk**, isi alamat server `http://localhost:8080/api`, lalu masuk dengan email apa saja dan kata sandi `kunci-dev`. Untuk mencoba akun sungguhan (halaman admin, email, banyak akun), pakai backend Laravel di bawah. Data uji disimpan di `.dev-data.json` (hapus berkas ini atau jalankan `node tools/dev-server.mjs --reset` untuk mengosongkan).
 
 Tombol **Muat data contoh** (Beranda atau Pengaturan) mengisi empat resep contoh, lengkap dengan foto makanan dan bahan, supaya semua layar bisa dilihat. Fotonya berlisensi bebas untuk penggunaan komersial (domain publik, CC0, atau CC BY); daftar pembuat dan sumbernya ada di `contoh/SUMBER.md` dan wajib ikut disertakan bila foto itu dipakai.
 
@@ -33,14 +33,14 @@ Tombol **Muat data contoh** (Beranda atau Pengaturan) mengisi empat resep contoh
 
 Folder `backend/` berisi API Laravel 13 (PHP 8.3). Semua permintaan masuk ke satu alamat `/api`:
 
-- tanpa login: `daftar`, `masuk`, `lupaSandi`, `aturSandi`, serta `infoNilai` dan `kirimNilai` untuk penilai QR;
+- tanpa login: `masuk`, `lupaSandi`, `aturSandi`, serta `infoNilai` dan `kirimNilai` untuk penilai QR;
 - dengan login (token sesi dari `masuk`): `ping`, `sinkron`, `unggahFoto`, `ubahProfil`, `gantiSandi`, `keluar`.
 
 | Bagian | Isi |
 |---|---|
 | `backend/config/goodrecipes.php` | alamat frontend, batas, dan skema tabel (harus sama dengan `js/lib/schema.js`) |
 | `backend/database/migrations/` | tabel akun (`users`, `sesi_masuk`) dan 12 tabel data (`resep`, `eksperimen`, …), masing-masing dengan kolom pemilik `id_pengguna` |
-| `backend/app/Services/` | `Akun` (daftar, masuk, sesi, kata sandi), `Sinkron` (yang lebih baru menang, per akun), `Foto` (Supabase Storage atau disk), `Penilai` (QR) |
+| `backend/app/Services/` | `Akun` (buat akun, masuk, sesi, kata sandi, syarat lunas), `Sinkron` (yang lebih baru menang, per akun), `Foto` (Supabase Storage atau disk), `Penilai` (QR) |
 | `backend/app/Mail/`, `resources/views/email/` | email akun baru dan email lupa kata sandi |
 | `backend/app/Http/Controllers/ApiController.php` | endpoint `GET/POST /api` dan `GET /foto/{nama}` |
 
@@ -57,7 +57,7 @@ Folder `backend/` berisi API Laravel 13 (PHP 8.3). Semua permintaan masuk ke sat
    php artisan serve           # http://localhost:8000
    ```
    Untuk uji lokal, arahkan email ke Mailpit Laragon: `MAIL_HOST=127.0.0.1`, `MAIL_PORT=1025`. Semua email yang "terkirim" bisa dibaca di http://localhost:8025. Isi `FRONTEND_URL=http://localhost:8080`.
-3. Jalankan aplikasi (`npm run dev` di folder utama). Di halaman **Masuk**, tekan **ganti** di bawah, isi server `http://localhost:8000/api`, lalu **Daftar akun baru**. Username dan kata sandi muncul di Mailpit.
+3. Jalankan aplikasi (`npm run dev` di folder utama). Buat admin lokal (`php artisan resep:buat-admin "Admin" admin@lokal.test`), buka http://localhost:8000/admin, lalu buat akun pembeli. Username dan kata sandi muncul di Mailpit. Di aplikasi, tekan **Login**; server lokal `http://localhost:8000/api` dipakai otomatis.
 
 Tanpa pengaturan Supabase, foto disimpan di `backend/storage/app/foto` dan dilayani lewat `/foto/...`.
 
@@ -67,23 +67,28 @@ Uji API sungguhan (membuat dua akun uji dan menulis data contoh, jadi pakai data
 API_URL=http://localhost:8000/api PHP=php npm run test:api
 ```
 
-### Akun pembeli (untuk penjual aplikasi)
+### Akun pembeli dan halaman admin (untuk penjual aplikasi)
 
-- Pembeli mendaftar sendiri di halaman **Daftar akun baru**: cukup nama dan email. Server membuat **username** (dari nama + 4 angka) dan **kata sandi acak**, lalu mengirim keduanya ke email itu. Kata sandi pertama sengaja dikirim lewat email, jadi berhasil masuk berarti emailnya benar.
-- Pembeli bisa masuk dengan username atau email, mengganti kata sandi di **Pengaturan > Akun**, dan memakai **Lupa kata sandi** (tautan ke email, berlaku 60 menit, sekali pakai).
+- **Tidak ada pendaftaran sendiri.** Setelah pembeli membayar, buat akunnya di halaman admin `https://<backend-anda>/admin`: isi nama, email, dan pembelian (tanggal, jumlah, metode, lunas). Server membuat **username** (dari nama + 4 angka) dan **kata sandi acak**, lalu mengirim keduanya ke email pembeli. Bila email gagal (atau tidak dicentang), kata sandi ditampilkan sekali di layar.
+- Akun hanya bisa masuk bila **aktif dan pembeliannya lunas**. Menandai belum lunas atau menonaktifkan akun langsung mengeluarkan semua perangkatnya; datanya tetap tersimpan.
+- Di halaman admin juga: cari dan saring akun, ringkasan pendapatan, ubah nama/email, atur ulang kata sandi (dikirim ke email), dan keluarkan semua perangkat.
+- Pembeli masuk dengan username atau email, mengganti kata sandi di **Pengaturan > Akun > Ganti kata sandi akun**, dan memakai **Lupa password?** (tautan ke email, berlaku 60 menit, sekali pakai).
 - Setiap akun hanya melihat datanya sendiri. Di perangkat yang dipakai bergantian, data akun sebelumnya dihapus dari perangkat saat akun lain masuk.
-- Percobaan dibatasi: masuk 10 kali gagal per 5 menit (per IP dan per akun), daftar dan lupa kata sandi 5 kali per 10 menit per IP.
+- Percobaan dibatasi: masuk 10 kali gagal per 5 menit (per IP dan per akun), lupa kata sandi 5 kali per 10 menit per IP, masuk admin 5 kali gagal per 10 menit.
 
-Perintah untuk Anda sebagai penjual (jalankan di folder `backend`, dengan `.env` mengarah ke database produksi):
+Admin disimpan terpisah dari akun pembeli. Buat admin pertama (atau ganti kata sandinya) dari komputer, di folder `backend`:
 
 ```bash
-php artisan resep:daftar-akun                                    # semua akun
-php artisan resep:buat-akun "Nama Pembeli" email@pembeli.com --kirim-email   # buat akun manual
-php artisan resep:akun-aktif sitiaminah1625 tidak                # nonaktifkan (mis. belum bayar); semua perangkatnya keluar
-php artisan resep:akun-aktif sitiaminah1625 ya                   # aktifkan lagi
+php artisan resep:buat-admin "Nama Anda" email@anda.com --env=production   # kata sandi ditanyakan (minimal 10 karakter)
 ```
 
-Akun nonaktif tidak bisa masuk atau sinkron, tetapi datanya tetap tersimpan. Data akun juga bisa dilihat di Supabase (*Table Editor > users*).
+Perintah cadangan (`--env=production` untuk database Supabase):
+
+```bash
+php artisan resep:daftar-akun                                    # semua akun beserta status lunas
+php artisan resep:buat-akun "Nama Pembeli" email@pembeli.com --jumlah=150000 --metode=QRIS --kirim-email
+php artisan resep:akun-aktif sitiaminah1625 tidak                # nonaktifkan; semua perangkatnya keluar
+```
 
 ### 2. Pindah ke Supabase
 
@@ -145,7 +150,7 @@ Semua tabel memakai Row Level Security tanpa kebijakan, sehingga API otomatis Su
 
 ### Email
 
-Email akun baru dan lupa kata sandi dikirim lewat SMTP. Pilihan mudah: [Resend](https://resend.com) atau [Brevo](https://www.brevo.com) (ada paket gratis), dengan domain Anda sendiri yang sudah diverifikasi supaya email tidak masuk Spam. Contoh isian untuk Resend ada di `backend/.env.example` (`MAIL_HOST=smtp.resend.com`, `MAIL_PORT=465`, `MAIL_SCHEME=smtps`, `MAIL_USERNAME=resend`, `MAIL_PASSWORD=<API key>`). Bila email gagal terkirim saat pendaftaran, akun tidak dibuat dan pembeli melihat pesan untuk mencoba lagi.
+Email akun baru dan lupa kata sandi dikirim lewat SMTP. Pilihan mudah: [Resend](https://resend.com) atau [Brevo](https://www.brevo.com) (ada paket gratis), dengan domain Anda sendiri yang sudah diverifikasi supaya email tidak masuk Spam. Contoh isian untuk Resend ada di `backend/.env.example` (`MAIL_HOST=smtp.resend.com`, `MAIL_PORT=465`, `MAIL_SCHEME=smtps`, `MAIL_USERNAME=resend`, `MAIL_PASSWORD=<API key>`). Bila email gagal terkirim saat admin membuat akun, akun tetap dibuat dan kata sandinya ditampilkan sekali di halaman admin.
 
 ## Menerbitkan ke GitHub Pages
 
@@ -228,7 +233,7 @@ tests/                                                uji otomatis
 npm test          # uji logika, data, sinkronisasi, kata sandi, dan PWA (tanpa paket tambahan)
 npm i             # sekali saja, memasang playwright-core
 npm run e2e       # semua alur di browser Chromium: bahan, resep, eksperimen, HPP, QR, penilai, offline,
-                  # lalu masuk/daftar akun, kunci layar, lupa kata sandi, keluar, serta nama dan logo aplikasi
+                  # lalu layar sambutan dan Login, kunci layar, lupa kata sandi, keluar, serta nama dan logo aplikasi
 npm run e2e:masuk # hanya alur masuk dan merek (SS=/folder untuk menyimpan tangkapan layar)
 npm run test:api  # backend Laravel sungguhan (lihat bagian Backend Laravel + Supabase)
 ```

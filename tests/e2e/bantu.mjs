@@ -3,6 +3,10 @@
 /** Masuk ke akun uji lewat layar Masuk, memakai tiruan akun dev-server (kata sandi kunci-dev). */
 export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'kunci-dev' } = {}) {
   await page.goto(base + '/');
+  // Layar sambutan: formulir baru muncul setelah tombol Login ditekan.
+  const tombolLogin = page.getByRole('button', { name: 'Login', exact: true });
+  await tombolLogin.or(page.locator('#login-akun')).first().waitFor();
+  if (await tombolLogin.count()) await tombolLogin.click();
   await page.locator('#login-akun').waitFor();
   const ganti = page.getByRole('button', { name: 'ganti', exact: true });
   if (await ganti.count()) await ganti.click();

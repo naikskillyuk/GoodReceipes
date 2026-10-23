@@ -2760,6 +2760,136 @@ button.tautan-hijau {
   min-height: 20px;
 }
 
+/* Sambutan sebelum login: foto cemilan, nama aplikasi, tombol Login, lalu formulir dari bawah */
+.sambut {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #2a1a12;
+  isolation: isolate;
+}
+.sambut-latar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 30% 60%;
+  z-index: -2;
+}
+.sambut::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    rgba(248, 243, 236, 0.97) 0%,
+    rgba(248, 243, 236, 0.9) 24%,
+    rgba(248, 243, 236, 0.35) 46%,
+    rgba(20, 14, 10, 0) 62%,
+    rgba(20, 14, 10, 0.55) 100%
+  );
+}
+.sambut-isi {
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 460px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: max(40px, calc(env(safe-area-inset-top) + 24px)) 24px max(20px, calc(env(safe-area-inset-bottom) + 12px));
+}
+.sambut-judul {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.sambut-judul h1 {
+  margin: 0;
+  font-family: var(--judul);
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(40px, 12vw, 54px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--hijau);
+  overflow-wrap: anywhere;
+}
+.sambut-judul p {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink2);
+}
+.sambut-bawah {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sambut-login {
+  min-height: 64px;
+  font-size: 18px;
+  box-shadow: 0 18px 36px -16px rgba(0, 0, 0, 0.7);
+}
+.sambut-kredit {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.lembar-masuk {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px 22px;
+  background: var(--kartu);
+  border-radius: 30px;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+  animation: lembar-naik 0.28s ease-out;
+}
+.lembar-kepala {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lembar-kepala h2 {
+  margin: 0;
+  font-family: var(--judul);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--hijau);
+}
+.tautan-kecil {
+  align-self: flex-end;
+  min-height: 32px;
+  margin-top: -6px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hijau-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@keyframes lembar-naik {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lembar-masuk {
+    animation: none;
+  }
+}
+
 /* Petunjuk dari pemilik di halaman penilai */
 .petunjuk-aspek {
   margin: 2px 0 6px;

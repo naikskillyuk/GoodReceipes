@@ -10,7 +10,7 @@ menunjukkan tampilan bahan yang belum punya foto.
 
 | Berkas | Dipakai untuk | Judul dan sumber | Pembuat | Lisensi |
 | --- | --- | --- | --- | --- |
-| `brownies-1.jpg` | Resep Brownies Fudgy, Eksperimen 3 | [basic fudgy brownies](https://www.flickr.com/photos/21001756@N06/4489064762) | Stacy Spensley | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
+| `brownies-1.jpg` | Resep Brownies Fudgy, Eksperimen 3; juga latar halaman Login (`gambar/latar-masuk.jpg`) | [basic fudgy brownies](https://www.flickr.com/photos/21001756@N06/4489064762) | Stacy Spensley | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 | `brownies-2.jpg` | Brownies Fudgy, Eksperimen 2 | [basic fudgy brownies](https://www.flickr.com/photos/21001756@N06/4489064826) | Stacy Spensley | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 | `brownies-3.jpg` | Brownies Fudgy, Eksperimen 4 | [basic fudgy brownies](https://www.flickr.com/photos/21001756@N06/4488416419) | Stacy Spensley | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
 | `es-kopi-1.jpg` | Resep Es Kopi Susu Gula Aren, Eksperimen 2 | [Pouring Espresso for Iced Latte](https://www.flickr.com/photos/195403219@N08/52220711540) | markolaz | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |

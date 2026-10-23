@@ -24,6 +24,7 @@
     "VIEW_COMPILED_PATH": "/tmp/storage/framework/views",
     "LOG_CHANNEL": "stderr",
     "SESSION_DRIVER": "cookie",
+    "SESSION_SECURE_COOKIE": "true",
     "CACHE_STORE": "database",
     "DB_CONNECTION": "pgsql",
     "DB_SSLMODE": "require"

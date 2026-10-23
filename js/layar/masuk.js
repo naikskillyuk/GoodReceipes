@@ -34,7 +34,7 @@ function LupaKataSandi({ db, onTutup, onSelesai }) {
     try {
       await masukAkun(db, alamatServer(db), { login: akun.username || akun.email || '', kataSandi: sandi });
       db.aturPengaturan({ kunciAplikasi: null });
-      tampilToast('Kata sandi perangkat dihapus. Buat yang baru di Pengaturan > Keamanan.');
+      tampilToast('Kata sandi perangkat dihapus. Buat yang baru di Pengaturan > Kunci perangkat.');
       onSelesai();
     } catch (err) {
       setGalat(err.message || 'Kata sandi akun tidak diterima.');

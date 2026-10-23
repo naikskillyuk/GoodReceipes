@@ -1,4 +1,4 @@
-// Layar akun sebelum aplikasi terbuka: Masuk, Daftar, Lupa kata sandi,
+// Layar akun sebelum aplikasi terbuka: sambutan dengan tombol Login, Lupa kata sandi,
 // dan Buat kata sandi baru (dibuka dari tautan di email).
 
 import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
@@ -7,7 +7,7 @@ import { Ikon } from '../ui/ikon.js';
 import { tampilToast } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
 import { ambilMerek } from '../lib/repo.js';
-import { alamatServer, serverTetap, masukAkun, daftarAkun, mintaAturUlang, aturSandiBaru, MIN_SANDI } from '../lib/akun.js';
+import { alamatServer, serverTetap, masukAkun, mintaAturUlang, aturSandiBaru, MIN_SANDI } from '../lib/akun.js';
 
 function IsianSandi({ id, label, nilai, onUbah, autocomplete, inputRef, galat }) {
   const [lihat, setLihat] = useState(false);
@@ -50,20 +50,22 @@ function PilihServerUji({ db }) {
   </form>`;
 }
 
+/**
+ * Layar sambutan: foto cemilan, nama aplikasi, dan tombol Login. Formulir masuk (dan lupa
+ * kata sandi) muncul dari bawah setelah tombol ditekan. Akun dibuat oleh admin, tidak ada daftar sendiri.
+ */
 export function LayarAkun({ k }) {
   const { db } = k;
   const merek = ambilMerek(db);
-  const [mode, setMode] = useState('masuk'); // masuk | daftar | lupa
+  const sesiHabis = !!(db.pengaturan.akun && db.pengaturan.akun.id);
+  const [mode, setMode] = useState(sesiHabis ? 'masuk' : 'sambut'); // sambut | masuk | lupa
   const [login, setLogin] = useState((db.pengaturan.akun && db.pengaturan.akun.username) || '');
   const [sandi, setSandi] = useState('');
-  const [nama, setNama] = useState('');
-  const [email, setEmail] = useState('');
   const [galat, setGalat] = useState('');
   const [pesan, setPesan] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const ref = useRef(null);
   const url = alamatServer(db);
-  const sesiHabis = !!(db.pengaturan.akun && db.pengaturan.akun.id);
 
   useEffect(() => {
     if (ref.current) ref.current.focus();
@@ -103,18 +105,6 @@ export function LayarAkun({ k }) {
     });
   };
 
-  const daftar = (e) => {
-    e.preventDefault();
-    if (nama.trim().length < 2) return setGalat('Isi nama Anda.');
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setGalat('Alamat email tidak valid.');
-    jalankan(async () => {
-      const j = await daftarAkun(url, { nama, email });
-      setLogin(email.trim());
-      setMode('masuk');
-      setPesan(j.pesan + ' Periksa juga folder Spam.');
-    });
-  };
-
   const lupa = (e) => {
     e.preventDefault();
     if (!login.trim()) return setGalat('Isi username atau email akun Anda.');
@@ -125,57 +115,57 @@ export function LayarAkun({ k }) {
     });
   };
 
-  return html`<main class="masuk">
-    <div class="masuk-kartu">
-      <${LogoMerek} src=${merek.logo} ukuran=${84} kelas="besar" />
-      <div class="masuk-judul">
-        <span class="hero-label">${mode === 'daftar' ? 'Buat akun baru' : mode === 'lupa' ? 'Lupa kata sandi' : sesiHabis ? 'Masuk lagi' : 'Selamat datang'}</span>
+  const terbuka = mode !== 'sambut';
+
+  return html`<main class="sambut">
+    <img class="sambut-latar" src="gambar/latar-masuk.jpg" alt="" aria-hidden="true" />
+    <div class="sambut-isi">
+      <header class="sambut-judul">
+        <${LogoMerek} src=${merek.logo} ukuran=${56} />
         <h1>${merek.nama}</h1>
-      </div>
+        <p>Catat eksperimen resep, hitung HPP, dan temukan resep juara Anda.</p>
+      </header>
 
-      ${pesan && html`<div class="info" role="status">${pesan}</div>`}
-      ${sesiHabis && mode === 'masuk' && !pesan && html`<p class="bantu" style="text-align:center">Sesi Anda berakhir. Masuk lagi untuk melanjutkan; data di perangkat ini tetap ada.</p>`}
+      ${!terbuka &&
+      html`<div class="sambut-bawah">
+        <button class="pil sambut-login" onClick=${() => ganti('masuk')}>Login<span class="ujung"><${Ikon} nama="panah" /></span></button>
+        <p class="sambut-kredit">Foto: Stacy Spensley, CC BY 2.0</p>
+      </div>`}
 
-      ${mode === 'masuk' &&
-      html`<form class="kolom" onSubmit=${masuk} style="gap:14px" novalidate>
-        <label class="bidang" for="login-akun"><span>Username atau email</span>
-          <input id="login-akun" ref=${ref} class="input" autocomplete="username" autocapitalize="off" spellcheck=${false} maxlength="190" value=${login} onInput=${(e) => setLogin(e.target.value)} />
-        </label>
-        <${IsianSandi} id="sandi-akun" label="Kata sandi" nilai=${sandi} onUbah=${setSandi} autocomplete="current-password" galat=${galat} />
-        ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
-        <button class="pil" type="submit" disabled=${sibuk}>${sibuk ? 'Memeriksa…' : 'Masuk'}<span class="ujung"><${Ikon} nama="panah" /></span></button>
-        <div class="baris-pisah" style="justify-content:space-between">
-          <button type="button" class="tautan-hijau" onClick=${() => ganti('lupa')}>Lupa kata sandi?</button>
-          <button type="button" class="tautan-hijau" onClick=${() => ganti('daftar')}>Daftar akun baru</button>
+      ${terbuka &&
+      html`<section class="lembar-masuk" aria-labelledby="judul-lembar">
+        <div class="lembar-kepala">
+          <h2 id="judul-lembar">${mode === 'lupa' ? 'Lupa kata sandi' : sesiHabis ? 'Masuk lagi' : 'Login'}</h2>
+          <button type="button" class="ikon-btn" aria-label="Tutup" onClick=${() => ganti('sambut')}><${Ikon} nama="tutup" /></button>
         </div>
-      </form>`}
 
-      ${mode === 'daftar' &&
-      html`<form class="kolom" onSubmit=${daftar} style="gap:14px" novalidate>
-        <label class="bidang" for="nama-daftar"><span>Nama Anda</span>
-          <input id="nama-daftar" ref=${ref} class="input" autocomplete="name" maxlength="60" value=${nama} onInput=${(e) => setNama(e.target.value)} />
-        </label>
-        <label class="bidang" for="email-daftar"><span>Email</span>
-          <input id="email-daftar" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck=${false} maxlength="190" value=${email} onInput=${(e) => setEmail(e.target.value)} />
-          <span class="bantu">Username dan kata sandi akan dikirim ke email ini.</span>
-        </label>
-        ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
-        <button class="pil" type="submit" disabled=${sibuk}>${sibuk ? 'Mendaftarkan…' : 'Daftar'}<span class="ujung"><${Ikon} nama="kirim" /></span></button>
-        <button type="button" class="tautan-hijau" style="align-self:center" onClick=${() => ganti('masuk')}>Sudah punya akun? Masuk</button>
-      </form>`}
+        ${pesan && html`<div class="info" role="status">${pesan}</div>`}
+        ${sesiHabis && mode === 'masuk' && !pesan && html`<p class="bantu">Sesi Anda berakhir. Masuk lagi untuk melanjutkan; data di perangkat ini tetap ada.</p>`}
 
-      ${mode === 'lupa' &&
-      html`<form class="kolom" onSubmit=${lupa} style="gap:14px" novalidate>
-        <label class="bidang" for="login-lupa"><span>Username atau email</span>
-          <input id="login-lupa" ref=${ref} class="input" autocomplete="username" autocapitalize="off" spellcheck=${false} maxlength="190" value=${login} onInput=${(e) => setLogin(e.target.value)} />
-          <span class="bantu">Kami kirim tautan untuk membuat kata sandi baru ke email akun Anda.</span>
-        </label>
-        ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
-        <button class="pil" type="submit" disabled=${sibuk}>${sibuk ? 'Mengirim…' : 'Kirim tautan'}<span class="ujung"><${Ikon} nama="kirim" /></span></button>
-        <button type="button" class="tautan-hijau" style="align-self:center" onClick=${() => ganti('masuk')}>Kembali ke Masuk</button>
-      </form>`}
+        ${mode === 'masuk' &&
+        html`<form class="kolom" onSubmit=${masuk} style="gap:14px" novalidate>
+          <label class="bidang" for="login-akun"><span>Username atau email</span>
+            <input id="login-akun" ref=${ref} class="input" autocomplete="username" autocapitalize="off" spellcheck=${false} maxlength="190" value=${login} onInput=${(e) => setLogin(e.target.value)} />
+          </label>
+          <${IsianSandi} id="sandi-akun" label="Kata sandi" nilai=${sandi} onUbah=${setSandi} autocomplete="current-password" galat=${galat} />
+          <button type="button" class="tautan-kecil" onClick=${() => ganti('lupa')}>Lupa password?</button>
+          ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+          <button class="pil" type="submit" disabled=${sibuk}>${sibuk ? 'Memeriksa…' : 'Masuk'}<span class="ujung"><${Ikon} nama="panah" /></span></button>
+        </form>`}
 
-      <${PilihServer} db=${db} />
+        ${mode === 'lupa' &&
+        html`<form class="kolom" onSubmit=${lupa} style="gap:14px" novalidate>
+          <label class="bidang" for="login-lupa"><span>Username atau email</span>
+            <input id="login-lupa" ref=${ref} class="input" autocomplete="username" autocapitalize="off" spellcheck=${false} maxlength="190" value=${login} onInput=${(e) => setLogin(e.target.value)} />
+            <span class="bantu">Kami kirim tautan untuk membuat kata sandi baru ke email akun Anda.</span>
+          </label>
+          ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+          <button class="pil" type="submit" disabled=${sibuk}>${sibuk ? 'Mengirim…' : 'Kirim tautan'}<span class="ujung"><${Ikon} nama="kirim" /></span></button>
+          <button type="button" class="tautan-kecil" style="align-self:center" onClick=${() => ganti('masuk')}>Kembali ke Login</button>
+        </form>`}
+
+        <${PilihServer} db=${db} />
+      </section>`}
     </div>
   </main>`;
 }

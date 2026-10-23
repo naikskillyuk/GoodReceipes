@@ -78,7 +78,8 @@ test('perangkat A -> server -> perangkat B, termasuk resep tambahan, foto, dan p
   a.db.simpan('ResepTambahan', { ...rt, jumlah: 50 });
 
   const eks = repo.eksperimenResep(a.db, brownies)[2];
-  a.db.simpan('Eksperimen', { ...a.db.ambil('Eksperimen', eks.id), fotoHasilLokal: PNG });
+  // Seperti saat foto diganti di aplikasi: foto baru mengosongkan tautan foto lama.
+  a.db.simpan('Eksperimen', { ...a.db.ambil('Eksperimen', eks.id), fotoHasilLokal: PNG, fotoHasilUrl: '' });
   repo.pastikanToken(a.db, eks.id);
   a.db.simpan('Eksperimen', { ...a.db.ambil('Eksperimen', eks.id), panduanNilai: { tekstur: 'Harus kriuk kering' }, catatanChef: 'Gula dikurangi.' });
 
