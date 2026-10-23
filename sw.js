@@ -3,9 +3,9 @@
 // Strategi: ambil dari jaringan lebih dulu (supaya pembaruan langsung terlihat) dan jatuh ke
 // salinan tersimpan bila offline atau lambat. Daftar berkas dan nomor versi di bawah ini
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
-// Permintaan ke Google Apps Script tidak pernah dicegat: itu lintas-asal.
+// Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-85763f0e9f';
+const VERSI = 'resep-fd9ea8e49b';
 const FILE = [
   // <daftar-file>
   'config.js',

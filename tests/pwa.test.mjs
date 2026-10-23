@@ -33,7 +33,7 @@ test('sw.js: semua berkas di daftar ada, dan berkas inti ikut tersimpan', () => 
   for (const wajib of ['index.html', 'js/main.js', 'css/app.css', 'vendor/preact-htm.js', 'vendor/qrcode.js', 'manifest.webmanifest']) {
     assert.ok(daftar.includes(wajib), wajib + ' belum ikut di-cache');
   }
-  assert.ok(!daftar.some((f) => f.startsWith('tests/') || f.startsWith('tools/') || f.startsWith('apps-script/')), 'berkas pengembangan tidak boleh ikut');
+  assert.ok(!daftar.some((f) => f.startsWith('tests/') || f.startsWith('tools/') ), 'berkas pengembangan tidak boleh ikut');
 });
 
 test('semua modul JS yang diimpor ada', () => {

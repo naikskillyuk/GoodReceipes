@@ -130,7 +130,7 @@ export function dariBaris(tabel, mentah) {
   return baris;
 }
 
-/** Pasangan [kolom foto lokal, kolom foto di Drive] per tabel. */
+/** Pasangan [kolom foto lokal, kolom tautan foto di server] per tabel. */
 export const KOLOM_FOTO = {
   Resep: [['fotoAcuanLokal', 'fotoAcuanUrl']],
   Eksperimen: [['fotoHasilLokal', 'fotoHasilUrl']],

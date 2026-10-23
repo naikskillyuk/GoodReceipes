@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * Sinkronisasi baris dengan aplikasi.
  *
- * Aturan sama dengan versi Spreadsheet: baris hanya menimpa bila `diubah`-nya lebih baru
+ * Aturan: baris hanya menimpa bila `diubah`-nya lebih baru
  * daripada yang tersimpan; jawaban berisi semua baris yang `diubah`-nya lewat dari `sejak`.
  */
 class Sinkron

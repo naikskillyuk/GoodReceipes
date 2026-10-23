@@ -41,7 +41,7 @@ async function tungguServer() {
 function pantau(page, nama) {
   page.on('pageerror', (e) => galat.push(`[${nama}] pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !/favicon|manifest|icon|sw\.js|404|drive\.google/.test(m.text())) galat.push(`[${nama}] console: ${m.text()}`);
+    if (m.type() === 'error' && !/favicon|manifest|icon|sw\.js|404/.test(m.text())) galat.push(`[${nama}] console: ${m.text()}`);
   });
 }
 
@@ -62,8 +62,8 @@ try {
 
   tahap('tampilan bawaan: nama dan logo bawaan di beranda dan judul tab');
   await page.goto(BASE + '/');
-  await page.getByRole('heading', { name: 'Eksperimen Resep', level: 1 }).waitFor();
-  assert.equal(await page.title(), 'Eksperimen Resep');
+  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  assert.equal(await page.title(), 'Good Receipes');
   assert.equal(await page.getByRole('button', { name: 'Kunci aplikasi' }).count(), 0, 'tanpa kata sandi tidak ada tombol kunci');
 
   tahap('muat data contoh');
@@ -201,7 +201,6 @@ try {
 
   tahap('penilai di perangkat lain melihat nama dan logo dari server');
   const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await ctx2.route('https://drive.google.com/**', (r) => r.fulfill({ contentType: 'image/png', body: PNG }));
   const rater = await ctx2.newPage();
   pantau(rater, 'penilai');
   await rater.goto(tautan);
@@ -210,7 +209,7 @@ try {
   await rater.getByText(/^Beri penilaian · Eksperimen/).waitFor();
   await rater.waitForFunction(() => document.title === 'Beri penilaian · Dapur Bu Sari');
   const srcLogo = await rater.locator('.merek-hero img').getAttribute('src');
-  assert.match(srcLogo, /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/, 'logo memakai tautan dari server, bukan salinan lokal');
+  assert.match(srcLogo, /^\/foto\//, 'logo memakai tautan dari server, bukan salinan lokal');
   assert.ok(await rater.locator('.merek-hero img').evaluate((i) => i.complete && i.naturalWidth > 0), 'logo penilai termuat');
   await foto(rater, '6-penilai');
   await ctx2.close();
@@ -276,7 +275,7 @@ try {
   await page.goto(BASE + '/#/');
   await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
   assert.ok((await page.evaluate(() => window.__app.db.semua('Resep').length)) > 0, 'resep kembali dari server');
-  assert.equal(await page.evaluate(() => /^(https:\/\/drive\.google\.com\/thumbnail|\/foto\/)/.test(window.__app.db.ambil('Setelan', 'stl_merek').logoUrl)), true, 'logo kembali lewat tautan server');
+  assert.equal(await page.evaluate(() => /^\/foto\//.test(window.__app.db.ambil('Setelan', 'stl_merek').logoUrl)), true, 'logo kembali lewat tautan server');
 
   tahap('kembalikan bawaan: nama dan logo kembali seperti semula');
   await page.goto(BASE + '/#/pengaturan');
@@ -284,8 +283,8 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: 'Kembalikan' }).click();
   await page.getByText('Kembali ke tampilan bawaan.').waitFor();
   await page.goto(BASE + '/#/');
-  await page.getByRole('heading', { name: 'Eksperimen Resep', level: 1 }).waitFor();
-  assert.equal(await page.title(), 'Eksperimen Resep');
+  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  assert.equal(await page.title(), 'Good Receipes');
   assert.equal(await page.locator('link[rel=icon]').getAttribute('href'), 'icons/icon.svg');
 
   tahap('nama sangat panjang tidak merusak tata letak di halaman masuk, beranda, pengaturan, dan QR');

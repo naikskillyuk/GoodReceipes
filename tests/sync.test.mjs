@@ -1,8 +1,8 @@
-// Tes sinkronisasi dengan apps-script/Code.gs yang sama persis, dijalankan di tiruan Apps Script.
+// Tes sinkronisasi terhadap tiruan backend Laravel (tools/server-tiruan.mjs) di memori.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buatServer, fetchKeServer } from '../tools/mock-gas.mjs';
+import { buatServer, fetchKeServer } from '../tools/server-tiruan.mjs';
 import { buatDB, penyimpananMemori } from '../js/lib/db.js';
 import { buatPenyinkron, panggilApi, ambilInfoNilai, kirimNilai, tesKoneksi, GalatSinkron } from '../js/lib/sync.js';
 import * as repo from '../js/lib/repo.js';
@@ -10,7 +10,7 @@ import { muatContoh } from '../js/lib/seed.js';
 import { skorDariDB } from '../js/lib/repo.js';
 
 const KUNCI = 'kunci-uji-123';
-const URL_UJI = 'https://script.google.com/macros/s/uji/exec';
+const URL_UJI = 'https://server-uji.test/api';
 
 async function perangkat(server, nama = 'A') {
   const db = buatDB(penyimpananMemori());
@@ -21,14 +21,14 @@ async function perangkat(server, nama = 'A') {
   return { db, sinkron: buatPenyinkron(db, { fetchFn }), fetchFn };
 }
 
-const baruServer = () => buatServer({ lembar: {}, foto: {} }, { kunci: KUNCI });
+const baruServer = () => buatServer({ tabel: {}, foto: {} }, { kunci: KUNCI });
 
-test('ping: kunci benar diterima, salah ditolak', async () => {
+test('ping: sesi benar diterima, salah ditolak', async () => {
   const server = baruServer();
   const { fetchFn } = await perangkat(server);
   assert.equal((await tesKoneksi({ scriptUrl: URL_UJI, kunci: KUNCI }, { fetchFn })).ok, true);
-  await assert.rejects(() => tesKoneksi({ scriptUrl: URL_UJI, kunci: 'salah' }, { fetchFn }), (e) => e instanceof GalatSinkron && e.kode === 'KUNCI');
-  await assert.rejects(() => tesKoneksi({ scriptUrl: URL_UJI, kunci: '' }, { fetchFn }), /Kunci salah/);
+  await assert.rejects(() => tesKoneksi({ scriptUrl: URL_UJI, kunci: 'salah' }, { fetchFn }), (e) => e instanceof GalatSinkron && e.kode === 'SESI');
+  await assert.rejects(() => tesKoneksi({ scriptUrl: URL_UJI, kunci: '' }, { fetchFn }), /Sesi Anda sudah berakhir/);
   assert.equal(server.get().ok, true);
 });
 
@@ -149,7 +149,7 @@ test('penilaian: token salah, nilai tidak sah, ditutup, nama wajib', async () =>
   await kirimNilai(URL_UJI, tokenNilai, baik, { fetchFn });
 });
 
-test('komentar berisi rumus dinetralkan dan teks panjang dipotong', async () => {
+test('teks dari penilai dibersihkan dari karakter kontrol dan dipotong', async () => {
   const server = baruServer();
   const a = await perangkat(server);
   const { brownies } = muatContoh(a.db);
@@ -157,31 +157,27 @@ test('komentar berisi rumus dinetralkan dan teks panjang dipotong', async () => 
   const { tokenNilai } = repo.pastikanToken(a.db, eks.id);
   await a.sinkron.sinkronkan();
   const { fetchFn } = a;
-  await kirimNilai(URL_UJI, tokenNilai, { nama: '=HYPERLINK("http://jahat")', rasa: 5, tekstur: 5, tampilan: 5, aroma: 5, minatBeli: 5, komentar: '+cmd|x' + 'a'.repeat(5000) }, { fetchFn });
-  const tersimpan = server.keadaan.lembar.Penilaian.data;
-  const header = tersimpan[0];
-  const baris = tersimpan[tersimpan.length - 1];
-  const nama = baris[header.indexOf('namaPenilai')];
-  const komentar = baris[header.indexOf('komentar')];
-  assert.ok(!/^[=+\-@]/.test(nama));
-  assert.ok(!/^[=+\-@]/.test(komentar));
-  assert.ok(komentar.length <= 1001);
-  assert.ok(server.keadaan.lembar.Penilaian.format[header.indexOf('komentar') + 1] === '@', 'kolom teks berformat teks biasa');
+  await kirimNilai(URL_UJI, tokenNilai, { nama: ' Tamu\u0007' + 'n'.repeat(100), rasa: 5, tekstur: 5, tampilan: 5, aroma: 5, minatBeli: 5, komentar: 'ok\u0000' + 'a'.repeat(5000) }, { fetchFn });
+  const baris = Object.values(server.keadaan.tabel.Penilaian).at(-1);
+  assert.ok(baris.namaPenilai.startsWith('Tamu'));
+  assert.equal(baris.namaPenilai.length, 60);
+  assert.ok(!/[\u0000-\u0008]/.test(baris.namaPenilai + baris.komentar));
+  assert.equal(baris.komentar.length, 1000);
 });
 
-test('aksi pemilik tanpa kunci ditolak, termasuk membaca data', async () => {
+test('aksi pemilik tanpa sesi ditolak, termasuk membaca data', async () => {
   const server = baruServer();
   const a = await perangkat(server);
   muatContoh(a.db);
   await a.sinkron.sinkronkan();
   const { fetchFn } = a;
-  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'sinkron', sejak: 0, baris: {} }, { fetchFn }), /Kunci salah/);
-  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'sinkron', kunci: 'x', sejak: 0, baris: {} }, { fetchFn }), /Kunci salah/);
-  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'unggahFoto', mime: 'image/png', base64: 'AAAA' }, { fetchFn }), /Kunci salah/);
-  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'apa-saja' }, { fetchFn }), /Kunci salah/);
+  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'sinkron', sejak: 0, baris: {} }, { fetchFn }), /Sesi Anda sudah berakhir/);
+  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'sinkron', kunci: 'x', sejak: 0, baris: {} }, { fetchFn }), /Sesi Anda sudah berakhir/);
+  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'unggahFoto', mime: 'image/png', base64: 'AAAA' }, { fetchFn }), /Sesi Anda sudah berakhir/);
+  await assert.rejects(() => panggilApi(URL_UJI, { aksi: 'apa-saja' }, { fetchFn }), /Sesi Anda sudah berakhir/);
 });
 
-test('unggah foto: data lokal menjadi tautan Drive dan tersimpan di baris', async () => {
+test('unggah foto: data lokal menjadi tautan server dan tersimpan di baris', async () => {
   const server = baruServer();
   const a = await perangkat(server);
   const { brownies } = muatContoh(a.db);
@@ -192,7 +188,7 @@ test('unggah foto: data lokal menjadi tautan Drive dan tersimpan di baris', asyn
   const hasil = await a.sinkron.sinkronkan();
   assert.equal(hasil.foto, 1);
   const sesudah = a.db.ambil('Eksperimen', eks.id);
-  assert.match(sesudah.fotoHasilUrl, /^https:\/\/drive\.google\.com\/thumbnail\?id=/);
+  assert.match(sesudah.fotoHasilUrl, /^\/foto\//);
   assert.equal(sesudah.fotoHasilLokal, png); // salinan lokal tetap ada
   assert.equal(Object.keys(server.keadaan.foto).length, 1);
   assert.equal(Buffer.from(Object.values(server.keadaan.foto)[0].base64, 'base64').toString(), 'gambar-uji');
@@ -268,7 +264,7 @@ test('kategori bawaan di perangkat baru tidak ganda dan tidak menimpa perubahan 
   assert.deepEqual(repo.daftarKategori(b.db).map((k) => k.nama).sort(), ['Camilan', 'Kue Basah', 'Lauk', 'Minuman', 'Roti']);
   await a.sinkron.sinkronkan();
   assert.equal(repo.daftarKategori(a.db).length, 5);
-  assert.equal(server.keadaan.lembar.Kategori.data.length - 1, 5, 'tidak ada baris ganda di Spreadsheet');
+  assert.equal(Object.keys(server.keadaan.tabel.Kategori).length, 5, 'tidak ada baris ganda di server');
 });
 
 test('merek: nama dan logo tersinkron ke perangkat lain dan tampil bagi penilai', async () => {
@@ -285,7 +281,7 @@ test('merek: nama dan logo tersinkron ke perangkat lain dan tampil bagi penilai'
   const merekA = repo.ambilMerek(a.db);
   assert.equal(merekA.logo, png, 'perangkat sendiri tetap memakai salinan lokal');
   const baris = a.db.ambil('Setelan', repo.ID_MEREK);
-  assert.match(baris.logoUrl, /^https:\/\/drive\.google\.com\/thumbnail\?id=/);
+  assert.match(baris.logoUrl, /^\/foto\//);
 
   // penilai (tanpa login) melihat nama dan logo
   const info = await ambilInfoNilai(URL_UJI, tokenNilai, { fetchFn: a.fetchFn });

@@ -406,7 +406,7 @@ export function dataHPP(db, idResep) {
 
 // ---------- Merek (nama dan logo aplikasi) ----------
 
-export const NAMA_APLIKASI_BAWAAN = 'Eksperimen Resep';
+export const NAMA_APLIKASI_BAWAAN = 'Good Receipes';
 export const LOGO_BAWAAN = 'icons/icon.svg';
 export const ID_MEREK = 'stl_merek';
 

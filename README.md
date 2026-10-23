@@ -1,4 +1,4 @@
-# Eksperimen Resep
+# Good Receipes
 
 Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Data tersimpan di perangkat Anda lebih dulu (tetap jalan tanpa internet), lalu disalin ke **akun pengguna** di server: backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: setiap pembeli mendaftar sendiri dan datanya terpisah dari pembeli lain.
 
@@ -25,7 +25,7 @@ Butuh Node.js 20 atau lebih baru. Tidak ada paket yang perlu dipasang untuk menj
 npm run dev
 ```
 
-Buka http://localhost:8080. Server uji ini memakai tiruan sederhana (tanpa database dan tanpa email). Di halaman **Masuk**, isi alamat server `http://localhost:8080/api`, lalu masuk dengan email apa saja dan kata sandi `kunci-dev`. Untuk mencoba akun sungguhan (pendaftaran, email, banyak akun), pakai backend Laravel di bawah. Data uji disimpan di `.dev-data.json` (hapus berkas ini atau jalankan `node tools/dev-server.mjs --reset` untuk mengosongkan).
+Buka http://localhost:8080. Server uji ini memakai tiruan backend Laravel di memori (`tools/server-tiruan.mjs`, tanpa database dan tanpa email). Di `localhost`, `config.js` sengaja tidak memakai server produksi. Di halaman **Masuk**, isi alamat server `http://localhost:8080/api`, lalu masuk dengan email apa saja dan kata sandi `kunci-dev`. Untuk mencoba akun sungguhan (pendaftaran, email, banyak akun), pakai backend Laravel di bawah. Data uji disimpan di `.dev-data.json` (hapus berkas ini atau jalankan `node tools/dev-server.mjs --reset` untuk mengosongkan).
 
 Tombol **Muat data contoh** (Beranda atau Pengaturan) mengisi empat resep contoh, lengkap dengan foto makanan dan bahan, supaya semua layar bisa dilihat. Fotonya berlisensi bebas untuk penggunaan komersial (domain publik, CC0, atau CC BY); daftar pembuat dan sumbernya ada di `contoh/SUMBER.md` dan wajib ikut disertakan bila foto itu dipakai.
 
@@ -147,12 +147,6 @@ Semua tabel memakai Row Level Security tanpa kebijakan, sehingga API otomatis Su
 
 Email akun baru dan lupa kata sandi dikirim lewat SMTP. Pilihan mudah: [Resend](https://resend.com) atau [Brevo](https://www.brevo.com) (ada paket gratis), dengan domain Anda sendiri yang sudah diverifikasi supaya email tidak masuk Spam. Contoh isian untuk Resend ada di `backend/.env.example` (`MAIL_HOST=smtp.resend.com`, `MAIL_PORT=465`, `MAIL_SCHEME=smtps`, `MAIL_USERNAME=resend`, `MAIL_PASSWORD=<API key>`). Bila email gagal terkirim saat pendaftaran, akun tidak dibuat dan pembeli melihat pesan untuk mencoba lagi.
 
-### Data lama (versi tanpa akun)
-
-Versi dengan akun mulai dari kosong. Saat pertama kali masuk, data lama di perangkat (dari versi kunci rahasia / Apps Script) dihapus dari perangkat. Bila masih diperlukan, unduh **cadangan** dari Pengaturan **sebelum** memperbarui aplikasi, lalu setelah masuk pakai **Pulihkan** dan sinkron; datanya akan menjadi milik akun Anda.
-
-`apps-script/Code.gs` tidak mendukung akun dan tidak dipakai lagi oleh aplikasi; berkas itu disimpan karena tiruannya dipakai server uji (`npm run dev`) dan tes sinkronisasi.
-
 ## Menerbitkan ke GitHub Pages
 
 1. Buat repositori di GitHub dan unggah seluruh isi folder ini (cabang `main`).
@@ -202,14 +196,14 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 - Penilai hanya bisa membaca nama resep, nomor eksperimen, dan foto hasil, serta mengirim satu penilaian. Mereka tidak bisa membaca atau mengubah data lain.
 - Masukan penilai dibersihkan: nilai harus bilangan bulat 1 sampai 10, teks dipotong, karakter kontrol dibuang, dan petunjuk dari pemilik juga dibatasi panjangnya. Server Laravel membatasi 180 permintaan per menit per alamat IP. Setiap eksperimen menerima maksimal 500 penilaian.
 - Siapa pun yang memegang tautan QR dapat menilai berkali-kali. Untuk uji pasar kecil ini wajar; matikan **Terima penilaian** bila sudah cukup.
-- Foto dan logo disimpan di bucket publik (atau "siapa pun dengan tautan" di Drive) agar tampil di aplikasi dan halaman penilai. Jangan unggah gambar yang bersifat pribadi.
+- Foto dan logo disimpan di bucket publik Supabase Storage agar tampil di aplikasi dan halaman penilai. Jangan unggah gambar yang bersifat pribadi.
 - Kata sandi aplikasi (lihat bagian di atas) hanya mengunci tampilan di perangkat itu dan bukan enkripsi data.
 
 ## Cara data disimpan dan disinkronkan
 
 - Satu dokumen JSON di IndexedDB perangkat. Setiap baris punya waktu ubah; penghapusan ditandai (bukan dibuang) supaya perangkat lain ikut menghapus.
 - Sinkron mengirim baris yang berubah lalu menerima baris baru. Jika dua perangkat mengubah baris yang sama, **yang terakhir diubah menang**.
-- Foto disimpan di perangkat sebagai JPEG maksimal 900 piksel, lalu diunggah ke Supabase Storage (atau Drive) saat sinkron.
+- Foto disimpan di perangkat sebagai JPEG maksimal 900 piksel, lalu diunggah ke Supabase Storage saat sinkron.
 - Aplikasi meminta browser menjaga penyimpanan tetap permanen. Tetap unduh **cadangan** dari Pengaturan sesekali.
 
 ## Struktur folder
@@ -224,7 +218,6 @@ vendor/                                               Preact + htm, qrcode, font
 contoh/foto/                                          foto untuk "Muat data contoh" (sumber dan lisensi: contoh/SUMBER.md)
 icons/                                                ikon aplikasi
 backend/                                              backend Laravel (API, migrasi database, Supabase)
-apps-script/Code.gs                                   backend lama (tanpa akun), dipakai server uji dan tes
 tools/                                                server uji dan pembaruan cache offline
 tests/                                                uji otomatis
 ```

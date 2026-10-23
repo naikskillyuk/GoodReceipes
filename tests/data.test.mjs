@@ -185,7 +185,7 @@ test('cadangan: ekspor tanpa kunci, impor menandai semua baris untuk dikirim', a
   await assert.rejects(() => b.impor('{"bukan":"cadangan"}'));
 });
 
-test('serialisasi baris untuk Spreadsheet: JSON, boolean, dan kolom lokal', async () => {
+test('serialisasi baris untuk server: JSON, boolean, dan kolom lokal', async () => {
   const baris = keBaris('Eksperimen', {
     id: 'e1', idResep: 'r1', nomor: 3, langkah: ['a', 'b'], terimaNilai: true, fotoHasilLokal: 'data:besar', fotoHasilUrl: 'https://x', diubah: 5, dihapus: false,
   });
@@ -202,7 +202,7 @@ test('serialisasi baris untuk Spreadsheet: JSON, boolean, dan kolom lokal', asyn
 
 test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async () => {
   const db = await dbBaru();
-  assert.deepEqual(repo.ambilMerek(db), { nama: 'Eksperimen Resep', logo: 'icons/icon.svg', logoSendiri: '', namaSendiri: '' });
+  assert.deepEqual(repo.ambilMerek(db), { nama: 'Good Receipes', logo: 'icons/icon.svg', logoSendiri: '', namaSendiri: '' });
 
   repo.simpanMerek(db, { nama: '  Dapur Agam  ' });
   let m = repo.ambilMerek(db);
@@ -221,7 +221,7 @@ test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async (
   assert.equal(repo.ambilMerek(db).logo, 'icons/icon.svg');
 
   repo.simpanMerek(db, { nama: '   ' }); // nama kosong -> bawaan
-  assert.equal(repo.ambilMerek(db).nama, 'Eksperimen Resep');
+  assert.equal(repo.ambilMerek(db).nama, 'Good Receipes');
 
   repo.simpanMerek(db, { nama: 'x'.repeat(100) });
   assert.equal(repo.ambilMerek(db).nama.length, 40);

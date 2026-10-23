@@ -83,7 +83,7 @@ test('cadangan tidak memuat kata sandi maupun kunci; hapus semua bisa ikut membu
   assert.equal(db.pengaturan.kunci, 'k-rahasia', 'hapus biasa mempertahankan sambungan');
   await db.hapusSemua({ hapusKataSandi: true });
   assert.equal(db.pengaturan.kunciAplikasi, null);
-  assert.equal(db.pengaturan.kunci, '', 'jalur lupa kata sandi juga membuang kunci Apps Script');
+  assert.equal(db.pengaturan.kunci, '', 'jalur lupa kata sandi juga membuang sesi akun');
   assert.equal(db.pengaturan.scriptUrl, 'https://x/exec');
 });
 

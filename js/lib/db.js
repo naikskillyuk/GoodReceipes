@@ -190,7 +190,7 @@ export function buatDB(penyimpanan = penyimpananMemori()) {
 
     /**
      * Anggap semua baris belum terkirim dan tarik ulang dari awal. Dipakai saat alamat server
-     * diganti (mis. pindah dari Apps Script ke Laravel) supaya seluruh data ikut ke server baru.
+     * diganti supaya seluruh data ikut ke server baru.
      */
     tandaiSemuaKotor() {
       for (const n of NAMA_TABEL) k.kotor[n] = Object.keys(k.tabel[n]);

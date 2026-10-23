@@ -1,7 +1,7 @@
 <?php
 
 /*
-| Pengaturan backend Eksperimen Resep.
+| Pengaturan backend Good Receipes.
 |
 | Skema tabel di bawah harus sama dengan js/lib/schema.js di frontend.
 | Nama tabel/kolom di aplikasi (camelCase) dipetakan ke nama tabel/kolom

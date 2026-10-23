@@ -1,4 +1,4 @@
-// Sinkronisasi dengan server (Laravel + Supabase; apps-script/Code.gs juga tetap bisa dipakai).
+// Sinkronisasi dengan server Laravel + Supabase.
 //
 // Aturan: data utama ada di perangkat. Saat sinkron, baris yang berubah dikirim,
 // lalu baris baru dari server (mis. penilaian dari QR) diterima. Jika dua perangkat

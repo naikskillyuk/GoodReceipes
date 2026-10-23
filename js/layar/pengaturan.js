@@ -267,7 +267,7 @@ export function Pengaturan({ k }) {
 
   const ekspor = () => {
     const tgl = new Date().toISOString().slice(0, 10);
-    unduhBerkas(`cadangan-eksperimen-resep-${tgl}.json`, db.ekspor());
+    unduhBerkas(`cadangan-good-receipes-${tgl}.json`, db.ekspor());
     tampilToast('Cadangan diunduh. Kunci rahasia tidak ikut disimpan.');
   };
   const impor = async (e) => {

@@ -28,7 +28,7 @@ class Skema
 
     /**
      * Baris dari aplikasi -> kolom database. Hanya kolom yang dikenal dan tidak kosong (null)
-     * yang diambil, sama seperti versi Spreadsheet: nilai yang tidak dikirim tidak menimpa.
+     * yang diambil: nilai yang tidak dikirim tidak menimpa.
      */
     public static function keDb(string $tabel, array $baris): array
     {

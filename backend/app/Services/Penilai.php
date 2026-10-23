@@ -110,7 +110,7 @@ class Penilai
         return $baris;
     }
 
-    /** Kosong -> bawaan (sama seperti versi Spreadsheet). */
+    /** Kosong -> bawaan. */
     private function benar(mixed $v, bool $bawaan): bool
     {
         return $v === null || $v === '' ? $bawaan : Skema::bool($v);

@@ -26,7 +26,7 @@ class ApiController extends Controller
     /** Pemeriksaan cepat lewat browser: tidak mengembalikan data apa pun. */
     public function info(): JsonResponse
     {
-        return response()->json(['ok' => true, 'nama' => 'Eksperimen Resep', 'versi' => config('goodrecipes.versi'), 'akun' => true]);
+        return response()->json(['ok' => true, 'nama' => 'Good Receipes', 'versi' => config('goodrecipes.versi'), 'akun' => true]);
     }
 
     public function handle(Request $request, Akun $akun, Sinkron $sinkron, Foto $foto, Penilai $penilai): JsonResponse
@@ -141,7 +141,7 @@ class ApiController extends Controller
 
     private function keluar(array $isi): JsonResponse
     {
-        // Selalu 200 seperti Apps Script; keberhasilan dibaca dari `ok`.
+        // Selalu 200; keberhasilan dibaca dari `ok`.
         return response()->json($isi, 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

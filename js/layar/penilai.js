@@ -43,12 +43,11 @@ export function PenggeserNilai({ nilai, disentuh, onUbah, panduan = {} }) {
   </div>`;
 }
 
-/** Alamat server dari tautan yang boleh dipakai penilai: Apps Script milik Google, atau localhost untuk uji.
- * Server Laravel ditetapkan lewat scriptUrl di config.js, sehingga tidak perlu ikut di tautan. */
+/** Alamat server dari tautan yang boleh dipakai penilai: hanya localhost untuk uji.
+ * Server produksi ditetapkan lewat scriptUrl di config.js, sehingga tidak perlu ikut di tautan. */
 export function scriptUrlAman(u) {
   try {
     const url = new URL(u);
-    if (url.protocol === 'https:' && (url.hostname === 'script.google.com' || url.hostname.endsWith('.googleusercontent.com'))) return true;
     return (url.hostname === 'localhost' || url.hostname === '127.0.0.1') && (url.protocol === 'http:' || url.protocol === 'https:');
   } catch {
     return false;

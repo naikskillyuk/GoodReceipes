@@ -1,6 +1,6 @@
 {
-  "name": "Eksperimen Resep",
-  "short_name": "Resep",
+  "name": "Good Receipes",
+  "short_name": "Good Receipes",
   "description": "Catat eksperimen resep, nilai hasilnya, hitung HPP, dan rencanakan penjualan.",
   "lang": "id",
   "start_url": "./",
