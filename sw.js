@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-17ae374c71';
+const VERSI = 'resep-ad36cdb6a2';
 const FILE = [
   // <daftar-file>
   'config.js',
@@ -16,6 +16,7 @@ const FILE = [
   'icons/icon-512.png',
   'icons/icon-maskable-512.png',
   'icons/icon.svg',
+  'icons/logo.svg',
   'index.html',
   'js/layar/akun.js',
   'js/layar/bagikan.js',

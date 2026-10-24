@@ -6,10 +6,12 @@ import { LogoMerek, NamaMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tampilToast } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
-import { ambilMerek } from '../lib/repo.js';
+import { ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
 import { alamatServer, serverTetap, masukAkun, mintaAturUlang, aturSandiBaru, MIN_SANDI } from '../lib/akun.js';
 
 const LATAR_BAWAAN = 'gambar/latar-masuk.jpg';
+// Logo bawaan tanpa kotak (ikon aplikasi berlatar hijau tetap dipakai untuk layar utama HP dan tab).
+const LOGO_POLOS = 'icons/logo.svg';
 
 function IsianSandi({ id, label, nilai, onUbah, autocomplete, inputRef, galat }) {
   const [lihat, setLihat] = useState(false);
@@ -130,7 +132,7 @@ export function LayarAkun({ k }) {
     </div>
     <div class="sambut-isi">
       <header class="sambut-judul">
-        <div class="sambut-merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /></div>
+        <div class="sambut-merek"><${LogoMerek} src=${merek.logo === LOGO_BAWAAN ? LOGO_POLOS : merek.logo} ukuran=${terbuka ? 64 : 88} kelas="polos" /></div>
         <h1><${NamaMerek} nama=${merek.nama} /></h1>
         ${!terbuka && html`<p>Catat eksperimen resep, hitung HPP, dan temukan resep juara Anda.</p>`}
       </header>

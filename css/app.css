@@ -2806,7 +2806,15 @@ button.tautan-hijau {
 .sambut-merek {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+}
+/* Logo tanpa kotak putih (mis. di halaman Login). */
+.logo-merek.polos {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 .sambut-judul h1 {
   margin: 0;
