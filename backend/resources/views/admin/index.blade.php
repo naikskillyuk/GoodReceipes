@@ -3,7 +3,7 @@
 @section('isi')
 @php($rp = fn ($n) => 'Rp '.number_format((int) $n, 0, ',', '.'))
 <div class="baris antara">
-  <h1>Akun pembeli</h1>
+  <h1>Akun <em>pembeli</em></h1>
   <a class="btn utama" href="/admin/akun/baru">+ Buat akun</a>
 </div>
 
@@ -12,7 +12,7 @@
   <div class="angka"><small>Lunas</small><b>{{ $ringkas['lunas'] }}</b></div>
   <div class="angka"><small>Belum lunas</small><b>{{ $ringkas['belum'] }}</b></div>
   <div class="angka"><small>Nonaktif</small><b>{{ $ringkas['nonaktif'] }}</b></div>
-  <div class="angka"><small>Pendapatan (lunas)</small><b>{{ $rp($ringkas['pendapatan']) }}</b></div>
+  <div class="angka sorot"><small>Pendapatan (lunas)</small><b>{{ $rp($ringkas['pendapatan']) }}</b></div>
 </div>
 
 <section class="kartu">

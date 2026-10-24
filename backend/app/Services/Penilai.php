@@ -30,7 +30,8 @@ class Penilai
             'terima' => $this->benar($e->terima_nilai, true),
             'wajibNama' => $this->benar($e->wajib_nama, false),
             'namaAplikasi' => $merek ? (string) ($merek->nama_aplikasi ?? '') : '',
-            'logoUrl' => $merek ? (string) ($merek->logo_url ?? '') : '',
+            // Logo pemilik, atau logo situs dari admin bila pemilik belum memasang logo sendiri.
+            'logoUrl' => ($merek ? (string) ($merek->logo_url ?? '') : '') ?: app(Situs::class)->tampilan()['logoUrl'],
             'panduan' => (object) $this->panduan($e->panduan_nilai ?? null),
             'catatanChef' => mb_substr(trim((string) ($e->catatan_chef ?? '')), 0, 1000),
         ];

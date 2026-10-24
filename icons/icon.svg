@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#0F5B3C"/><g><g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="112" fill="#43922A"/><g><g>
   <defs><clipPath id="botol"><path d="M226 112V220L124 378Q108 408 142 408H370Q404 408 388 378L286 220V112Z"/></clipPath></defs>
   <path d="M226 112V220L124 378Q108 408 142 408H370Q404 408 388 378L286 220V112Z" fill="#FFF8EE"/>
   <g clip-path="url(#botol)"><rect x="100" y="318" width="320" height="110" fill="#F2B632"/></g>

@@ -8,6 +8,13 @@ import { tampilToast } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
 
+/** Nama aplikasi untuk judul: kata terakhir diberi warna hijau (mis. "Good <em>Receipes</em>"). */
+export function NamaMerek({ nama }) {
+  const kata = String(nama || '').trim().split(/\s+/);
+  const akhir = kata.length > 1 ? kata.pop() : '';
+  return html`${kata.join(' ')}${akhir && html` <em>${akhir}</em>`}`;
+}
+
 /** Logo aplikasi di dalam ubin putih; kembali ke logo bawaan bila gambarnya gagal dimuat. */
 export function LogoMerek({ src, ukuran = 40, kelas = '' }) {
   const [gagal, setGagal] = useState(false);

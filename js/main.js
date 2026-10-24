@@ -10,7 +10,7 @@ import { Kosong } from './ui/komponen.js';
 import { terapkanMerekDokumen } from './ui/merek.js';
 import { LayarAkun, AturSandi } from './layar/akun.js';
 import { CetakResep } from './layar/cetak-resep.js';
-import { sudahMasuk, sesiBerakhir } from './lib/akun.js';
+import { sudahMasuk, sesiBerakhir, perbaruiTampilanSitus } from './lib/akun.js';
 import { Beranda } from './layar/beranda.js';
 import { DaftarResep } from './layar/daftar-resep.js';
 import { FormResep } from './layar/form-resep.js';
@@ -191,6 +191,7 @@ async function mulai() {
   };
 
   const penyinkron = buatPenyinkron(db);
+  if (bacaHash().bagian[0] !== 'nilai') perbaruiTampilanSitus(db); // logo dan latar Login dari admin
   render(html`<${App} db=${db} penyinkron=${penyinkron} peringatan=${peringatan} pasangan=${pasangan} />`, akar);
   window.__app = { db, penyinkron };
 

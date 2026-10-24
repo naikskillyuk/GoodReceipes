@@ -2,12 +2,14 @@
 // dan Buat kata sandi baru (dibuka dari tautan di email).
 
 import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
-import { LogoMerek } from '../ui/komponen.js';
+import { LogoMerek, NamaMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tampilToast } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
 import { ambilMerek } from '../lib/repo.js';
 import { alamatServer, serverTetap, masukAkun, mintaAturUlang, aturSandiBaru, MIN_SANDI } from '../lib/akun.js';
+
+const LATAR_BAWAAN = 'gambar/latar-masuk.jpg';
 
 function IsianSandi({ id, label, nilai, onUbah, autocomplete, inputRef, galat }) {
   const [lihat, setLihat] = useState(false);
@@ -116,20 +118,26 @@ export function LayarAkun({ k }) {
   };
 
   const terbuka = mode !== 'sambut';
+  // Foto latar dari admin; tanpa itu memakai foto bawaan (yang wajib mencantumkan pembuatnya).
+  const latarSitus = (db.pengaturan.situs && db.pengaturan.situs.latarUrl) || '';
+  const [latarGagal, setLatarGagal] = useState(false);
+  const latar = latarSitus && !latarGagal ? latarSitus : LATAR_BAWAAN;
 
-  return html`<main class="sambut">
-    <img class="sambut-latar" src="gambar/latar-masuk.jpg" alt="" aria-hidden="true" />
+  return html`<main class=${'sambut' + (terbuka ? ' terbuka' : '')}>
+    <div class="sambut-foto">
+      <img src=${latar} alt="" aria-hidden="true" onError=${() => setLatarGagal(true)} />
+      ${latar === LATAR_BAWAAN && html`<span class="sambut-kredit">Foto: Stacy Spensley, CC BY 2.0</span>`}
+    </div>
     <div class="sambut-isi">
       <header class="sambut-judul">
-        <${LogoMerek} src=${merek.logo} ukuran=${56} />
-        <h1>${merek.nama}</h1>
-        <p>Catat eksperimen resep, hitung HPP, dan temukan resep juara Anda.</p>
+        <div class="sambut-merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /></div>
+        <h1><${NamaMerek} nama=${merek.nama} /></h1>
+        ${!terbuka && html`<p>Catat eksperimen resep, hitung HPP, dan temukan resep juara Anda.</p>`}
       </header>
 
       ${!terbuka &&
       html`<div class="sambut-bawah">
         <button class="pil sambut-login" onClick=${() => ganti('masuk')}>Login<span class="ujung"><${Ikon} nama="panah" /></span></button>
-        <p class="sambut-kredit">Foto: Stacy Spensley, CC BY 2.0</p>
       </div>`}
 
       ${terbuka &&
@@ -202,7 +210,7 @@ export function AturSandi({ k }) {
       <${LogoMerek} src=${merek.logo} ukuran=${84} kelas="besar" />
       <div class="masuk-judul">
         <span class="hero-label">Buat kata sandi baru</span>
-        <h1>${merek.nama}</h1>
+        <h1><${NamaMerek} nama=${merek.nama} /></h1>
       </div>
       ${!email || !t
         ? html`<p class="peringatan" role="alert"><b>Tautan tidak lengkap.</b>Buka tautan langsung dari email, atau minta tautan baru lewat "Lupa kata sandi".</p>`

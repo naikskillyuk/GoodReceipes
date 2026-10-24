@@ -20,5 +20,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/akun/{user}/aktif', [AdminController::class, 'ubahAktif'])->whereNumber('user');
         Route::post('/akun/{user}/sandi', [AdminController::class, 'aturUlangSandi'])->whereNumber('user');
         Route::post('/akun/{user}/keluarkan', [AdminController::class, 'keluarkanPerangkat'])->whereNumber('user');
+        Route::get('/tampilan', [AdminController::class, 'tampilan']);
+        Route::post('/tampilan/{jenis}', [AdminController::class, 'simpanTampilan'])->whereIn('jenis', ['logo', 'latar']);
+        Route::post('/tampilan/{jenis}/hapus', [AdminController::class, 'hapusTampilan'])->whereIn('jenis', ['logo', 'latar']);
     });
 });

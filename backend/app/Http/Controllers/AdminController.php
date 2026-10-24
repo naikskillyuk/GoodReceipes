@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Admin;
 use App\Models\User;
 use App\Services\Akun;
+use App\Services\Foto;
+use App\Services\Situs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -185,6 +187,40 @@ class AdminController extends Controller
         $n = DB::table('sesi_masuk')->where('user_id', $user->id)->delete();
 
         return back()->with('berhasil', "{$n} perangkat dikeluarkan.");
+    }
+
+    public function tampilan(Situs $situs): View
+    {
+        return view('admin.tampilan', ['situs' => $situs->tampilan()]);
+    }
+
+    /**
+     * Simpan logo atau foto latar Login. Gambar sudah diperkecil di browser (data URL di `gambar`),
+     * supaya permintaan tetap di bawah batas 4,5 MB Vercel.
+     */
+    public function simpanTampilan(Request $request, string $jenis, Situs $situs, Foto $foto): RedirectResponse
+    {
+        abort_unless(isset(Situs::KUNCI[$jenis]), 404);
+        $data = (string) $request->input('gambar', '');
+        if (! preg_match('/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+\/=]+)$/', $data, $m)) {
+            return back()->with('gagal', 'Pilih gambar PNG, JPG, atau WebP dulu.');
+        }
+        try {
+            $url = $foto->unggah(0, $m[1], $m[2], 'situs_'.$jenis);
+        } catch (\RuntimeException $e) {
+            return back()->with('gagal', $e->getMessage());
+        }
+        $situs->atur($jenis, $url);
+
+        return back()->with('berhasil', $jenis === 'logo' ? 'Logo aplikasi diganti.' : 'Foto latar halaman Login diganti.');
+    }
+
+    public function hapusTampilan(string $jenis, Situs $situs): RedirectResponse
+    {
+        abort_unless(isset(Situs::KUNCI[$jenis]), 404);
+        $situs->atur($jenis, '');
+
+        return back()->with('berhasil', $jenis === 'logo' ? 'Logo kembali ke bawaan.' : 'Foto latar kembali ke bawaan.');
     }
 
     private function aturanPembelian(): array

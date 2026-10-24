@@ -1,5 +1,5 @@
-/* Good Receipes — gaya. Nada krem hangat + hijau tua, kartu membulat dengan bayangan lembut,
-   foto makanan sebagai pusat, judul serif (miring untuk penekanan) dan teks sans. */
+/* Good Receipes — gaya. Nada segar: putih kehijauan dan hijau daun cerah, kartu putih membulat,
+   foto makanan sebagai pusat, judul sans tebal dengan kata penekanan berwarna hijau. */
 
 @font-face {
   font-family: 'Plus Jakarta Sans';
@@ -7,49 +7,35 @@
   font-weight: 200 800;
   font-display: swap;
 }
-@font-face {
-  font-family: 'Fraunces';
-  src: url('../vendor/fonts/fraunces.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Fraunces';
-  src: url('../vendor/fonts/fraunces-italic.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: italic;
-  font-display: swap;
-}
 
 :root {
-  /* Nada: krem hangat, hijau tua, aksen emas lembut */
-  --bg: #f4eee5;
-  --bg-atas: #f8f3ec;
-  --ink: #1c2621;
-  --ink2: #3f4a44;
-  --muted: #646b65;
-  --hijau: #1f3b32;
-  --hijau-2: #2f5445;
-  --hijau-muda: #e3ebe3;
-  --hijau-garis: #c9d8cc;
-  --tomat: #c4472f;
-  --navy: #2f5445;
-  --kuning: #d9a441;
+  /* Nada segar: putih kehijauan, hijau daun cerah, aksen jeruk dan kuning */
+  --bg: #f4f8f1;
+  --bg-atas: #ffffff;
+  --ink: #17251a;
+  --ink2: #3c4b3e;
+  --muted: #667467;
+  --hijau: #43922a;
+  --hijau-2: #2f6e1c;
+  --hijau-muda: #e8f4df;
+  --hijau-garis: #cfe5c2;
+  --tomat: #ef6c35;
+  --navy: #2f6e1c;
+  --kuning: #f2b632;
   --kuning-tua: #8a5a00;
   --coklat: #7a3e1d;
-  --kartu: #fffdf9;
-  --kartu-2: #faf5ee;
-  --garis: #ebe3d7;
-  --garis-input: #ddd2c2;
-  --juara-bg: #f6ecd3;
-  --juara-garis: #e5cf98;
-  --krem: #ece3d5;
-  --bahaya: #a3321e;
-  --bayang: 0 1px 2px rgba(58, 44, 28, 0.04), 0 12px 32px -16px rgba(58, 44, 28, 0.22);
-  --bayang-kecil: 0 1px 2px rgba(58, 44, 28, 0.06), 0 4px 12px -6px rgba(58, 44, 28, 0.18);
-  --r-kartu: 26px;
-  --judul: 'Fraunces', Georgia, serif;
+  --kartu: #ffffff;
+  --kartu-2: #f7fbf4;
+  --garis: #e5eedf;
+  --garis-input: #d5e3cb;
+  --juara-bg: #fff4d6;
+  --juara-garis: #f1d58a;
+  --krem: #eef6e8;
+  --bahaya: #c2412d;
+  --bayang: 0 1px 2px rgba(31, 64, 20, 0.04), 0 14px 34px -20px rgba(31, 64, 20, 0.28);
+  --bayang-kecil: 0 1px 2px rgba(31, 64, 20, 0.05), 0 6px 14px -8px rgba(31, 64, 20, 0.22);
+  --r-kartu: 24px;
+  --judul: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --badan: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --sisi: 248px;
   --aman-bawah: env(safe-area-inset-bottom, 0px);
@@ -181,7 +167,7 @@ img {
 }
 .hero h1 {
   font-family: var(--judul);
-  font-weight: 500;
+  font-weight: 800;
   font-size: 40px;
   line-height: 44px;
   letter-spacing: -0.02em;
@@ -714,12 +700,16 @@ img {
 }
 .sapa h1 {
   font-family: var(--judul);
-  font-style: italic;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 38px;
   line-height: 42px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   margin-top: 2px;
+  color: var(--ink);
+}
+.sapa h1 em,
+.masuk-judul h1 em {
+  font-style: normal;
   color: var(--hijau);
 }
 .judul-bagian {
@@ -834,7 +824,7 @@ button.tautan-hijau {
 }
 .juara-kartu h3 {
   font-family: var(--judul);
-  font-weight: 500;
+  font-weight: 800;
   font-size: 26px;
   line-height: 30px;
   letter-spacing: -0.01em;
@@ -885,7 +875,7 @@ button.tautan-hijau {
   align-items: center;
   justify-content: center;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 24px;
   font-variant-numeric: tabular-nums;
 }
@@ -997,7 +987,7 @@ button.tautan-hijau {
   font-family: var(--judul);
   font-size: 18px;
   line-height: 22px;
-  font-weight: 500;
+  font-weight: 800;
   min-height: 44px;
   overflow-wrap: anywhere;
 }
@@ -1016,7 +1006,7 @@ button.tautan-hijau {
 }
 .angka-skor {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 22px;
   line-height: 26px;
   font-variant-numeric: tabular-nums;
@@ -1076,7 +1066,7 @@ button.tautan-hijau {
   align-items: center;
   justify-content: center;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 22px;
   overflow: hidden;
 }
@@ -1109,7 +1099,7 @@ button.tautan-hijau {
 }
 .baris-eks .skor-kecil {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 26px;
   line-height: 30px;
   font-variant-numeric: tabular-nums;
@@ -1166,7 +1156,7 @@ button.tautan-hijau {
   align-items: center;
   justify-content: center;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
@@ -1266,7 +1256,7 @@ button.tautan-hijau {
 }
 .ubin-huruf {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 22px;
 }
 .ubin-bahan b {
@@ -1477,7 +1467,7 @@ button.tautan-hijau {
 }
 .total-biaya .angka {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 28px;
   line-height: 32px;
   font-variant-numeric: tabular-nums;
@@ -1650,7 +1640,7 @@ button.tautan-hijau {
 .baris-bahan .harga b {
   display: block;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 20px;
   line-height: 24px;
   font-variant-numeric: tabular-nums;
@@ -1742,7 +1732,7 @@ button.tautan-hijau {
 }
 .kartu-hpp .besar {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 44px;
   line-height: 48px;
   letter-spacing: -0.02em;
@@ -1770,7 +1760,7 @@ button.tautan-hijau {
   min-width: 72px;
   text-align: center;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 28px;
   font-variant-numeric: tabular-nums;
 }
@@ -1791,7 +1781,7 @@ button.tautan-hijau {
 }
 .hasil-baris b {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -1989,7 +1979,7 @@ button.tautan-hijau {
   align-items: center;
   justify-content: center;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 20px;
 }
 .geser input[type='range'] {
@@ -2078,7 +2068,7 @@ button.tautan-hijau {
 }
 .lembar h2 {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 24px;
   line-height: 28px;
 }
@@ -2158,7 +2148,7 @@ button.tautan-hijau {
 }
 .kosong h3 {
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 22px;
 }
 .kosong p {
@@ -2246,7 +2236,7 @@ button.tautan-hijau {
     align-items: center;
     gap: 12px;
     font-family: var(--judul);
-    font-weight: 600;
+    font-weight: 800;
     font-size: 22px;
     line-height: 26px;
     padding: 0 8px;
@@ -2658,7 +2648,7 @@ button.tautan-hijau {
   gap: 8px;
   max-width: 100%;
   font-family: var(--judul);
-  font-weight: 600;
+  font-weight: 800;
   font-size: 16px;
   line-height: 20px;
 }
@@ -2678,6 +2668,7 @@ button.tautan-hijau {
 .pratinjau-merek b {
   min-width: 0;
   font-family: var(--judul);
+  font-weight: 800;
   font-size: 22px;
   line-height: 26px;
   overflow-wrap: anywhere;
@@ -2748,11 +2739,10 @@ button.tautan-hijau {
 }
 .masuk-judul h1 {
   font-family: var(--judul);
-  font-style: italic;
-  font-weight: 600;
+  font-weight: 800;
   font-size: 34px;
   line-height: 38px;
-  color: var(--hijau);
+  color: var(--ink);
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
@@ -2760,97 +2750,106 @@ button.tautan-hijau {
   min-height: 20px;
 }
 
-/* Sambutan sebelum login: foto cemilan, nama aplikasi, tombol Login, lalu formulir dari bawah */
+/* Sambutan sebelum login: foto di atas, nama aplikasi dan tombol Login di area putih */
 .sambut {
-  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow: hidden;
-  background: #2a1a12;
-  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
 }
-.sambut-latar {
+.sambut-foto {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 42vh;
+  max-height: 58vh;
+  overflow: hidden;
+  border-radius: 0 0 40px 40px;
+  background: var(--hijau-muda);
+}
+.sambut.terbuka .sambut-foto {
+  min-height: 24vh;
+  max-height: 30vh;
+}
+.sambut-foto img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 30% 60%;
-  z-index: -2;
+  object-position: 35% 55%;
 }
-.sambut::before {
-  content: '';
+.sambut-kredit {
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(
-    to bottom,
-    rgba(248, 243, 236, 0.97) 0%,
-    rgba(248, 243, 236, 0.9) 24%,
-    rgba(248, 243, 236, 0.35) 46%,
-    rgba(20, 14, 10, 0) 62%,
-    rgba(20, 14, 10, 0.55) 100%
-  );
+  right: 14px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 10px;
 }
 .sambut-isi {
-  min-height: 100vh;
-  min-height: 100dvh;
+  width: 100%;
   max-width: 460px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: max(40px, calc(env(safe-area-inset-top) + 24px)) 24px max(20px, calc(env(safe-area-inset-bottom) + 12px));
+  gap: 22px;
+  padding: 26px 24px max(24px, calc(env(safe-area-inset-bottom) + 14px));
 }
 .sambut-judul {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+.sambut-merek {
+  display: flex;
   align-items: center;
   gap: 10px;
-  text-align: center;
 }
 .sambut-judul h1 {
   margin: 0;
   font-family: var(--judul);
-  font-style: italic;
-  font-weight: 600;
-  font-size: clamp(40px, 12vw, 54px);
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-  color: var(--hijau);
+  font-weight: 800;
+  font-size: clamp(36px, 10.5vw, 50px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--ink);
   overflow-wrap: anywhere;
+}
+.sambut-judul h1 em {
+  font-style: normal;
+  color: var(--hijau);
 }
 .sambut-judul p {
   margin: 0;
-  max-width: 30ch;
+  max-width: 32ch;
   font-size: 15px;
   line-height: 22px;
-  color: var(--ink2);
+  color: var(--muted);
 }
 .sambut-bawah {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: auto;
 }
 .sambut-login {
-  min-height: 64px;
+  min-height: 62px;
   font-size: 18px;
-  box-shadow: 0 18px 36px -16px rgba(0, 0, 0, 0.7);
-}
-.sambut-kredit {
-  margin: 0;
-  text-align: center;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
+  background: var(--hijau);
+  box-shadow: 0 16px 30px -16px rgba(67, 146, 42, 0.8);
 }
 .lembar-masuk {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 22px 22px;
-  background: var(--kartu);
-  border-radius: 30px;
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6);
+  padding: 18px 20px 20px;
+  background: #fff;
+  border: 1px solid var(--garis);
+  border-radius: 28px;
+  box-shadow: var(--bayang);
   animation: lembar-naik 0.28s ease-out;
 }
 .lembar-kepala {
@@ -2861,9 +2860,9 @@ button.tautan-hijau {
 .lembar-kepala h2 {
   margin: 0;
   font-family: var(--judul);
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--hijau);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
 }
 .tautan-kecil {
   align-self: flex-end;
@@ -2873,7 +2872,7 @@ button.tautan-hijau {
   border: 0;
   background: none;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--hijau-2);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -2887,6 +2886,33 @@ button.tautan-hijau {
 @media (prefers-reduced-motion: reduce) {
   .lembar-masuk {
     animation: none;
+  }
+}
+/* Laptop: foto di kiri, isi di kanan */
+@media (min-width: 900px) {
+  .sambut {
+    flex-direction: row;
+    padding: 20px;
+    gap: 20px;
+    background: var(--bg);
+  }
+  .sambut-foto,
+  .sambut.terbuka .sambut-foto {
+    flex: 1 1 55%;
+    min-height: 0;
+    max-height: none;
+    border-radius: 36px;
+  }
+  .sambut-isi {
+    flex: 1 1 45%;
+    max-width: 520px;
+    justify-content: center;
+    padding: 40px 48px;
+    background: #fff;
+    border-radius: 36px;
+  }
+  .sambut-bawah {
+    margin-top: 0;
   }
 }
 
@@ -2943,6 +2969,7 @@ button.tautan-hijau {
 .cetak-kertas h1 {
   margin: 2px 0;
   font-family: var(--judul);
+  font-weight: 800;
   font-size: 30px;
   line-height: 1.15;
   color: var(--hijau);
@@ -2950,6 +2977,7 @@ button.tautan-hijau {
 .cetak-kertas h2 {
   margin: 0 0 10px;
   font-family: var(--judul);
+  font-weight: 800;
   font-size: 20px;
   color: var(--hijau);
 }

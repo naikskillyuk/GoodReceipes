@@ -36,6 +36,23 @@ function namaPerangkat() {
   return `${browser} di ${os}`;
 }
 
+/**
+ * Logo dan foto latar Login yang diatur admin untuk seluruh situs. Disimpan di pengaturan perangkat
+ * supaya halaman Login tetap tampil benar saat sinyal lemah. Gagal diam-diam (memakai yang lama/bawaan).
+ */
+export async function perbaruiTampilanSitus(db, opsi) {
+  const url = alamatServer(db);
+  if (!url || (globalThis.navigator && navigator.onLine === false)) return;
+  try {
+    const j = await panggilApi(url, { aksi: 'infoSitus' }, { batasWaktu: 15000, ...opsi });
+    const baru = { logoUrl: String(j.logoUrl || ''), latarUrl: String(j.latarUrl || '') };
+    const lama = db.pengaturan.situs || {};
+    if (lama.logoUrl !== baru.logoUrl || lama.latarUrl !== baru.latarUrl) db.aturPengaturan({ situs: baru });
+  } catch {
+    /* tetap memakai tampilan terakhir yang diketahui */
+  }
+}
+
 export function mintaAturUlang(url, login, opsi) {
   return panggilApi(url, { aksi: 'lupaSandi', login: login.trim() }, opsi);
 }

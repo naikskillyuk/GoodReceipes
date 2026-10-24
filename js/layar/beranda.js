@@ -1,7 +1,7 @@
 // Beranda: sapaan, resep juara dengan foto besar, lalu menu ubin.
 
 import { html } from '../../vendor/preact-htm.js';
-import { Kerangka, Foto, Kosong, LogoMerek } from '../ui/komponen.js';
+import { Kerangka, Foto, Kosong, LogoMerek, NamaMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
 import { daftarJuara, ambilMerek } from '../lib/repo.js';
@@ -39,7 +39,7 @@ export function Beranda({ k }) {
         <${LogoMerek} src=${merek.logo} ukuran=${52} />
         <div>
           <div class="sapa-teks">${sapaan()}${nama ? ', ' + nama : ''}</div>
-          <h1>${merek.nama}</h1>
+          <h1><${NamaMerek} nama=${merek.nama} /></h1>
         </div>
       </div>
       <div class="sapa-aksi">

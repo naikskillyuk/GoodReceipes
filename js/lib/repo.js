@@ -446,7 +446,9 @@ export function ambilMerek(db) {
   const baris = db.ambil('Setelan', ID_MEREK);
   const nama = baris && baris.namaAplikasi && baris.namaAplikasi.trim() ? baris.namaAplikasi.trim() : NAMA_APLIKASI_BAWAAN;
   const logoSendiri = baris ? baris.logoLokal || baris.logoUrl || '' : '';
-  return { nama, logo: logoSendiri || LOGO_BAWAAN, logoSendiri, namaSendiri: baris && baris.namaAplikasi ? baris.namaAplikasi.trim() : '' };
+  // Urutan logo: milik pengguna, lalu logo situs dari admin, lalu logo bawaan aplikasi.
+  const logoSitus = (db.pengaturan.situs && db.pengaturan.situs.logoUrl) || '';
+  return { nama, logo: logoSendiri || logoSitus || LOGO_BAWAAN, logoSendiri, namaSendiri: baris && baris.namaAplikasi ? baris.namaAplikasi.trim() : '' };
 }
 
 /**

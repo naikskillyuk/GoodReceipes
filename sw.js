@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-ae87e96b88';
+const VERSI = 'resep-17ae374c71';
 const FILE = [
   // <daftar-file>
   'config.js',
@@ -51,8 +51,6 @@ const FILE = [
   'js/ui/router.js',
   'manifest.webmanifest',
   'vendor/LISENSI.md',
-  'vendor/fonts/fraunces-italic.woff2',
-  'vendor/fonts/fraunces.woff2',
   'vendor/fonts/plus-jakarta-sans.woff2',
   'vendor/preact-htm.js',
   'vendor/qrcode.js',

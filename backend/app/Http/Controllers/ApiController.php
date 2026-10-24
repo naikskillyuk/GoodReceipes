@@ -6,6 +6,7 @@ use App\Services\Akun;
 use App\Services\Foto;
 use App\Services\Penilai;
 use App\Services\Sinkron;
+use App\Services\Situs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,7 +19,7 @@ use Throwable;
  * Satu alamat /api. Isi permintaan: JSON {aksi, kunci?, ...}, dikirim sebagai text/plain agar
  * browser tidak mengirim preflight CORS.
  *
- * - Tanpa login : masuk, lupaSandi, aturSandi (akun) dan infoNilai, kirimNilai (penilai QR).
+ * - Tanpa login : masuk, lupaSandi, aturSandi (akun), infoNilai, kirimNilai (penilai QR), dan infoSitus.
  *   Akun dibuat oleh admin di /admin; tidak ada pendaftaran sendiri.
  * - Dengan login: `kunci` berisi token sesi dari aksi `masuk`.
  */
@@ -30,7 +31,7 @@ class ApiController extends Controller
         return response()->json(['ok' => true, 'nama' => 'Good Receipes', 'versi' => config('goodrecipes.versi'), 'akun' => true]);
     }
 
-    public function handle(Request $request, Akun $akun, Sinkron $sinkron, Foto $foto, Penilai $penilai): JsonResponse
+    public function handle(Request $request, Akun $akun, Sinkron $sinkron, Foto $foto, Penilai $penilai, Situs $situs): JsonResponse
     {
         $req = json_decode($request->getContent(), true);
         if (! is_array($req)) {
@@ -39,6 +40,11 @@ class ApiController extends Controller
 
         try {
             $aksi = is_string($req['aksi'] ?? null) ? $req['aksi'] : '';
+
+            // Tampilan situs dari admin (logo, foto latar Login): terbuka, dipakai sebelum masuk.
+            if ($aksi === 'infoSitus') {
+                return $this->keluar(['ok' => true, ...$situs->tampilan()]);
+            }
 
             // Penilai lewat QR: hanya butuh token tautan.
             if ($aksi === 'infoNilai') {
