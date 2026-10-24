@@ -2,7 +2,8 @@
 // Dengan ?tujuan=hpp atau ?tujuan=marketing layar ini menjadi pemilih resep.
 
 import { html, useState } from '../../vendor/preact-htm.js';
-import { Kerangka, Hero, Tab, Foto, Kosong, Stat } from '../ui/komponen.js';
+import { Kerangka, Hero, Foto, Kosong, Stat } from '../ui/komponen.js';
+import { IkonKategori, IKON_UMUM } from '../ui/ikon-kategori.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, q } from '../ui/router.js';
 import { daftarKategori, ringkasResep } from '../lib/repo.js';
@@ -34,7 +35,7 @@ export function DaftarResep({ k }) {
     return '/resep' + (p.length ? '?' + p.join('&') : '');
   };
   const hitung = (idKat) => semua.filter((r) => !idKat || r.resep.idKategori === idKat).length;
-  const tab = [{ label: `Semua ${hitung('')}`, href: href(''), aktif: !kat }, ...kategori.map((c) => ({ label: `${c.nama} ${hitung(c.id)}`, href: href(c.id), aktif: kat === c.id }))];
+  const pilihan = [{ id: '', nama: 'Semua', kunci: IKON_UMUM }, ...kategori];
 
   return html`<${Kerangka} k=${k} aktif="resep" plus=${tujuan ? null : { href: '/resep/baru', label: 'Resep baru' }}>
     <${Hero}
@@ -44,7 +45,15 @@ export function DaftarResep({ k }) {
       kembali="/"
       stat=${html`<${Stat} nilai=${semua.length} label="resep" />`}
     />
-    <${Tab} item=${tab} />
+    <nav class="kategori-bulat" aria-label="Kategori">
+      ${pilihan.map(
+        (c) => html`<a key=${c.id || 'semua'} href=${tautan(href(c.id))} class=${(c.id ? kat === c.id : !kat) ? 'aktif' : ''} aria-current=${(c.id ? kat === c.id : !kat) ? 'page' : null}>
+          <span class="kategori-gambar" style=${c.warna ? `--warna:${c.warna}` : ''}><${IkonKategori} nama=${c.nama} kunci=${c.kunci} ukuran=${40} /></span>
+          <span class="kategori-nama">${c.nama}</span>
+          <small>${hitung(c.id)}</small>
+        </a>`,
+      )}
+    </nav>
     <div style="padding:12px 20px 0">
       <input class="input" type="search" placeholder="Cari nama resep…" aria-label="Cari resep" value=${cari} onInput=${(e) => setCari(e.target.value)} />
     </div>
@@ -55,11 +64,11 @@ export function DaftarResep({ k }) {
             const tujuanHref = tujuan ? `/resep/${r.resep.id}/${tujuan}` : `/resep/${r.resep.id}`;
             return html`<a class="kartu-resep" key=${r.resep.id} href=${tautan(tujuanHref)} style=${`--warna:${warna}`}>
               <span class="foto"><${Foto} src=${r.foto} ikon="resep" ukuranIkon=${32} /></span>
-              <span class="kat">${r.kategori ? r.kategori.nama : 'Tanpa kategori'}</span>
+              <span class="kat"><${IkonKategori} nama=${r.kategori ? r.kategori.nama : ''} ukuran=${18} />${r.kategori ? r.kategori.nama : 'Tanpa kategori'}</span>
               <span class="nama">${r.resep.nama}</span>
               <span class="meta">${r.eksperimen.length} eksperimen</span>
               <span class="skor-baris">
-                ${r.juara ? html`<span class="lencana-juara" title="Sudah ada juara"><${Ikon} nama="piala" ukuran=${16} /></span>` : null}
+                ${r.juara ? html`<span class="lencana-juara" title="Sudah ada juara"><img src="gambar/menu/piala.png" alt="" width="20" height="20" /></span>` : null}
                 <span class=${'angka-skor' + (r.juara ? ' juara' : '')}>${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'}</span>
               </span>
             </a>`;

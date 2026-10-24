@@ -174,12 +174,20 @@ try {
   await page.getByRole('heading', { name: 'Eksperimen 2' }).waitFor();
   const idEks2 = await page.evaluate(() => window.__app.db.semua('Eksperimen').find((e) => e.nomor === 2).id);
 
-  tahap('tandai eksperimen 2 sebagai juara dan tampil di beranda');
+  tahap('sebelum ada juara, resep tampil di banner "Sedang dikembangkan" beranda');
+  const urlEks2 = page.url();
+  await page.goto(BASE + '/#/');
+  await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).waitFor();
+  assert.equal(await page.locator('.kartu-juara').count(), 0);
+
+  tahap('tandai eksperimen 2 sebagai juara: pindah ke slider resep juara di beranda');
+  await page.goto(urlEks2);
   await page.getByRole('button', { name: 'Tandai' }).click();
   await page.getByText('Eksperimen juara').first().waitFor();
   await page.goto(BASE + '/#/');
-  await page.locator('.juara-kartu', { hasText: 'Kue Uji' }).waitFor();
-  assert.match(await teks(page, '.juara-kartu'), /Eksperimen 2 juara/);
+  await page.locator('.kartu-juara', { hasText: 'Kue Uji' }).waitFor();
+  assert.match(await teks(page, '.kartu-juara'), /Eksperimen 2/);
+  assert.equal(await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).count(), 0, 'tidak lagi di banner dikembangkan');
 
   tahap('HPP: biaya lain, harga jual, margin, BEP, target');
   await page.goto(BASE + `/#/resep/${idResep}/hpp`);

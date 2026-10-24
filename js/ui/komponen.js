@@ -2,6 +2,7 @@
 
 import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
 import { Ikon } from './ikon.js';
+import { IkonKategori } from './ikon-kategori.js';
 import { tautan } from './router.js';
 import { kompres } from './gambar.js';
 import { tampilToast } from './pesan.js';
@@ -65,7 +66,7 @@ export function Kerangka({ k, aktif, plus, children }) {
         <div class="kategori-sisi">
           ${kategori.map(
             (c) => html`<a href=${tautan('/resep?kat=' + c.id)} style=${`--warna:${c.warna}`} class=${aktif === 'resep' && kategoriAktif === c.id ? 'aktif' : ''}>
-              <span class="titik"></span>${c.nama}<em>${pakaiKategori(db, c.id)}</em>
+              <span class="ikon-sisi"><${IkonKategori} nama=${c.nama} ukuran=${20} /></span>${c.nama}<em>${pakaiKategori(db, c.id)}</em>
             </a>`,
           )}
         </div>
@@ -134,7 +135,7 @@ export function Hero({ warna, label, judul, kembali, kanan, stat, panjang, teran
 /** Ubin angka ringkas. Dengan `ikon`: ikon dalam lingkaran di kiri, seperti ubin gizi di kartu resep. */
 export function Stat({ nilai, label, ikon }) {
   return html`<div class=${'stat' + (ikon ? ' berikon' : '')}>
-    ${ikon && html`<span class="stat-ikon" aria-hidden="true"><${Ikon} nama=${ikon} ukuran=${18} /></span>`}
+    ${ikon && html`<span class="stat-ikon" data-ikon=${ikon} aria-hidden="true"><${Ikon} nama=${ikon} ukuran=${18} /></span>`}
     <span class="stat-teks"><b>${nilai}</b><small>${label}</small></span>
   </div>`;
 }

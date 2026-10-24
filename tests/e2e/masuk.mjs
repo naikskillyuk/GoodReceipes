@@ -61,7 +61,8 @@ try {
 
   tahap('tampilan bawaan; tidak ada kunci aplikasi, tombol sinkron, cadangan, atau data contoh');
   await page.goto(BASE + '/');
-  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  await page.locator('.sapa-merek-nama', { hasText: 'Good Receipes' }).waitFor();
+  assert.match(await page.locator('.sapa h1').innerText(), /^Halo/, 'Beranda menyapa pengguna');
   assert.equal(await page.title(), 'Good Receipes');
   await page.goto(BASE + '/#/pengaturan');
   await page.getByRole('heading', { name: 'Pengaturan', level: 1 }).waitFor();
@@ -114,12 +115,12 @@ try {
 
   tahap('nama dan logo tampil di beranda, judul tab, dan ikon tab; bertahan setelah muat ulang');
   await page.goto(BASE + '/#/');
-  await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
+  await page.locator('.sapa-merek-nama', { hasText: 'Dapur Bu Sari' }).waitFor();
   assert.equal(await page.title(), 'Dapur Bu Sari');
   assert.match(await page.locator('link[rel=icon]').getAttribute('href'), /^data:image\/png/);
   await page.waitForTimeout(400); // penyimpanan ditulis dengan jeda singkat setelah perubahan
   await page.reload();
-  await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
+  await page.locator('.sapa-merek-nama', { hasText: 'Dapur Bu Sari' }).waitFor();
   await foto(page, '2-beranda');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('complementary', { name: 'Menu utama' }).getByText('Dapur Bu Sari').waitFor();
@@ -194,7 +195,7 @@ try {
   await page.waitForFunction((n) => window.__app.db.semua('Resep').length === n, jumlahResep - 1, { timeout: 15000 });
   assert.equal(await page.evaluate((id) => window.__app.db.ambil('Resep', id), idResep), null);
   await page.goto(BASE + '/#/');
-  await page.getByRole('heading', { name: 'Dapur Bu Sari', level: 1 }).waitFor();
+  await page.locator('.sapa-merek-nama', { hasText: 'Dapur Bu Sari' }).waitFor();
 
   tahap('ganti kata sandi akun: kata sandi saat ini yang salah ditolak');
   await page.goto(BASE + '/#/pengaturan');
@@ -219,7 +220,7 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: 'Kembalikan' }).click();
   await page.getByText('Kembali ke tampilan bawaan.').waitFor();
   await page.goto(BASE + '/#/');
-  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  await page.locator('.sapa-merek-nama', { hasText: 'Good Receipes' }).waitFor();
   assert.equal(await page.title(), 'Good Receipes');
   assert.equal(await page.locator('link[rel=icon]').getAttribute('href'), 'icons/icon.svg');
 

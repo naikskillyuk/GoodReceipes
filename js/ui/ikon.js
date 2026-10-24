@@ -3,6 +3,7 @@ import { html } from '../../vendor/preact-htm.js';
 
 const JALUR = {
   rumah: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  lonceng: 'M6 9a6 6 0 1112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9zM10 20.5a2 2 0 004 0',
   resep: 'M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3V4zM5 17a3 3 0 013-3h11M9 8h6',
   keranjang: 'M3 9h18l-2 11H5L3 9zM8 9l3-5M16 9l-3-5',
   obrolan: 'M4 5h16v11H9l-5 4V5zM8 10h8M8 13h5',

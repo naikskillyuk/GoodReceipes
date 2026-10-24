@@ -3,6 +3,7 @@
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, LogoMerek, FotoInput } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
+import { IkonKategori } from '../ui/ikon-kategori.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { kompresLogo } from '../ui/gambar.js';
 import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
@@ -14,6 +15,7 @@ function BarisKategori({ db, kat }) {
   return html`<div class="kolom" style="gap:8px">
     <div class="kategori-baris">
       <button class="titik-warna" style=${`--warna:${kat.warna};border:0`} aria-label=${'Ganti warna ' + kat.nama} aria-expanded=${warnaBuka} onClick=${() => setWarnaBuka(!warnaBuka)}></button>
+      <${IkonKategori} nama=${kat.nama} ukuran=${30} />
       <input class="input kecil" style="flex:1" aria-label=${'Nama kategori ' + kat.nama} maxlength="30" value=${kat.nama} onChange=${(e) => e.target.value.trim() && db.simpan('Kategori', { ...kat, nama: e.target.value.trim() })} />
       <span class="teks-kecil" style="min-width:56px;text-align:right">${dipakai} resep</span>
       <button class="ikon-btn kecil" disabled=${dipakai > 0} title=${dipakai > 0 ? 'Masih dipakai resep' : 'Hapus kategori'} aria-label=${'Hapus kategori ' + kat.nama} onClick=${() => db.hapus('Kategori', kat.id)}><${Ikon} nama="sampah" ukuran=${18} /></button>

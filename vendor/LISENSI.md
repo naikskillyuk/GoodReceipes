@@ -1,11 +1,12 @@
 # Lisensi pihak ketiga
 
-Berkas di folder `vendor/` adalah salinan pustaka dan font sumber terbuka. Semuanya dipakai sesuai lisensinya.
+Berkas di folder `vendor/` adalah salinan pustaka dan font sumber terbuka, ditambah ikon 3D di `gambar/kategori/` dan `gambar/menu/`. Semuanya dipakai sesuai lisensinya.
 
 | Berkas | Sumber | Lisensi |
 | --- | --- | --- |
 | `preact-htm.js` | Preact 10.29.8 + htm 3.1.1 (satu bundel) | MIT (Preact), Apache-2.0 (htm) |
 | `qrcode.js` | qrcode-generator 1.5.2, Kazuhiko Arase | MIT |
+| `../gambar/kategori/*.png`, `../gambar/menu/*.png` | Microsoft Fluent Emoji (gaya 3D, github.com/microsoft/fluentui-emoji), diperkecil ke 128 piksel | MIT |
 | `fonts/plus-jakarta-sans.woff2` | Plus Jakarta Sans (paket @fontsource-variable/plus-jakarta-sans 5.3.0) | SIL OFL 1.1 |
 
 ## MIT: Preact
@@ -16,7 +17,11 @@ Copyright (c) 2015-present Jason Miller
 
 Copyright (c) 2009 Kazuhiko Arase. QR Code adalah merek dagang terdaftar DENSO WAVE INCORPORATED.
 
-## Teks lisensi MIT (berlaku untuk dua pustaka di atas)
+## MIT: Fluent Emoji
+
+Copyright (c) Microsoft Corporation.
+
+## Teks lisensi MIT (berlaku untuk Preact, qrcode-generator, dan Fluent Emoji)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

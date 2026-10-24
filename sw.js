@@ -5,12 +5,37 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-ad36cdb6a2';
+const VERSI = 'resep-4a5bfd09ad';
 const FILE = [
   // <daftar-file>
   'config.js',
   'css/app.css',
+  'gambar/kategori/burger.png',
+  'gambar/kategori/camilan.png',
+  'gambar/kategori/cokelat.png',
+  'gambar/kategori/donat.png',
+  'gambar/kategori/eskrim.png',
+  'gambar/kategori/jus.png',
+  'gambar/kategori/kopi.png',
+  'gambar/kategori/kue.png',
+  'gambar/kategori/lauk.png',
+  'gambar/kategori/mie.png',
+  'gambar/kategori/minuman.png',
+  'gambar/kategori/nasi.png',
+  'gambar/kategori/pizza.png',
+  'gambar/kategori/roti.png',
+  'gambar/kategori/salad.png',
+  'gambar/kategori/sambal.png',
+  'gambar/kategori/seafood.png',
+  'gambar/kategori/sup.png',
+  'gambar/kategori/umum.png',
   'gambar/latar-masuk.jpg',
+  'gambar/menu/bahan.png',
+  'gambar/menu/hpp.png',
+  'gambar/menu/marketing.png',
+  'gambar/menu/piala.png',
+  'gambar/menu/resep.png',
+  'gambar/menu/ulasan.png',
   'icons/icon-180.png',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -45,6 +70,7 @@ const FILE = [
   'js/lib/util.js',
   'js/main.js',
   'js/ui/gambar.js',
+  'js/ui/ikon-kategori.js',
   'js/ui/ikon.js',
   'js/ui/komponen.js',
   'js/ui/merek.js',
