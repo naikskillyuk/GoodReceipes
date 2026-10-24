@@ -224,7 +224,7 @@ try {
   await page.goto(BASE + '/#/');
   await page.locator('.sapa-merek-nama', { hasText: 'Good Receipes' }).waitFor();
   assert.equal(await page.title(), 'Good Receipes');
-  assert.equal(await page.locator('link[rel=icon]').getAttribute('href'), 'icons/icon.svg');
+  assert.equal(await page.locator('link[rel=icon]').getAttribute('href'), 'icons/icon-192.png');
 
   tahap('nama sangat panjang tidak merusak tata letak di beranda, pengaturan, QR, dan halaman export');
   await page.goto(BASE + '/#/pengaturan');

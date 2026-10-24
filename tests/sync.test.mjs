@@ -299,7 +299,7 @@ test('merek: nama dan logo tersinkron ke perangkat lain dan tampil bagi penilai'
   repo.simpanMerek(b.db, { logo: '' });
   await b.sinkron.sinkronkan();
   await a.sinkron.sinkronkan();
-  assert.equal(repo.ambilMerek(a.db).logo, 'icons/icon.svg');
+  assert.equal(repo.ambilMerek(a.db).logo, 'icons/icon-192.png');
   assert.equal(repo.ambilMerek(a.db).nama, 'Dapur Agam');
 });
 

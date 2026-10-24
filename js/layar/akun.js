@@ -11,7 +11,7 @@ import { alamatServer, serverTetap, masukAkun, mintaAturUlang, aturSandiBaru, MI
 
 const LATAR_BAWAAN = 'gambar/latar-masuk.jpg';
 // Logo bawaan tanpa kotak (ikon aplikasi berlatar hijau tetap dipakai untuk layar utama HP dan tab).
-const LOGO_POLOS = 'icons/logo.svg';
+const LOGO_POLOS = 'icons/logo.png';
 
 function IsianSandi({ id, label, nilai, onUbah, autocomplete, inputRef, galat }) {
   const [lihat, setLihat] = useState(false);

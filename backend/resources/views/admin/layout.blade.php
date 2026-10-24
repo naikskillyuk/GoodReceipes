@@ -80,7 +80,7 @@
 </head>
 <body>
 @isset($admin)
-@php($logoSitus = app(\App\Services\Situs::class)->tampilan()['logoUrl'] ?: rtrim((string) config('goodrecipes.frontend_url'), '/').'/icons/icon.svg')
+@php($logoSitus = app(\App\Services\Situs::class)->tampilan()['logoUrl'] ?: rtrim((string) config('goodrecipes.frontend_url'), '/').'/icons/icon-192.png')
 <header class="atas"><div class="atas-isi">
   <a class="merek" href="/admin"><img src="{{ $logoSitus }}" alt="">{{ config('app.name') }} <small>Admin</small></a>
   <nav>

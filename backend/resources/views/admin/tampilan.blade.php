@@ -11,7 +11,7 @@
 
 <div class="kisi-2">
   @foreach ([
-    'logo' => ['judul' => 'Logo aplikasi', 'bantu' => 'Tampil di halaman Login, beranda, menu, ikon tab, dan halaman penilai. Gambar persegi, PNG transparan paling bagus. Diperkecil otomatis ke 512 piksel.', 'bawaan' => $frontend.'/icons/icon.svg', 'maks' => 512, 'tipe' => 'image/png'],
+    'logo' => ['judul' => 'Logo aplikasi', 'bantu' => 'Tampil di halaman Login, beranda, menu, ikon tab, dan halaman penilai. Gambar persegi, PNG transparan paling bagus. Diperkecil otomatis ke 512 piksel.', 'bawaan' => $frontend.'/icons/icon-192.png', 'maks' => 512, 'tipe' => 'image/png'],
     'latar' => ['judul' => 'Foto latar halaman Login', 'bantu' => 'Foto cemilan atau masakan yang memenuhi layar di belakang tombol Login. Foto tegak (portrait) paling pas di HP. Diperkecil otomatis ke 1600 piksel.', 'bawaan' => $frontend.'/gambar/latar-masuk.jpg', 'maks' => 1600, 'tipe' => 'image/jpeg'],
   ] as $jenis => $c)
   @php($sekarang = $situs[$jenis === 'logo' ? 'logoUrl' : 'latarUrl'])

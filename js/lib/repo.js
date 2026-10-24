@@ -438,7 +438,7 @@ export function dataEksporResep(db, idResep) {
 // ---------- Merek (nama dan logo aplikasi) ----------
 
 export const NAMA_APLIKASI_BAWAAN = 'Good Receipes';
-export const LOGO_BAWAAN = 'icons/icon.svg';
+export const LOGO_BAWAAN = 'icons/icon-192.png';
 export const ID_MEREK = 'stl_merek';
 
 /** Nama dan logo yang tampil di aplikasi. Bila belum diatur, memakai bawaan. */

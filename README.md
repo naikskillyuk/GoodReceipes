@@ -174,7 +174,7 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 - Keduanya disimpan di server (tabel `setelan`, logo di Supabase Storage), jadi ikut muncul di perangkat Anda yang lain dan **di halaman penilai** yang dibuka lewat QR.
 - **Kembalikan bawaan** menghapus nama dan logo sendiri.
 
-**Ikon dan nama di layar utama HP tidak ikut berubah.** Keduanya dibaca browser dari berkas `manifest.webmanifest` dan folder `icons/` saat aplikasi dipasang, sehingga tidak bisa diganti dari dalam aplikasi. Untuk mengubahnya: ganti `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `icon-180.png`, dan `icon.svg` dengan logo Anda (ukuran sama), ubah `name` dan `short_name` di `manifest.webmanifest`, jalankan `npm run sw`, terbitkan ulang, lalu hapus dan pasang ulang aplikasinya di HP.
+**Ikon dan nama di layar utama HP tidak ikut berubah.** Keduanya dibaca browser dari berkas `manifest.webmanifest` dan folder `icons/` saat aplikasi dipasang, sehingga tidak bisa diganti dari dalam aplikasi. Untuk mengubahnya: ganti `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (latar penuh), `icon-180.png` (latar penuh), dan `logo.png` (tanpa kotak, untuk halaman Login) dengan logo Anda (ukuran sama), ubah `name` dan `short_name` di `manifest.webmanifest`, jalankan `npm run sw`, terbitkan ulang, lalu hapus dan pasang ulang aplikasinya di HP.
 
 ## Cara kerja penilaian lewat QR
 
