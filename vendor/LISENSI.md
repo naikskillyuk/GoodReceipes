@@ -1,12 +1,12 @@
 # Lisensi pihak ketiga
 
-Berkas di folder `vendor/` adalah salinan pustaka dan font sumber terbuka, ditambah ikon 3D di `gambar/kategori/` dan `gambar/menu/`. Semuanya dipakai sesuai lisensinya.
+Berkas di folder `vendor/` adalah salinan pustaka dan font sumber terbuka, ditambah ikon flat di `gambar/kategori/` dan `gambar/menu/`. Semuanya dipakai sesuai lisensinya.
 
 | Berkas | Sumber | Lisensi |
 | --- | --- | --- |
 | `preact-htm.js` | Preact 10.29.8 + htm 3.1.1 (satu bundel) | MIT (Preact), Apache-2.0 (htm) |
 | `qrcode.js` | qrcode-generator 1.5.2, Kazuhiko Arase | MIT |
-| `../gambar/kategori/*.png`, `../gambar/menu/*.png` | Microsoft Fluent Emoji (gaya 3D, github.com/microsoft/fluentui-emoji), diperkecil ke 128 piksel | MIT |
+| `../gambar/kategori/*.svg`, `../gambar/menu/*.svg` | Microsoft Fluent Emoji (gaya Flat, github.com/microsoft/fluentui-emoji), tanpa diubah | MIT |
 | `fonts/plus-jakarta-sans.woff2` | Plus Jakarta Sans (paket @fontsource-variable/plus-jakarta-sans 5.3.0) | SIL OFL 1.1 |
 
 ## MIT: Preact

@@ -2183,8 +2183,7 @@ button.tautan-hijau {
     padding: 18px 40px 6px;
     max-width: 760px;
   }
-  .gulir-banner,
-  .slider-juara {
+  .gulir-banner {
     padding-left: 40px;
     padding-right: 40px;
     scroll-padding: 0 40px;
@@ -3146,83 +3145,6 @@ button.tautan-hijau {
   align-items: center;
   justify-content: center;
 }
-.slider-juara {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(160px, 46%);
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  padding: 4px 20px 14px;
-  scroll-padding: 0 20px;
-}
-.kartu-juara {
-  scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 8px 12px;
-  border-radius: 22px;
-  background: var(--kartu);
-  border: 1px solid var(--garis);
-  box-shadow: var(--bayang-kecil);
-  color: var(--ink);
-  min-width: 0;
-}
-.kartu-juara-foto {
-  position: relative;
-  aspect-ratio: 1 / 0.85;
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--krem);
-  color: var(--muted);
-  display: grid;
-  place-items: center;
-  margin-bottom: 6px;
-}
-.kartu-juara-foto > img:first-child {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.piala-juara {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 30px;
-  height: 30px;
-  padding: 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-}
-.kartu-juara-kat {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-.kartu-juara > b {
-  padding: 0 4px;
-  font-size: 15px;
-  line-height: 19px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-.kartu-juara-bawah {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 0 4px;
-}
-.kartu-juara-bawah small {
-  font-size: 11px;
-  color: var(--muted);
-}
 .skor-bintang {
   display: inline-flex;
   align-items: center;
@@ -3243,9 +3165,6 @@ button.tautan-hijau {
     grid-auto-flow: row;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow: visible;
-  }
-  .slider-juara {
-    grid-auto-columns: 240px;
   }
 }
 
@@ -3345,4 +3264,143 @@ button.tautan-hijau {
 .sisi .kategori-sisi .ikon-sisi .ikon-kategori {
   width: 20px;
   height: 20px;
+}
+
+/* Resep juara: satu kartu foto besar per geseran, teks di atas gradasi gelap */
+.juara-wadah {
+  padding-bottom: 6px;
+}
+.slider-juara {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding: 4px 0 8px;
+}
+.slider-juara::-webkit-scrollbar {
+  display: none;
+}
+.kartu-juara {
+  scroll-snap-align: center;
+  position: relative;
+  display: block;
+  margin: 0 20px;
+  height: min(94vw, 400px);
+  border-radius: 30px;
+  overflow: hidden;
+  background: var(--krem);
+  color: #fff;
+  box-shadow: var(--bayang);
+  isolation: isolate;
+}
+.kartu-juara > img,
+.kartu-juara > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+}
+.kartu-juara > svg {
+  width: 40px;
+  height: 40px;
+  inset: 40% auto auto 50%;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+}
+.kartu-juara::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(10, 30, 8, 0.88) 0%, rgba(10, 30, 8, 0.55) 30%, rgba(10, 30, 8, 0) 58%);
+}
+.kartu-juara-atas {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.piala-juara {
+  width: 40px;
+  height: 40px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.kartu-juara-atas .skor-bintang {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+}
+.kartu-juara-teks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 20px 22px;
+}
+.kartu-juara-kat {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  font-weight: 700;
+}
+.kartu-juara-teks b {
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
+}
+.kartu-juara-teks small {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.titik-slider {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.titik-slider button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--garis-input);
+  transition: width 0.2s, background 0.2s;
+}
+.titik-slider button.on {
+  width: 22px;
+  background: var(--hijau);
+}
+@media (min-width: 960px) {
+  .juara-wadah {
+    max-width: 820px;
+  }
+  .kartu-juara {
+    margin: 0 40px;
+    height: 420px;
+  }
 }

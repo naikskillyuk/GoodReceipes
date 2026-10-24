@@ -68,7 +68,7 @@ export function DaftarResep({ k }) {
               <span class="nama">${r.resep.nama}</span>
               <span class="meta">${r.eksperimen.length} eksperimen</span>
               <span class="skor-baris">
-                ${r.juara ? html`<span class="lencana-juara" title="Sudah ada juara"><img src="gambar/menu/piala.png" alt="" width="20" height="20" /></span>` : null}
+                ${r.juara ? html`<span class="lencana-juara" title="Sudah ada juara"><img src="gambar/menu/piala.svg" alt="" width="20" height="20" /></span>` : null}
                 <span class=${'angka-skor' + (r.juara ? ' juara' : '')}>${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'}</span>
               </span>
             </a>`;

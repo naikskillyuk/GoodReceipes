@@ -41,7 +41,9 @@ async function tungguServer() {
 function pantau(page, nama) {
   page.on('pageerror', (e) => galat.push(`[${nama}] pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !/favicon|manifest|icon|sw\.js|404/.test(m.text())) galat.push(`[${nama}] console: ${m.text()}`);
+    // Sebelum memilih server uji, aplikasi mencoba Laravel lokal (localhost:8000) yang tidak dijalankan di tes ini.
+    const keLaravelLokal = /localhost:8000\//.test((m.location() && m.location().url) || '');
+    if (m.type() === 'error' && !keLaravelLokal && !/favicon|manifest|icon|sw\.js|404/.test(m.text())) galat.push(`[${nama}] console: ${m.text()}`);
   });
 }
 

@@ -1,4 +1,4 @@
-// Ikon kategori berupa gambar 3D berwarna (Microsoft Fluent Emoji, lisensi MIT; lihat vendor/LISENSI.md).
+// Ikon kategori berupa gambar flat berwarna (Microsoft Fluent Emoji gaya Flat, lisensi MIT; lihat vendor/LISENSI.md).
 // Ikon dipilih otomatis dari nama kategori, jadi kategori buatan pengguna juga mendapat ikon yang cocok.
 
 import { html } from '../../vendor/preact-htm.js';
@@ -34,7 +34,7 @@ export function kunciIkonKategori(nama) {
   return cocok ? cocok[0] : IKON_UMUM;
 }
 
-export const srcIkonKategori = (namaAtauKunci, { kunci = false } = {}) => `gambar/kategori/${kunci ? namaAtauKunci : kunciIkonKategori(namaAtauKunci)}.png`;
+export const srcIkonKategori = (namaAtauKunci, { kunci = false } = {}) => `gambar/kategori/${kunci ? namaAtauKunci : kunciIkonKategori(namaAtauKunci)}.svg`;
 
 /** Gambar ikon kategori (dekoratif: nama kategori selalu ditulis di sebelahnya). */
 export function IkonKategori({ nama, ukuran = 24, kunci }) {

@@ -1,6 +1,6 @@
 // Beranda: sapaan, banner resep yang masih dikembangkan, menu 4 kotak, lalu slider resep juara.
 
-import { html } from '../../vendor/preact-htm.js';
+import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Foto, Kosong } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { IkonKategori } from '../ui/ikon-kategori.js';
@@ -49,6 +49,49 @@ function BannerDikembangkan({ r }) {
   </a>`;
 }
 
+/** Resep juara: satu kartu foto besar per geseran, teks di atas gradasi, titik penanda di bawah. */
+function SliderJuara({ juara }) {
+  const ref = useRef(null);
+  const [aktif, setAktif] = useState(0);
+  // Daftar berubah (mis. data baru datang dari server): kembali ke kartu pertama, jangan ikut
+  // "terkunci" pada kartu lama yang posisinya bergeser.
+  const ids = juara.map((r) => r.resep.id).join(',');
+  useEffect(() => {
+    if (ref.current) ref.current.scrollLeft = 0;
+    setAktif(0);
+  }, [ids]);
+  const saatGulir = () => {
+    const el = ref.current;
+    if (el) setAktif(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+  };
+  const ke = (i) => {
+    const el = ref.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+  };
+  return html`<div class="juara-wadah">
+    <div class="slider-juara" ref=${ref} onScroll=${saatGulir} role="list" aria-label="Resep juara">
+      ${juara.map(
+        (r) => html`<a class="kartu-juara" role="listitem" key=${r.resep.id} href=${tautan('/resep/' + r.resep.id)}>
+          <${Foto} src=${r.foto} ikon="kamera" ukuranIkon=${40} />
+          <span class="kartu-juara-atas" aria-hidden="true">
+            <img class="piala-juara" src="gambar/menu/piala.svg" alt="" width="32" height="32" />
+            <span class="skor-bintang"><${Ikon} nama="bintang" ukuran=${15} />${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'}</span>
+          </span>
+          <span class="kartu-juara-teks">
+            <span class="kartu-juara-kat"><${IkonKategori} nama=${r.kategori ? r.kategori.nama : ''} ukuran=${18} />${r.kategori ? r.kategori.nama : 'Resep'}</span>
+            <b>${r.resep.nama}</b>
+            <small>Eksperimen ${r.juara.nomor} juara · ${r.eksperimen.length} percobaan · ${r.jumlahPenilai > 0 ? `${r.jumlahPenilai} penilai` : 'belum ada penilai'}</small>
+          </span>
+        </a>`,
+      )}
+    </div>
+    ${juara.length > 1 &&
+    html`<div class="titik-slider">
+      ${juara.map((r, i) => html`<button type="button" key=${r.resep.id} class=${i === aktif ? 'on' : ''} aria-label=${`Lihat ${r.resep.nama}`} aria-current=${i === aktif ? 'true' : null} onClick=${() => ke(i)}></button>`)}
+    </div>`}
+  </div>`;
+}
+
 const MENU = [
   { href: '/resep', label: 'Daftar resep', gambar: 'resep' },
   { href: '/bahan', label: 'Daftar bahan', gambar: 'bahan' },
@@ -88,7 +131,7 @@ export function Beranda({ k }) {
     <nav class="menu-empat" aria-label="Menu">
       ${MENU.map(
         (m) => html`<a class="menu-kotak" href=${tautan(m.href)}>
-          <span class="menu-gambar"><img src=${`gambar/menu/${m.gambar}.png`} alt="" width="40" height="40" /></span>
+          <span class="menu-gambar"><img src=${`gambar/menu/${m.gambar}.svg`} alt="" width="40" height="40" /></span>
           <span class="menu-label">${m.label}</span>
           ${hitung[m.href] > 0 && html`<span class="lencana" aria-label=${hitung[m.href] + ' item'}>${hitung[m.href]}</span>`}
         </a>`,
@@ -101,22 +144,7 @@ export function Beranda({ k }) {
     </div>
 
     ${juara.length > 0
-      ? html`<div class="slider-juara" role="list" aria-label="Resep juara">
-          ${juara.map(
-            (r) => html`<a class="kartu-juara" role="listitem" key=${r.resep.id} href=${tautan('/resep/' + r.resep.id)}>
-              <span class="kartu-juara-foto" aria-hidden="true">
-                <${Foto} src=${r.foto} ikon="kamera" ukuranIkon=${32} />
-                <img class="piala-juara" src="gambar/menu/piala.png" alt="" width="30" height="30" />
-              </span>
-              <span class="kartu-juara-kat"><${IkonKategori} nama=${r.kategori ? r.kategori.nama : ''} ukuran=${16} />${r.kategori ? r.kategori.nama : 'Resep'}</span>
-              <b>${r.resep.nama}</b>
-              <span class="kartu-juara-bawah">
-                <small>Eksperimen ${r.juara.nomor} · ${r.jumlahPenilai} penilai</small>
-                <span class="skor-bintang"><${Ikon} nama="bintang" ukuran=${14} />${Number.isFinite(r.skor) ? desimal1(r.skor) : '–'}</span>
-              </span>
-            </a>`,
-          )}
-        </div>`
+      ? html`<${SliderJuara} juara=${juara} />`
       : html`<div style="padding:0 20px">
           ${jumlahResep === 0
             ? html`<${Kosong} judul="Belum ada resep" teks="Mulai dengan membuat resep pertama.">
