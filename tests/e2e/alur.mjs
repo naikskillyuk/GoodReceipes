@@ -198,7 +198,6 @@ try {
   await page.goto(BASE + `/#/resep/${idResep}/hpp`);
   await page.getByRole('button', { name: /Kemasan/ }).click();
   await page.getByLabel('Nilai Kemasan').fill('500');
-  await page.getByLabel('Dihitung per untuk Kemasan').selectOption('porsi');
   // bahan eks. 2 = 150 g x 13 + 2 x 1.650 + 1.080 = 1.950 + 3.300 + 1.080 = 6.330; + kemasan 500 x 10
   await page.getByText('Rp 11.330').first().waitFor();
   await page.getByText('Rp 1.133').first().waitFor(); // HPP per porsi
@@ -225,7 +224,7 @@ try {
   await page.getByLabel('Tambah resep tambahan').selectOption(idSaus);
   await page.getByRole('link', { name: 'Saus Uji' }).waitFor();
   await page.getByLabel('Jumlah Saus Uji').fill('50');
-  await page.getByRole('cell', { name: /Saus Uji/ }).waitFor();
+  await page.locator('.baris-tambahan', { hasText: 'Saus Uji' }).locator('b', { hasText: 'Rp' }).waitFor();
   const hppSesudah = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id), idResep);
   assert.equal(hppSesudah.tambahan.rincian.length, 1);
   assert.ok(hppSesudah.hpp.totalResep > hppSebelum, 'HPP bertambah');
@@ -234,7 +233,6 @@ try {
 
   tahap('HPP: harga yang diinginkan menampilkan margin dan markup');
   await page.goto(BASE + `/#/resep/${idResep}/hpp`);
-  await page.getByRole('button', { name: 'Dari harga saya' }).click();
   const hppPorsiUji = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id).hpp.hppPorsi, idResep);
   const hargaUji = Math.ceil(hppPorsiUji * 2 / 100) * 100;
   await page.getByPlaceholder('mis. 8.000').fill(String(hargaUji));

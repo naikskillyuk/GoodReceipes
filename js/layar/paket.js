@@ -8,6 +8,7 @@ import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { KartuHarga } from '../ui/harga.js';
+import { Langkah } from './hpp.js';
 import { daftarPaket, buatPaket, hapusPaket, dataPaket, tambahIsiPaket, biayaPaketList } from '../lib/repo.js';
 import { marginDariHarga } from '../lib/hpp.js';
 import { rupiah, angka, persen, tampilJumlah } from '../lib/util.js';
@@ -83,11 +84,16 @@ export function DetailPaket({ k, id }) {
       <input class="input" value=${paket.nama} onInput=${(e) => ubahPaket({ nama: e.target.value })} />
     </label>
 
-    <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:4px"><span class="no-langkah">1</span>Isi paket</div>
-      <p class="bantu" style="margin:0 0 10px">Setiap resep memakai <b>biaya produksi per porsi</b> (bahan + resep tambahan + biaya per resep). Kemasan per porsi resep itu tidak ikut dihitung.</p>
+    <${Langkah}
+      no="1"
+      judul="Isi paket"
+      bantu="Pilih resep dan jumlahnya. Yang dihitung modal produksinya saja (bahan, resep tambahan, biaya sekali masak); kemasan tiap resep tidak ikut."
+      hasil=${d.totalIsi}
+      rumus="Jumlah isi paket"
+      unit="paket"
+    >
       ${d.bermasalah.length > 0 &&
-      html`<div class="peringatan" role="alert" style="margin-bottom:10px">
+      html`<div class="peringatan" role="alert">
         <b>Ada resep yang biayanya belum bisa dihitung:</b>
         ${d.isi.filter((i) => i.alasan).map((i) => `${i.resep ? i.resep.nama : 'resep terhapus'} (${i.alasan})`).join(', ')}.
       </div>`}
@@ -113,16 +119,21 @@ export function DetailPaket({ k, id }) {
             </select>`
           : d.isi.length === 0 && html`<p class="bantu" style="margin:0">Belum ada resep. Buat resep dulu di Daftar resep.</p>`}
       </div>
-    </div>
+    <//>
 
-    <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:4px"><span class="no-langkah">2</span>Biaya paket (sekali per paket)</div>
-      <p class="bantu" style="margin:0 0 10px">Kotak, kantong, label, ongkir: dihitung satu kali untuk satu paket.</p>
+    <${Langkah}
+      no="2"
+      judul="Kemasan paket"
+      bantu="Kotak, kantong, label, ongkir. Dihitung satu kali untuk satu paket."
+      hasil=${d.totalBiaya}
+      rumus="Jumlah biaya paket"
+      unit="paket"
+    >
       <div class="kolom">
         ${d.biaya.map(
-          (b) => html`<div class="biaya-lain-baris" key=${b.id}>
-            <input class="input kecil bl-nama" aria-label="Jenis biaya paket" value=${b.jenis} onInput=${(e) => db.simpan('BiayaPaket', { ...b, jenis: e.target.value })} />
-            <${InputRupiah} kelas="input kecil bl-nilai" nilai=${b.nilai} aria-label=${'Nilai ' + b.jenis} onUbah=${(n) => db.simpan('BiayaPaket', { ...b, nilai: n })} />
+          (b) => html`<div class="baris-biaya" key=${b.id}>
+            <input class="input kecil" aria-label="Jenis biaya paket" value=${b.jenis} onInput=${(e) => db.simpan('BiayaPaket', { ...b, jenis: e.target.value })} />
+            <${InputRupiah} kelas="input kecil" nilai=${b.nilai} aria-label=${'Nilai ' + b.jenis} onUbah=${(n) => db.simpan('BiayaPaket', { ...b, nilai: n })} />
             <button class="ikon-btn" aria-label=${'Hapus ' + b.jenis} onClick=${() => db.hapus('BiayaPaket', b.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
           </div>`,
         )}
@@ -133,18 +144,18 @@ export function DetailPaket({ k, id }) {
           <button type="button" class="chip putus" onClick=${() => tambahBiaya('Biaya lain')}><${Ikon} nama="plus" ukuran=${16} />Lainnya</button>
         </div>
       </div>
-    </div>
+    <//>
 
     <button class="btn bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${18} />Hapus paket</button>
   </div>`;
 
   const kanan = html`<div class="kolom">
     <div class="kartu-hpp">
-      <div class="label-kecil">HPP per paket</div>
+      <div class="label-kecil">HPP (modal) per paket</div>
       <div class="besar">${rupiah(d.hppPaket)}</div>
       <div class="hpp-pecah">
-        <span>Isi paket (1)</span><b>${rupiah(d.totalIsi)}</b>
-        <span>Biaya paket (2)</span><b>${rupiah(d.totalBiaya)}</b>
+        <span><i class="no-mini">1</i>Isi paket</span><b>${rupiah(d.totalIsi)}</b>
+        <span><i class="no-mini">2</i>Kemasan paket</span><b>${rupiah(d.totalBiaya)}</b>
       </div>
     </div>
     <${KartuHarga} key=${id} hpp=${d.hppPaket} marginTarget=${Number(paket.marginTarget) || 40} hargaJual=${Number(paket.hargaJual) || 0} onUbah=${ubahPaket} unit="paket" />
