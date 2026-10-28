@@ -245,10 +245,35 @@ test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async (
   assert.equal(db.semua('Setelan').length, 1, 'selalu satu baris');
 });
 
-test('resep tambahan: HPP resep A ikut menghitung resep B, dan tidak bisa berputar', async () => {
+test('HPP Resep: disimpan dengan tombol, tanda bila hitungan berubah', async () => {
   const db = await dbBaru();
   const { brownies } = muatContoh(db);
-  const awal = repo.dataHPP(db, brownies);
+  let d = repo.dataHPP(db, brownies);
+  assert.equal(d.tersimpan, false, 'belum disimpan: memakai hitungan saat ini');
+  assert.equal(Math.round(d.hppPorsi), Math.round(d.hpp.hppPorsi));
+  assert.equal(d.packingPorsi, 1200, 'kemasan contoh dicatat sebagai packing');
+  assert.equal(Math.round(d.tanpaPacking), Math.round(d.hpp.hppPorsi - 1200));
+
+  repo.simpanHPPResep(db, brownies);
+  d = repo.dataHPP(db, brownies);
+  assert.equal(d.tersimpan, true);
+  assert.equal(d.berubah, false);
+  const tersimpan = d.hppPorsi;
+
+  // Harga bahan naik: angka tersimpan tetap, tapi ada tanda berubah.
+  const bahan = db.semua('Bahan')[0];
+  db.simpan('Bahan', { ...bahan, hargaBeli: bahan.hargaBeli * 3 });
+  d = repo.dataHPP(db, brownies);
+  assert.equal(d.hppPorsi, tersimpan);
+  assert.equal(d.berubah, true);
+  assert.ok(d.hpp.hppPorsi > tersimpan);
+  repo.simpanHPPResep(db, brownies);
+  assert.equal(repo.dataHPP(db, brownies).hppPorsi, d.hpp.hppPorsi);
+});
+
+test('HPP Jual: HPP resep + HPP resep lain tanpa packing', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
   const kat = repo.daftarKategori(db)[0].id;
   const saus = repo.buatResep(db, { nama: 'Saus cokelat', idKategori: kat });
   const bahan = db.semua('Bahan')[0];
@@ -256,52 +281,39 @@ test('resep tambahan: HPP resep A ikut menghitung resep B, dan tidak bisa berput
     eksperimen: { ...repo.draftEksperimen(db, saus.id).eksperimen, porsi: 200, satuanPorsi: 'gram' },
     baris: [{ idBahan: bahan.id, jumlah: 1, satuan: bahan.satuanBeli }],
   });
-  const biayaSaus = repo.biayaBahanEksperimen(db, repo.eksperimenResep(db, saus.id)[0].id).total;
-  assert.ok(biayaSaus > 0);
+  db.simpan('BiayaLain', { idResep: saus.id, jenis: 'Cup saus', nilai: 1000, dihitungPer: 'packing', urutan: 0 });
+  repo.simpanHPPResep(db, saus.id);
+  repo.simpanHPPResep(db, brownies);
+  const hSaus = repo.hppResep(db, saus.id);
+  const perGram = hSaus.tanpaPacking;
+  assert.equal(Math.round(hSaus.hppPorsi - perGram), 1000, 'packing saus terpisah');
 
   assert.ok(repo.pilihanResepTambahan(db, brownies).some((r) => r.id === saus.id));
   const rt = repo.tambahResepTambahan(db, brownies, saus.id);
-  assert.equal(rt.dipakaiPer, 'porsi', 'resep tambahan baru: takaran untuk tiap porsi');
-  const porsi = awal.porsi;
-  assert.ok(porsi > 1);
-
-  // 50 gram saus (dari 200 gram) untuk TIAP porsi brownies: per porsi naik biayaSaus/4, tidak dibagi jumlah porsi.
-  db.simpan('ResepTambahan', { ...rt, jumlah: 50 });
-  let hasil = repo.dataHPP(db, brownies);
-  assert.equal(Math.round(hasil.tambahan.rincian[0].biayaPorsi), Math.round(biayaSaus / 4));
-  assert.equal(Math.round(hasil.hpp.hppPorsi - awal.hpp.hppPorsi), Math.round(biayaSaus / 4));
-  assert.equal(Math.round(hasil.tambahan.total), Math.round((biayaSaus / 4) * porsi));
-  assert.equal(Math.round(hasil.hpp.totalResep), Math.round(awal.hpp.totalResep + (biayaSaus / 4) * porsi));
-  assert.equal(hasil.tambahan.bermasalah.length, 0);
-
-  // 50 gram saus untuk SATU KALI MASAK brownies: dibagi jumlah porsi.
-  db.simpan('ResepTambahan', { ...db.ambil('ResepTambahan', rt.id), dipakaiPer: 'resep' });
-  hasil = repo.dataHPP(db, brownies);
-  assert.equal(Math.round(hasil.tambahan.total), Math.round(biayaSaus / 4));
-  assert.equal(Math.round(hasil.hpp.hppPorsi * 100), Math.round((awal.hpp.hppPorsi + biayaSaus / 4 / porsi) * 100));
-
-  // 2 resep saus penuh untuk satu kali masak.
-  db.simpan('ResepTambahan', { ...db.ambil('ResepTambahan', rt.id), jumlah: 2, satuan: 'resep' });
-  hasil = repo.dataHPP(db, brownies);
-  assert.equal(Math.round(hasil.tambahan.total), Math.round(biayaSaus * 2));
-
-  // Baris lama tanpa dipakaiPer tetap dibaca "untuk satu kali masak" (angka lama tidak berubah).
-  const { dipakaiPer, ...lama } = db.ambil('ResepTambahan', rt.id);
-  db.simpan('ResepTambahan', { ...lama, dipakaiPer: '' });
-  assert.equal(Math.round(repo.dataHPP(db, brownies).tambahan.total), Math.round(biayaSaus * 2));
-
-  // Saus tidak boleh memakai brownies (brownies sudah memakai saus).
-  assert.equal(repo.pilihanResepTambahan(db, saus.id).some((r) => r.id === brownies), false);
+  assert.equal(rt.dipakaiPer, 'porsi');
+  db.simpan('ResepTambahan', { ...rt, jumlah: 30 }); // 30 gram saus setiap porsi brownies
+  let d = repo.dataHPP(db, brownies);
+  assert.equal(Math.round(d.tambahan.totalPorsi), Math.round(perGram * 30), 'packing saus tidak ikut');
+  assert.equal(Math.round(d.hppJual), Math.round(d.hppPorsi + perGram * 30));
+  assert.equal(d.tambahan.bermasalah.length, 0);
   assert.equal(repo.pilihanResepTambahan(db, brownies).some((r) => r.id === saus.id), false, 'tidak ditawarkan dua kali');
-  // Bila tetap terjadi (mis. dari dua perangkat), perhitungan tidak berputar selamanya.
-  db.simpan('ResepTambahan', { idResep: saus.id, idResepKomponen: brownies, jumlah: 1, satuan: 'porsi', urutan: 0 });
-  hasil = repo.dataHPP(db, brownies);
-  assert.ok(Number.isFinite(hasil.hpp.totalResep));
 
-  // Menghapus resep saus melepasnya dari HPP brownies.
+  // Satu resep saus penuh untuk setiap porsi.
+  db.simpan('ResepTambahan', { ...db.ambil('ResepTambahan', rt.id), jumlah: 1, satuan: 'resep' });
+  assert.equal(Math.round(repo.dataHPP(db, brownies).tambahan.totalPorsi), Math.round(perGram * 200));
+
+  // Data lama: takaran untuk satu kali masak, dibagi jumlah porsi brownies.
+  db.simpan('ResepTambahan', { ...db.ambil('ResepTambahan', rt.id), dipakaiPer: '' });
+  d = repo.dataHPP(db, brownies);
+  assert.equal(Math.round(d.tambahan.totalPorsi), Math.round((perGram * 200) / d.porsi));
+
+  // Saling memakai tidak berputar (resep lain hanya memakai HPP Resep, tanpa resep lainnya).
+  repo.tambahResepTambahan(db, saus.id, brownies);
+  assert.ok(Number.isFinite(repo.dataHPP(db, brownies).hppJual));
+
+  // Menghapus resep saus melepasnya dari HPP Jual brownies.
   repo.hapusResep(db, saus.id);
   assert.equal(repo.dataHPP(db, brownies).tambahan.rincian.length, 0);
-  assert.equal(Math.round(repo.dataHPP(db, brownies).hpp.totalResep), Math.round(awal.hpp.totalResep));
 });
 
 test('ganti server: semua baris dikirim ulang dan ditarik dari awal', async () => {
@@ -334,12 +346,11 @@ test('petunjuk penilaian ikut ke eksperimen baru dan duplikat, catatan chef tida
   assert.equal(dariBaris('Eksperimen', kirim).catatanChef, 'Catatan lama');
 });
 
-test('paket: biaya produksi tiap resep (tanpa kemasan per porsi) + biaya paket sekali', async () => {
+test('paket: HPP jual tiap resep tanpa packing + packing paket sekali', async () => {
   const db = await dbBaru();
   const { brownies } = muatContoh(db);
   const d = repo.dataHPP(db, brownies);
-  const kemasan = d.hpp.alur.biayaPorsi;
-  assert.ok(kemasan > 0, 'contoh brownies punya kemasan per porsi');
+  assert.ok(d.packingPorsi > 0, 'contoh brownies punya packing');
 
   const paket = repo.buatPaket(db, 'Paket Hemat');
   const isi = repo.tambahIsiPaket(db, paket.id, brownies);
@@ -347,8 +358,8 @@ test('paket: biaya produksi tiap resep (tanpa kemasan per porsi) + biaya paket s
   db.simpan('BiayaPaket', { idPaket: paket.id, jenis: 'Kotak', nilai: 2500, urutan: 0 });
 
   let p = repo.dataPaket(db, paket.id);
-  assert.equal(Math.round(p.totalIsi), Math.round(d.hpp.produksiPorsi * 2));
-  assert.equal(Math.round(p.hppPaket), Math.round((d.hpp.hppPorsi - kemasan) * 2 + 2500));
+  assert.equal(Math.round(p.totalIsi), Math.round(d.tanpaPacking * 2));
+  assert.equal(Math.round(p.hppPaket), Math.round((d.hppJual - d.packingPorsi) * 2 + 2500));
   assert.equal(p.bermasalah.length, 0);
 
   // Menghapus resep mengeluarkannya dari paket.

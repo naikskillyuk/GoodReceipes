@@ -96,6 +96,8 @@ return [
             'kolom' => [
                 'id' => 't', 'idResep' => 't', 'idEksperimenHitung' => 't', 'marginTarget' => 'n', 'hargaJual' => 'n',
                 'modalAwal' => 'n', 'labaTargetBulanan' => 'n',
+                // HPP resep per porsi yang disimpan dengan tombol "Simpan HPP".
+                'hppSimpan' => 'n', 'packingSimpan' => 'n', 'hppSimpanPada' => 'n',
             ],
         ],
         // Paket: beberapa resep dijual bersama dalam satu kemasan.

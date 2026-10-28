@@ -105,10 +105,11 @@ export function CetakResep({ k, id }) {
       html`<h3>HPP dan harga (dihitung dari Eksperimen ${hpp.eksperimen.nomor})</h3>
         <dl class="cetak-info">
           <dt>Biaya bahan</dt><dd>${rupiah(hpp.hpp.biayaBahan)}</dd>
-          ${hpp.hpp.biayaResepLain > 0 && html`<dt>Resep tambahan</dt><dd>${rupiah(hpp.hpp.biayaResepLain)}</dd>`}
           ${hpp.hpp.lain.map((b) => html`<dt>${b.jenis || 'Biaya lain'}</dt><dd>${rupiah(b.total)}</dd>`)}
           <dt>Total per resep</dt><dd>${rupiah(hpp.hpp.totalResep)}</dd>
-          <dt>HPP per porsi</dt><dd><b>${rupiah(hpp.hpp.hppPorsi)}</b></dd>
+          <dt>HPP resep per porsi${hpp.tersimpan ? ' (tersimpan)' : ''}</dt><dd><b>${rupiah(hpp.hppPorsi)}</b></dd>
+          ${hpp.tambahan.rincian.map((t) => html`<dt>${t.resep ? t.resep.nama : 'Resep lain'} (resep lain)</dt><dd>${rupiah(t.biayaPorsi)}</dd>`)}
+          ${hpp.tambahan.rincian.length > 0 && html`<dt>HPP jual per porsi</dt><dd><b>${rupiah(hpp.hppJual)}</b></dd>`}
           ${target && Number(target.hargaJual) > 0 && html`<dt>Harga jual</dt><dd>${rupiah(Number(target.hargaJual))}</dd>`}
           ${target && Number(target.marginTarget) > 0 && html`<dt>Target margin</dt><dd>${persen(Number(target.marginTarget), 0)}</dd>`}
         </dl>`}

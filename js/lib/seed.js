@@ -113,7 +113,7 @@ export function muatContoh(db) {
   ulasan(e3.id, [44, 40, 42, 43, 41, 42]); // rata-rata 8,4
   ulasan(e4.id, [39, 38]);
   db.simpan('Resep', { ...db.ambil('Resep', brownies.id), idJuara: e3.id });
-  db.simpan('BiayaLain', { idResep: brownies.id, jenis: 'Kemasan', nilai: 1200, dihitungPer: 'porsi', urutan: 0 });
+  db.simpan('BiayaLain', { idResep: brownies.id, jenis: 'Kemasan', nilai: 1200, dihitungPer: 'packing', urutan: 0 });
   db.simpan('BiayaLain', { idResep: brownies.id, jenis: 'Gas dan listrik', nilai: 3500, dihitungPer: 'resep', urutan: 1 });
   db.simpan('BiayaLain', { idResep: brownies.id, jenis: 'Tenaga kerja', nilai: 12000, dihitungPer: 'resep', urutan: 2 });
   db.simpan('Target', { idResep: brownies.id, idEksperimenHitung: e3.id, marginTarget: 40, hargaJual: 8000, modalAwal: 1500000, labaTargetBulanan: 3000000 });

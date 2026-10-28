@@ -87,7 +87,7 @@ export function DetailPaket({ k, id }) {
     <${Langkah}
       no="1"
       judul="Isi paket"
-      bantu="Pilih resep dan jumlahnya. Yang dihitung modal produksinya saja (bahan, resep tambahan, biaya sekali masak); kemasan tiap resep tidak ikut."
+      bantu="Pilih resep dan jumlahnya. Dipakai HPP Jual tiap resep tanpa packing-nya, karena paket punya packing sendiri."
       hasil=${d.totalIsi}
       rumus="Jumlah isi paket"
       unit="paket"
@@ -109,7 +109,7 @@ export function DetailPaket({ k, id }) {
             <span style="min-width:84px;text-align:right;font-weight:700">${rupiah(i.total)}</span>
             <button class="ikon-btn" aria-label=${'Keluarkan ' + nama} onClick=${() => db.hapus('IsiPaket', i.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
             ${Number.isFinite(i.biayaProduksi) &&
-            html`<small class="teks-kecil" style="flex-basis:100%">${rupiah(i.biayaProduksi)} per ${i.satuanPorsi} × ${tampilJumlah(i.jumlah)}${i.biayaPorsiResep > 0 ? ` · kemasan per porsi resep ini (${rupiah(i.biayaPorsiResep)}) tidak ikut` : ''}</small>`}
+            html`<small class="teks-kecil" style="flex-basis:100%">${rupiah(i.biayaProduksi)} per ${i.satuanPorsi} × ${tampilJumlah(i.jumlah)}${i.biayaPorsiResep > 0 ? ` · packing resep ini (${rupiah(i.biayaPorsiResep)}) tidak ikut` : ''}</small>`}
           </div>`;
         })}
         ${pilihan.length > 0
@@ -123,7 +123,7 @@ export function DetailPaket({ k, id }) {
 
     <${Langkah}
       no="2"
-      judul="Kemasan paket"
+      judul="Packing paket"
       bantu="Kotak, kantong, label, ongkir. Dihitung satu kali untuk satu paket."
       hasil=${d.totalBiaya}
       rumus="Jumlah biaya paket"
@@ -155,7 +155,7 @@ export function DetailPaket({ k, id }) {
       <div class="besar">${rupiah(d.hppPaket)}</div>
       <div class="hpp-pecah">
         <span><i class="no-mini">1</i>Isi paket</span><b>${rupiah(d.totalIsi)}</b>
-        <span><i class="no-mini">2</i>Kemasan paket</span><b>${rupiah(d.totalBiaya)}</b>
+        <span><i class="no-mini">2</i>Packing paket</span><b>${rupiah(d.totalBiaya)}</b>
       </div>
     </div>
     <${KartuHarga} key=${id} hpp=${d.hppPaket} marginTarget=${Number(paket.marginTarget) || 40} hargaJual=${Number(paket.hargaJual) || 0} onUbah=${ubahPaket} unit="paket" />

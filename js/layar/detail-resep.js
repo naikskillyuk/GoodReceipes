@@ -7,7 +7,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { ringkasResep, dataHPP, skorDariDB, fotoSrc, penilaianEksperimen, hapusResep } from '../lib/repo.js';
 import { desimal1, angka, rupiah } from '../lib/util.js';
-import { PanelHPP } from './hpp.js';
+import { PanelHPPResep, PanelHPPJual } from './hpp.js';
 import { PanelMarketing } from './marketing.js';
 
 function ringkasEksperimen(e) {
@@ -92,8 +92,8 @@ export function DetailResep({ k, id, tab }) {
   const r = ringkasResep(db, resep);
   const data = dataHPP(db, id);
   const warna = r.kategori ? r.kategori.warna : 'var(--tomat)';
-  const hppPorsi = data && data.eksperimen && Number.isFinite(data.hpp.hppPorsi) ? angka(Math.round(data.hpp.hppPorsi)) : '–';
-  const tabAktif = tab === 'hpp' || tab === 'marketing' ? tab : 'eksperimen';
+  const hppPorsi = data && data.eksperimen && Number.isFinite(data.hppPorsi) ? angka(Math.round(data.hppPorsi)) : '–';
+  const tabAktif = ['hpp', 'jual', 'marketing'].includes(tab) ? tab : 'eksperimen';
 
   return html`<${Kerangka} k=${k} aktif="resep" plus=${tabAktif === 'eksperimen' ? { href: `/resep/${id}/eksperimen/baru`, label: 'Eksperimen baru' } : null}>
     <${Hero}
@@ -114,12 +114,14 @@ export function DetailResep({ k, id, tab }) {
     <${Tab}
       item=${[
         { label: 'Eksperimen', href: `/resep/${id}`, aktif: tabAktif === 'eksperimen' },
-        { label: 'HPP & Harga', href: `/resep/${id}/hpp`, aktif: tabAktif === 'hpp' },
+        { label: 'HPP Resep', href: `/resep/${id}/hpp`, aktif: tabAktif === 'hpp' },
+        { label: 'HPP Jual', href: `/resep/${id}/jual`, aktif: tabAktif === 'jual' },
         { label: 'Marketing', href: `/resep/${id}/marketing`, aktif: tabAktif === 'marketing' },
       ]}
     />
     ${tabAktif === 'eksperimen' && html`<${PanelEksperimen} k=${k} r=${r} />`}
-    ${tabAktif === 'hpp' && html`<${PanelHPP} k=${k} resep=${resep} />`}
+    ${tabAktif === 'hpp' && html`<${PanelHPPResep} k=${k} resep=${resep} />`}
+    ${tabAktif === 'jual' && html`<${PanelHPPJual} k=${k} resep=${resep} />`}
     ${tabAktif === 'marketing' && html`<${PanelMarketing} k=${k} resep=${resep} />`}
   <//>`;
 }

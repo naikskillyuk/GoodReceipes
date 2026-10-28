@@ -194,49 +194,58 @@ try {
   assert.match(await teks(page, '.kartu-juara'), /Eksperimen 2/);
   assert.equal(await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).count(), 0, 'tidak lagi di banner dikembangkan');
 
-  tahap('HPP: biaya lain, harga jual, margin, BEP, target');
+  tahap('HPP Resep: packing per porsi, lalu Simpan HPP');
   await page.goto(BASE + `/#/resep/${idResep}/hpp`);
-  await page.getByRole('button', { name: /Kemasan/ }).click();
-  await page.getByLabel('Nilai Kemasan').fill('500');
-  // bahan eks. 2 = 150 g x 13 + 2 x 1.650 + 1.080 = 1.950 + 3.300 + 1.080 = 6.330; + kemasan 500 x 10
+  await page.getByRole('button', { name: /^Packing$/ }).click();
+  await page.getByLabel('Nilai Packing').fill('500');
+  // bahan eks. 2 = 150 g x 13 + 2 x 1.650 + 1.080 = 1.950 + 3.300 + 1.080 = 6.330; + packing 500 x 10
   await page.getByText('Rp 11.330').first().waitFor();
   await page.getByText('Rp 1.133').first().waitFor(); // HPP per porsi
+  assert.match(await teks(page, '.status-simpan'), /Belum disimpan/);
+  await page.getByRole('button', { name: /Simpan HPP Rp 1\.133/ }).click();
+  await page.locator('.status-simpan.sudah').waitFor();
+  assert.equal(Math.round(await page.evaluate(() => window.__app.db.semua('Target')[0].hppSimpan)), 1133);
+
+  tahap('HPP Jual: harga jual dari margin, BEP, target');
+  await page.getByRole('link', { name: /Lanjut ke HPP Jual/ }).click();
   await page.getByRole('button', { name: /Pakai Rp/ }).click();
   const hargaJual = await page.evaluate(() => window.__app.db.semua('Target')[0].hargaJual);
   assert.equal(hargaJual, 2000, '1.133 / 0,6 = 1.888,9 -> dibulatkan ke 2.000');
   await page.getByPlaceholder('mis. 1.500.000').fill('500000');
   await page.getByPlaceholder('mis. 3.000.000').fill('1000000');
-  await page.getByText('577 porsi').first().waitFor(); // 500.000 / (2.000 - 1.133) = 576,6 -> 577
-  await page.getByText('1.154 porsi').first().waitFor(); // 1.000.000 / 867 = 1.153,4 -> 1.154
+  await page.getByText('577 potong').first().waitFor(); // 500.000 / (2.000 - 1.133) = 576,6 -> 577
+  await page.getByText('1.154 potong').first().waitFor(); // 1.000.000 / 867 = 1.153,4 -> 1.154
   assert.match(await teks(page, '.kartu-hpp'), /1\.133/);
 
-  tahap('HPP: resep lain sebagai resep tambahan menambah HPP');
-  const hppSebelum = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id).hpp.totalResep, idResep);
+  tahap('HPP Jual: HPP resep lain (tanpa packing) menambah HPP jual');
   const idSaus = await page.evaluate(async (id) => {
     const repo = await import('/js/lib/repo.js');
     const db = window.__app.db;
     const saus = repo.buatResep(db, { nama: 'Saus Uji', idKategori: db.ambil('Resep', id).idKategori });
     const bahan = db.semua('Bahan')[0];
     repo.simpanEksperimen(db, { eksperimen: { ...repo.draftEksperimen(db, saus.id).eksperimen, porsi: 100, satuanPorsi: 'gram' }, baris: [{ idBahan: bahan.id, jumlah: 100, satuan: 'g' }] });
+    db.simpan('BiayaLain', { idResep: saus.id, jenis: 'Cup', nilai: 700, dihitungPer: 'packing', urutan: 0 });
+    repo.simpanHPPResep(db, saus.id);
     return saus.id;
   }, idResep);
-  await page.goto(BASE + `/#/resep/${idResep}/hpp`);
-  await page.getByLabel('Tambah resep tambahan').selectOption(idSaus);
+  await page.goto(BASE + `/#/resep/${idResep}/jual`);
+  await page.getByLabel('Tambah resep lain').selectOption(idSaus);
   await page.getByRole('link', { name: 'Saus Uji' }).waitFor();
   await page.getByLabel('Jumlah Saus Uji').fill('50');
   await page.locator('.baris-tambahan', { hasText: 'Saus Uji' }).locator('b', { hasText: 'Rp' }).waitFor();
-  const hppSesudah = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id), idResep);
-  assert.equal(hppSesudah.tambahan.rincian.length, 1);
-  assert.ok(hppSesudah.hpp.totalResep > hppSebelum, 'HPP bertambah');
-  assert.equal(Math.round(hppSesudah.hpp.totalResep - hppSebelum), Math.round(hppSesudah.tambahan.total));
-  assert.equal(await page.locator('select[aria-label="Tambah resep tambahan"]').count(), 0, 'tidak ada resep lain yang bisa ditambahkan lagi');
+  const jual = await page.evaluate(async ([id, idS]) => {
+    const repo = await import('/js/lib/repo.js');
+    return { d: repo.dataHPP(window.__app.db, id), saus: repo.hppResep(window.__app.db, idS) };
+  }, [idResep, idSaus]);
+  assert.equal(jual.d.tambahan.rincian.length, 1);
+  assert.equal(Math.round(jual.d.tambahan.totalPorsi), Math.round(jual.saus.tanpaPacking * 50), 'packing saus tidak ikut');
+  assert.equal(Math.round(jual.d.hppJual), Math.round(jual.d.hppPorsi + jual.saus.tanpaPacking * 50));
+  assert.equal(await page.locator('select[aria-label="Tambah resep lain"]').count(), 0, 'tidak ada resep lain yang bisa ditambahkan lagi');
 
-  tahap('HPP: harga yang diinginkan menampilkan margin dan markup');
-  await page.goto(BASE + `/#/resep/${idResep}/hpp`);
-  const hppPorsiUji = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id).hpp.hppPorsi, idResep);
-  const hargaUji = Math.ceil(hppPorsiUji * 2 / 100) * 100;
+  tahap('HPP Jual: harga yang diinginkan menampilkan margin dan markup');
+  const hargaUji = Math.ceil((jual.d.hppJual * 2) / 100) * 100;
   await page.getByPlaceholder('mis. 8.000').fill(String(hargaUji));
-  const marginUji = ((hargaUji - hppPorsiUji) / hargaUji) * 100;
+  const marginUji = ((hargaUji - jual.d.hppJual) / hargaUji) * 100;
   await page.getByText(marginUji.toFixed(1).replace('.', ',') + '%').first().waitFor();
 
   tahap('HPP paket: biaya kemasan paket dihitung sekali');
@@ -251,10 +260,10 @@ try {
     const repo = await import('/js/lib/repo.js');
     const db = window.__app.db;
     const p = repo.daftarPaket(db)[0];
-    return { d: repo.dataPaket(db, p.id), hpp: repo.dataHPP(db, repo.isiPaket(db, p.id)[0].idResep).hpp };
+    return { d: repo.dataPaket(db, p.id), hpp: repo.dataHPP(db, repo.isiPaket(db, p.id)[0].idResep) };
   });
   assert.equal(paketUji.d.isi.length, 1);
-  assert.equal(Math.round(paketUji.d.hppPaket), Math.round(paketUji.hpp.produksiPorsi + 2000), 'kemasan per porsi resep tidak ikut, kotak paket sekali');
+  assert.equal(Math.round(paketUji.d.hppPaket), Math.round(paketUji.hpp.hppJual - paketUji.hpp.packingPorsi + 2000), 'packing resep tidak ikut, kotak paket sekali');
   assert.match(await teks(page, '.kartu-hpp'), new RegExp(angkaRp(Math.round(paketUji.d.hppPaket))));
   rutePaket = `/paket/${paketUji.d.paket.id}`;
 
@@ -330,7 +339,7 @@ try {
   await page.getByText('Belum ada ulasan').waitFor();
 
   tahap('tidak ada layar yang melebar keluar di HP, tablet, dan laptop');
-  const rute = ['/', '/resep', '/resep?tujuan=hpp', '/resep/baru', '/bahan', '/ulasan', '/pengaturan', `/resep/${idResep}`, `/resep/${idResep}/hpp`, `/resep/${idResep}/marketing`, `/resep/${idResep}/bandingkan`, `/resep/${idResep}/ubah`, `/eksperimen/${idEks2}`, `/eksperimen/${idEks2}/ubah`, `/eksperimen/${idEks2}/bagikan`, `/resep/${idResep}/eksperimen/baru?dari=${idEks2}`, '/paket', rutePaket];
+  const rute = ['/', '/resep', '/resep?tujuan=hpp', '/resep/baru', '/bahan', '/ulasan', '/pengaturan', `/resep/${idResep}`, `/resep/${idResep}/hpp`, `/resep/${idResep}/jual`, `/resep/${idResep}/marketing`, `/resep/${idResep}/bandingkan`, `/resep/${idResep}/ubah`, `/eksperimen/${idEks2}`, `/eksperimen/${idEks2}/ubah`, `/eksperimen/${idEks2}/bagikan`, `/resep/${idResep}/eksperimen/baru?dari=${idEks2}`, '/paket', rutePaket];
   for (const [lebar, tinggi] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
     await page.setViewportSize({ width: lebar, height: tinggi });
     for (const r of rute) {

@@ -20,41 +20,42 @@ export function biayaEksperimen(baris, bahanById, konversiByBahan = {}) {
 }
 
 /**
- * HPP per resep dan per porsi, dengan alur yang semuanya dibawa ke "per 1 porsi":
+ * HPP resep per porsi (tab "HPP Resep"). Semua dibawa ke per 1 porsi:
  *   1. bahan resep ÷ jumlah porsi
- *   2. resep tambahan (sudah dihitung per resep oleh pemanggil) ÷ jumlah porsi
- *   3. biaya lain "per resep" (gas, tenaga, sewa) ÷ jumlah porsi
- *   4. biaya lain "per porsi" (kemasan, label, ongkir) apa adanya
- * HPP per porsi = 1 + 2 + 3 + 4. Biaya produksi per porsi = 1 + 2 + 3 (tanpa kemasan), dipakai paket.
- * biayaLain: [{jenis, nilai, dihitungPer: 'resep' | 'porsi'}]
- * biayaResepLain: total biaya resep tambahan untuk satu kali masak resep ini.
+ *   2. biaya sekali masak (dihitungPer 'resep': gas, tenaga) ÷ jumlah porsi
+ *   3. biaya per porsi (dihitungPer 'porsi': seasoning, label)
+ *   4. packing (dihitungPer 'packing', per porsi). Dipisah supaya tidak terhitung dua kali
+ *      saat resep ini dipakai di resep lain atau di paket.
+ * HPP per porsi = 1 + 2 + 3 + 4; tanpaPacking = 1 + 2 + 3.
+ * biayaResepLain (opsional): biaya resep lain untuk satu kali masak, ikut dibagi porsi (dipakai data lama).
  */
 export function hitungHPP({ biayaBahan = 0, biayaResepLain = 0, biayaLain = [], porsi = 1 }) {
   const lain = biayaLain.map((b) => {
     const nilai = Number(b.nilai);
-    const perPorsi = b.dihitungPer === 'porsi';
+    const perPorsi = b.dihitungPer === 'porsi' || b.dihitungPer === 'packing';
     return { ...b, total: perPorsi ? nilai * porsi : nilai, perPorsi: perPorsi ? nilai : porsi > 0 ? nilai / porsi : NaN };
   });
-  const jumlah = (daftar) => daftar.reduce((jml, b) => jml + (Number.isFinite(b.total) ? b.total : 0), 0);
+  const jumlah = (daftar, kunci = 'total') => daftar.reduce((jml, b) => jml + (Number.isFinite(b[kunci]) ? b[kunci] : 0), 0);
+  const per = (jenis) => lain.filter((b) => (b.dihitungPer === 'porsi' || b.dihitungPer === 'packing' ? b.dihitungPer : 'resep') === jenis);
   const totalLain = jumlah(lain);
-  const totalLainResep = jumlah(lain.filter((b) => b.dihitungPer !== 'porsi'));
-  const totalLainPorsi = lain.reduce((jml, b) => jml + (b.dihitungPer === 'porsi' && Number.isFinite(Number(b.nilai)) ? Number(b.nilai) : 0), 0);
+  const totalLainResep = jumlah(per('resep'));
   const totalResep = biayaBahan + biayaResepLain + totalLain;
   const bagi = (n) => (porsi > 0 ? n / porsi : NaN);
+  const adaPorsi = (n) => (porsi > 0 ? n : NaN);
   const alur = {
-    bahan: bagi(biayaBahan),
-    resepTambahan: bagi(biayaResepLain),
+    bahan: bagi(biayaBahan + biayaResepLain),
     biayaResep: bagi(totalLainResep),
-    biayaPorsi: porsi > 0 ? totalLainPorsi : NaN,
+    biayaPorsi: adaPorsi(jumlah(per('porsi'), 'perPorsi')),
+    packing: adaPorsi(jumlah(per('packing'), 'perPorsi')),
   };
-  const produksiPorsi = alur.bahan + alur.resepTambahan + alur.biayaResep;
+  const tanpaPacking = alur.bahan + alur.biayaResep + alur.biayaPorsi;
   const hppPorsi = bagi(totalResep);
-  return { biayaBahan, biayaResepLain, lain, totalLain, totalLainResep, totalLainPorsi, totalResep, hppPorsi, produksiPorsi, alur, porsi };
+  return { biayaBahan, biayaResepLain, lain, totalLain, totalLainResep, totalResep, hppPorsi, tanpaPacking, packingPorsi: alur.packing, alur, porsi };
 }
 
 /**
  * HPP satu paket (mis. nasi + minuman + kue dalam satu kotak).
- * isi: [{biayaProduksi, jumlah}]  biaya produksi per porsi tiap resep (tanpa kemasan) dan jumlah porsinya.
+ * isi: [{biayaProduksi, jumlah}]  HPP per porsi tiap resep tanpa packing, dan jumlah porsinya.
  * biayaPaket: [{jenis, nilai}]    biaya sekali per paket (kotak, label, ongkir), dihitung satu kali saja.
  */
 export function hitungPaket({ isi = [], biayaPaket = [] }) {

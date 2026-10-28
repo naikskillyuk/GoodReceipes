@@ -3713,3 +3713,34 @@ button.tautan-hijau {
 .saran-harga .label-kecil {
   margin-bottom: 8px;
 }
+.langkah .tautan-kecil {
+  align-self: flex-start;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.status-simpan {
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.status-simpan a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.status-simpan.belum {
+  background: #fff6e0;
+  color: #6b4a00;
+}
+.status-simpan.berubah {
+  background: #fdecea;
+  color: var(--bahaya);
+}
+.status-simpan.sudah {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--krem);
+  color: var(--hijau-2);
+}

@@ -338,91 +338,128 @@ export function biayaLainResep(db, idResep) {
   return db.semua('BiayaLain', (b) => b.idResep === idResep).sort((a, b) => (a.urutan ?? 0) - (b.urutan ?? 0));
 }
 
-// ---------- Resep tambahan (resep lain sebagai komponen HPP) ----------
+// ---------- HPP Resep (tab "HPP Resep", disimpan dengan tombol) ----------
+
+/** HPP resep dari eksperimen tertentu: bahan + biaya lain resep itu (resep lain tidak ikut). */
+export function hppEksperimen(db, idResep, eksperimen) {
+  const porsi = eksperimen ? Number(eksperimen.porsi) || 0 : 0;
+  const biaya = eksperimen ? biayaBahanEksperimen(db, eksperimen.id) : { rincian: [], total: 0, bermasalah: [] };
+  const biayaLain = biayaLainResep(db, idResep);
+  const hpp = hitungHPP({ biayaBahan: biaya.total, biayaLain, porsi });
+  return { biaya, biayaLain, hpp, porsi };
+}
+
+const TARGET_BARU = { marginTarget: 40, hargaJual: 0, modalAwal: 0, labaTargetBulanan: 0 };
+
+/**
+ * Simpan HPP resep per porsi saat ini. Angka inilah yang dipakai di HPP Jual, di resep lain, dan di paket,
+ * sampai disimpan ulang. Mengembalikan null bila HPP belum bisa dihitung (mis. jumlah porsi kosong).
+ */
+export function simpanHPPResep(db, idResep) {
+  const resep = db.ambil('Resep', idResep);
+  if (!resep) return null;
+  const target = targetResep(db, idResep);
+  const { hpp } = hppEksperimen(db, idResep, eksperimenUntukHitung(db, resep, target));
+  if (!Number.isFinite(hpp.hppPorsi)) return null;
+  return db.simpan('Target', {
+    ...TARGET_BARU,
+    ...(target || { idResep }),
+    hppSimpan: hpp.hppPorsi,
+    packingSimpan: Number.isFinite(hpp.packingPorsi) ? hpp.packingPorsi : 0,
+    hppSimpanPada: Date.now(),
+  });
+}
+
+/**
+ * HPP resep per porsi yang dipakai di mana-mana: yang tersimpan, atau hitungan saat ini bila belum pernah disimpan.
+ * `berubah` = hitungan saat ini berbeda dari yang tersimpan (mis. harga bahan naik), perlu disimpan ulang.
+ */
+export function hppResep(db, idResep) {
+  const resep = db.ambil('Resep', idResep);
+  if (!resep) return null;
+  const target = targetResep(db, idResep);
+  const eksperimen = eksperimenUntukHitung(db, resep, target);
+  const kini = hppEksperimen(db, idResep, eksperimen);
+  const tersimpan = !!target && typeof target.hppSimpan === 'number' && Number.isFinite(target.hppSimpan);
+  const hppPorsi = tersimpan ? target.hppSimpan : kini.hpp.hppPorsi;
+  const packingPorsi = tersimpan ? Number(target.packingSimpan) || 0 : kini.hpp.packingPorsi;
+  const berubah = tersimpan && Number.isFinite(kini.hpp.hppPorsi) && Math.abs(kini.hpp.hppPorsi - target.hppSimpan) >= 0.5;
+  return {
+    resep,
+    target,
+    eksperimen,
+    ...kini,
+    satuanPorsi: (eksperimen && eksperimen.satuanPorsi) || 'porsi',
+    tersimpan,
+    berubah,
+    disimpanPada: tersimpan ? target.hppSimpanPada : null,
+    hppPorsi,
+    packingPorsi,
+    tanpaPacking: hppPorsi - (Number.isFinite(packingPorsi) ? packingPorsi : 0),
+  };
+}
+
+// ---------- HPP Jual: HPP resep ini + HPP resep lain (mis. saus) ----------
 
 export function resepTambahan(db, idResep) {
   return db.semua('ResepTambahan', (r) => r.idResep === idResep).sort((a, b) => (a.urutan ?? 0) - (b.urutan ?? 0));
 }
 
 /**
- * Biaya resep-resep tambahan sebuah resep.
- * Setiap baris: `jumlah` + `satuan` (porsi/gram hasil jadi resep komponen, atau 'resep' penuh)
- * dan `dipakaiPer`: 'porsi' = takaran itu untuk SETIAP porsi resep ini (mis. 30 gram saus per piring),
- * 'resep' = untuk SATU KALI MASAK resep ini (mis. 1 resep saus untuk 80 porsi). Baris lama tanpa
- * `dipakaiPer` dibaca sebagai 'resep' supaya angkanya tidak berubah.
- * Per baris: `biaya` (biaya takaran yang diisi), `biayaPorsi` (per 1 porsi resep ini), `biayaResep` (per satu kali masak).
- * `total` = jumlah biayaResep. Biaya komponen = bahan eksperimen yang dihitung + resep tambahannya sendiri,
- * tanpa biaya lain (kemasan, gas, dll.) supaya tidak terhitung dua kali.
- * `porsi` = jumlah porsi resep ini (bawaan: dari eksperimen yang dihitung). `jejak` mencegah perhitungan berputar.
+ * HPP resep lain yang ikut dijual bersama resep ini (mis. saus, sambal, minuman).
+ * Memakai HPP tersimpan resep itu TANPA packing, supaya packing tidak terhitung dua kali.
+ * `jumlah` dalam satuan porsi resep itu (mis. 30 gram), atau satuan 'resep' = satu resep penuh.
+ * `dipakaiPer`: 'porsi' = untuk setiap porsi yang dijual (bawaan); 'resep' (data lama) = untuk satu kali masak,
+ * dibagi jumlah porsi resep ini (`porsiInduk`).
  */
-export function biayaResepTambahan(db, idResep, { porsi, jejak = new Set([idResep]) } = {}) {
-  if (porsi === undefined) {
-    const induk = db.ambil('Resep', idResep);
-    const eks = induk ? eksperimenUntukHitung(db, induk, targetResep(db, idResep)) : null;
-    porsi = eks ? Number(eks.porsi) || 0 : 0;
-  }
+export function biayaResepTambahan(db, idResep, porsiInduk = 0) {
   const rincian = resepTambahan(db, idResep).map((rt) => {
-    const resep = db.ambil('Resep', rt.idResepKomponen);
     const jumlah = Number(rt.jumlah) || 0;
     const dipakaiPer = rt.dipakaiPer === 'porsi' ? 'porsi' : 'resep';
-    const gagal = (alasan, lain = {}) => ({ ...rt, dipakaiPer, resep, eksperimen: null, biaya: NaN, biayaPorsi: NaN, biayaResep: NaN, alasan, ...lain });
-    if (!resep) return gagal('resepnya sudah dihapus', { resep: null });
-    if (jejak.has(resep.id)) return gagal('saling memakai (berputar)');
-    const eksperimen = eksperimenUntukHitung(db, resep, targetResep(db, resep.id));
-    if (!eksperimen) return gagal('belum punya eksperimen');
-    const porsiKomponen = Number(eksperimen.porsi) || 0;
-    const bahan = biayaBahanEksperimen(db, eksperimen.id);
-    const dalam = biayaResepTambahan(db, resep.id, { porsi: porsiKomponen, jejak: new Set([...jejak, resep.id]) });
-    const perResep = bahan.total + dalam.total;
-    const perPorsi = porsiKomponen > 0 ? perResep / porsiKomponen : NaN;
-    const biaya = rt.satuan === 'resep' ? perResep * jumlah : perPorsi * jumlah;
-    const biayaPorsi = dipakaiPer === 'porsi' ? biaya : porsi > 0 ? biaya / porsi : NaN;
-    const biayaResep = dipakaiPer === 'porsi' ? biaya * porsi : biaya;
-    let alasan = '';
-    if (!Number.isFinite(biaya)) alasan = 'jumlah hasil jadinya belum diisi';
-    else if (bahan.bermasalah.length || dalam.bermasalah.length) alasan = 'ada bahan yang biayanya belum bisa dihitung';
-    return { ...rt, dipakaiPer, resep, eksperimen, perResep, perPorsi, satuanPorsi: eksperimen.satuanPorsi || 'porsi', biaya, biayaPorsi, biayaResep, alasan };
+    const k = rt.idResepKomponen === idResep ? null : hppResep(db, rt.idResepKomponen);
+    const gagal = (alasan) => ({ ...rt, jumlah, dipakaiPer, resep: k ? k.resep : null, komponen: k, biaya: NaN, biayaPorsi: NaN, alasan });
+    if (!k) return gagal('resepnya sudah dihapus');
+    if (!k.eksperimen) return gagal('belum punya eksperimen');
+    const perSatuan = k.tanpaPacking;
+    const biaya = rt.satuan === 'resep' ? perSatuan * k.porsi * jumlah : perSatuan * jumlah;
+    const biayaPorsi = dipakaiPer === 'porsi' ? biaya : porsiInduk > 0 ? biaya / porsiInduk : NaN;
+    return {
+      ...rt,
+      jumlah,
+      dipakaiPer,
+      resep: k.resep,
+      komponen: k,
+      perSatuan,
+      satuanPorsi: k.satuanPorsi,
+      biaya,
+      biayaPorsi,
+      alasan: Number.isFinite(biayaPorsi) ? '' : 'jumlah hasil jadinya belum diisi',
+    };
   });
-  const jumlahkan = (kunci) => rincian.reduce((jml, r) => jml + (Number.isFinite(r[kunci]) ? r[kunci] : 0), 0);
-  return { rincian, total: jumlahkan('biayaResep'), totalPorsi: jumlahkan('biayaPorsi'), bermasalah: rincian.filter((r) => r.alasan), porsi };
+  const totalPorsi = rincian.reduce((jml, r) => jml + (Number.isFinite(r.biayaPorsi) ? r.biayaPorsi : 0), 0);
+  return { rincian, totalPorsi, bermasalah: rincian.filter((r) => r.alasan) };
 }
 
-/** Apakah resep `idDari` (langsung atau lewat resep lain) memakai resep `idTujuan`? */
-export function resepMemakai(db, idDari, idTujuan, jejak = new Set()) {
-  if (jejak.has(idDari)) return false;
-  jejak.add(idDari);
-  return resepTambahan(db, idDari).some((rt) => rt.idResepKomponen === idTujuan || resepMemakai(db, rt.idResepKomponen, idTujuan, jejak));
-}
-
-/** Resep yang boleh ditambahkan ke HPP resep ini: bukan dirinya, belum dipakai, dan tidak memakai resep ini. */
+/** Resep yang boleh ditambahkan ke HPP Jual resep ini: bukan dirinya dan belum ada. */
 export function pilihanResepTambahan(db, idResep) {
   const sudah = new Set(resepTambahan(db, idResep).map((rt) => rt.idResepKomponen));
-  return db
-    .semua('Resep', (r) => r.id !== idResep && !sudah.has(r.id) && !resepMemakai(db, r.id, idResep))
-    .sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
+  return db.semua('Resep', (r) => r.id !== idResep && !sudah.has(r.id)).sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
 }
 
 export function tambahResepTambahan(db, idResep, idResepKomponen) {
   return db.simpan('ResepTambahan', { idResep, idResepKomponen, jumlah: 1, satuan: 'porsi', dipakaiPer: 'porsi', urutan: resepTambahan(db, idResep).length });
 }
 
-/** HPP satu eksperimen tertentu dari sebuah resep (bahan + resep tambahan + biaya lain resep itu). */
-export function hppEksperimen(db, idResep, eksperimen) {
-  const porsi = eksperimen ? Number(eksperimen.porsi) || 0 : 0;
-  const biaya = eksperimen ? biayaBahanEksperimen(db, eksperimen.id) : { rincian: [], total: 0, bermasalah: [] };
-  const tambahan = biayaResepTambahan(db, idResep, { porsi });
-  const biayaLain = biayaLainResep(db, idResep);
-  const hpp = hitungHPP({ biayaBahan: biaya.total, biayaResepLain: tambahan.total, biayaLain, porsi });
-  return { biaya, tambahan, biayaLain, hpp, porsi };
-}
-
-/** Semua angka yang dibutuhkan layar HPP & Harga untuk satu resep. */
+/**
+ * Semua angka untuk tab HPP Resep dan HPP Jual satu resep.
+ * - hpp: hitungan HPP resep saat ini; hppPorsi/packingPorsi: yang tersimpan (lihat hppResep)
+ * - tambahan: HPP resep lain; hppJual = hppPorsi + tambahan.totalPorsi
+ */
 export function dataHPP(db, idResep) {
-  const resep = db.ambil('Resep', idResep);
-  if (!resep) return null;
-  const target = targetResep(db, idResep);
-  const eksperimen = eksperimenUntukHitung(db, resep, target);
-  return { resep, target, eksperimen, ...hppEksperimen(db, idResep, eksperimen) };
+  const h = hppResep(db, idResep);
+  if (!h) return null;
+  const tambahan = biayaResepTambahan(db, idResep, h.porsi);
+  return { ...h, tambahan, hppJual: h.hppPorsi + tambahan.totalPorsi };
 }
 
 /**
@@ -477,9 +514,8 @@ export function biayaPaketList(db, idPaket) {
 }
 
 /**
- * Hitungan satu paket. Setiap resep di dalamnya memakai biaya produksi per porsi
- * (bahan + resep tambahan + biaya per resep ÷ porsi), TANPA biaya per porsi resep itu
- * (kemasan, label, ongkir), karena paket punya kemasannya sendiri yang dihitung sekali.
+ * Hitungan satu paket. Setiap resep di dalamnya memakai HPP Jual-nya TANPA packing
+ * (HPP resep tersimpan + resep lain), karena paket punya packing sendiri yang dihitung sekali.
  */
 export function dataPaket(db, idPaket) {
   const paket = db.ambil('Paket', idPaket);
@@ -487,13 +523,15 @@ export function dataPaket(db, idPaket) {
   const isi = isiPaket(db, idPaket).map((i) => {
     const d = dataHPP(db, i.idResep);
     const ada = d && d.eksperimen;
-    const alasan = !d ? 'resepnya sudah dihapus' : !d.eksperimen ? 'belum punya eksperimen' : !Number.isFinite(d.hpp.produksiPorsi) ? 'jumlah porsinya belum diisi' : '';
+    const packing = ada && Number.isFinite(d.packingPorsi) ? d.packingPorsi : 0;
+    const biayaProduksi = ada ? d.hppJual - packing : NaN;
+    const alasan = !d ? 'resepnya sudah dihapus' : !d.eksperimen ? 'belum punya eksperimen' : !Number.isFinite(biayaProduksi) ? 'jumlah porsinya belum diisi' : '';
     return {
       ...i,
       resep: d ? d.resep : null,
-      satuanPorsi: ada ? d.eksperimen.satuanPorsi || 'porsi' : 'porsi',
-      biayaProduksi: ada ? d.hpp.produksiPorsi : NaN,
-      biayaPorsiResep: ada ? d.hpp.alur.biayaPorsi : NaN,
+      satuanPorsi: ada ? d.satuanPorsi : 'porsi',
+      biayaProduksi,
+      biayaPorsiResep: packing,
       alasan,
     };
   });

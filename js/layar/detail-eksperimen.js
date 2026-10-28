@@ -157,7 +157,7 @@ export function DetailEksperimen({ k, id }) {
       ${info.map(([a, b]) => html`<div class="hasil-baris" key=${a}><span>${a}</span><b style="font-size:18px">${b}</b></div>`)}
       <div class="hasil-baris"><span>Biaya bahan</span><b style="font-size:18px">${rupiah(biaya.total)}</b></div>
       <div class="hasil-baris"><span>HPP per porsi</span><b style="font-size:18px">${rupiah(hpp.hppPorsi)}</b></div>
-      <div class="teks-kecil">HPP termasuk biaya lain yang diisi di tab HPP & Harga.</div>
+      <div class="teks-kecil">HPP termasuk biaya lain yang diisi di tab HPP Resep.</div>
     </div>
 
     <div class="kolom" style="gap:10px">

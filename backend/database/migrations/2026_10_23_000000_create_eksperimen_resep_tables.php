@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 return new class extends Migration
 {
     /** Kolom angka yang berisi waktu (ms) disimpan sebagai bilangan bulat besar. */
-    private const KOLOM_WAKTU = ['dibuat', 'waktu', 'hargaDiperbarui'];
+    private const KOLOM_WAKTU = ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada'];
 
     public function up(): void
     {

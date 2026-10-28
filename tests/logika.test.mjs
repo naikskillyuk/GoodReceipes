@@ -80,7 +80,7 @@ test('HPP, harga minimum, margin, BEP, dan target (angka mockup)', () => {
     biayaBahan: 38960,
     porsi: 16,
     biayaLain: [
-      { jenis: 'Kemasan', nilai: 1200, dihitungPer: 'porsi' }, // 19.200 per resep
+      { jenis: 'Kemasan', nilai: 1200, dihitungPer: 'packing' }, // 19.200 per resep
       { jenis: 'Gas dan listrik', nilai: 3500, dihitungPer: 'resep' },
       { jenis: 'Tenaga kerja', nilai: 12000, dihitungPer: 'resep' },
     ],
@@ -90,9 +90,14 @@ test('HPP, harga minimum, margin, BEP, dan target (angka mockup)', () => {
   // Alur per porsi: bahan 38.960/16 + (3.500 + 12.000)/16 + kemasan 1.200 = 2.435 + 968,75 + 1.200
   assert.equal(hpp.alur.bahan, 2435);
   assert.equal(hpp.alur.biayaResep, 968.75);
-  assert.equal(hpp.alur.biayaPorsi, 1200);
-  assert.equal(hpp.produksiPorsi, 3403.75);
-  assert.equal(hpp.alur.bahan + hpp.alur.resepTambahan + hpp.alur.biayaResep + hpp.alur.biayaPorsi, hpp.hppPorsi);
+  assert.equal(hpp.alur.biayaPorsi, 0);
+  assert.equal(hpp.alur.packing, 1200);
+  assert.equal(hpp.tanpaPacking, 3403.75);
+  assert.equal(hpp.alur.bahan + hpp.alur.biayaResep + hpp.alur.biayaPorsi + hpp.alur.packing, hpp.hppPorsi);
+  // Biaya per porsi biasa (mis. seasoning) ikut "tanpa packing".
+  const dgnSeasoning = hitungHPP({ biayaBahan: 1000, porsi: 10, biayaLain: [{ nilai: 50, dihitungPer: 'porsi' }, { nilai: 300, dihitungPer: 'packing' }] });
+  assert.equal(dgnSeasoning.tanpaPacking, 150);
+  assert.equal(dgnSeasoning.hppPorsi, 450);
 
   const min = hargaMinimum(hpp.hppPorsi, 40);
   assert.equal(angka(min), '7.673');
