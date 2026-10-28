@@ -7,10 +7,9 @@ import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
 import { PenggeserNilai, NILAI_AWAL } from './penilai.js';
 import {
-  skorDariDB, penilaianEksperimen, biayaBahanEksperimen, biayaLainResep, fotoSrc, ubahJuara,
-  hapusEksperimen, tambahPenilaianPemilik, eksperimenResep, biayaResepTambahan,
+  skorDariDB, penilaianEksperimen, biayaBahanEksperimen, fotoSrc, ubahJuara,
+  hapusEksperimen, tambahPenilaianPemilik, eksperimenResep, hppEksperimen,
 } from '../lib/repo.js';
-import { hitungHPP } from '../lib/hpp.js';
 import { ASPEK, skorPenilaian, bacaPanduan } from '../lib/skor.js';
 import { desimal1, angka, rupiah, tampilJumlah, tanggal } from '../lib/util.js';
 
@@ -57,12 +56,7 @@ export function DetailEksperimen({ k, id }) {
   const skor = skorDariDB(db, id);
   const ulasan = penilaianEksperimen(db, id);
   const biaya = biayaBahanEksperimen(db, id);
-  const hpp = hitungHPP({
-    biayaBahan: biaya.total,
-    biayaResepLain: biayaResepTambahan(db, resep.id).total,
-    biayaLain: biayaLainResep(db, resep.id),
-    porsi: Number(e.porsi) || 0,
-  });
+  const { hpp } = hppEksperimen(db, resep.id, e);
   const juara = resep.idJuara === id;
   const juaraLain = resep.idJuara && !juara ? db.ambil('Eksperimen', resep.idJuara) : null;
   const foto = fotoSrc(e, 'fotoHasilLokal', 'fotoHasilUrl');
@@ -230,12 +224,10 @@ export function Bandingkan({ k, id }) {
   if (!resep) return html`<${Kerangka} k=${k} aktif="resep"><${Hero} label="Bandingkan" judul="Tidak ada" kembali="/resep" /><//>`;
   const kat = db.ambil('Kategori', resep.idKategori);
   const daftar = eksperimenResep(db, id);
-  const lain = biayaLainResep(db, id);
-  const biayaResepLain = biayaResepTambahan(db, id).total;
   const kolom = daftar.map((e) => {
     const skor = skorDariDB(db, e.id);
     const biaya = biayaBahanEksperimen(db, e.id);
-    const hpp = hitungHPP({ biayaBahan: biaya.total, biayaResepLain, biayaLain: lain, porsi: Number(e.porsi) || 0 });
+    const { hpp } = hppEksperimen(db, id, e);
     return { e, skor, biaya, hpp };
   });
   const baris = [

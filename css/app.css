@@ -3404,3 +3404,97 @@ button.tautan-hijau {
     height: 420px;
   }
 }
+
+/* ---------- Alur HPP, kartu harga, paket ---------- */
+.tab.dalam {
+  margin: 0;
+}
+.tabel-alur th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink2);
+  text-align: right;
+  padding: 0 0 6px 8px;
+  white-space: nowrap;
+}
+.tabel-alur td + td {
+  padding-left: 8px;
+}
+.tabel-alur td:nth-child(2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.tabel-alur .kepala-langkah td {
+  padding-top: 14px;
+  font-weight: 800;
+  text-align: left;
+  color: var(--ink);
+}
+.tabel-alur tr.kepala-langkah + tr td {
+  border-top: 0;
+}
+.no-langkah {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--hijau);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+.no-langkah + .no-langkah {
+  margin-left: -4px;
+}
+.hpp-pecah {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+}
+.hpp-pecah b {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rumus {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.catatan-margin {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.catatan-margin summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.catatan-margin p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.tambahan-baris .bl-nama {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tambahan-isian {
+  flex: 1 1 100%;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

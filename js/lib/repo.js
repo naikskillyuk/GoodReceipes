@@ -1,7 +1,7 @@
 // Operasi data tingkat resep: ambil, hitung, simpan. Dipakai semua layar.
 
 import { skorEksperimen, skorPenilaian } from './skor.js';
-import { biayaEksperimen, hitungHPP } from './hpp.js';
+import { biayaEksperimen, hitungHPP, hitungPaket } from './hpp.js';
 import { buatToken } from './util.js';
 
 export const KATEGORI_AWAL = [
@@ -69,6 +69,8 @@ export function hapusResep(db, idResep) {
   }
   // Resep ini juga dilepas dari HPP resep lain yang memakainya.
   db.semua('ResepTambahan', (r) => r.idResepKomponen === idResep).forEach((r) => db.hapus('ResepTambahan', r.id));
+  // ...dan dari paket yang berisinya.
+  db.semua('IsiPaket', (r) => r.idResep === idResep).forEach((r) => db.hapus('IsiPaket', r.id));
   db.hapus('Resep', idResep);
 }
 
@@ -343,32 +345,46 @@ export function resepTambahan(db, idResep) {
 }
 
 /**
- * Biaya resep-resep tambahan sebuah resep, per resep (satu kali masak).
- * Biaya komponen = biaya bahan eksperimen yang dihitung + resep tambahannya sendiri,
+ * Biaya resep-resep tambahan sebuah resep.
+ * Setiap baris: `jumlah` + `satuan` (porsi/gram hasil jadi resep komponen, atau 'resep' penuh)
+ * dan `dipakaiPer`: 'porsi' = takaran itu untuk SETIAP porsi resep ini (mis. 30 gram saus per piring),
+ * 'resep' = untuk SATU KALI MASAK resep ini (mis. 1 resep saus untuk 80 porsi). Baris lama tanpa
+ * `dipakaiPer` dibaca sebagai 'resep' supaya angkanya tidak berubah.
+ * Per baris: `biaya` (biaya takaran yang diisi), `biayaPorsi` (per 1 porsi resep ini), `biayaResep` (per satu kali masak).
+ * `total` = jumlah biayaResep. Biaya komponen = bahan eksperimen yang dihitung + resep tambahannya sendiri,
  * tanpa biaya lain (kemasan, gas, dll.) supaya tidak terhitung dua kali.
- * `jejak` mencegah perhitungan berputar (A memakai B, B memakai A).
+ * `porsi` = jumlah porsi resep ini (bawaan: dari eksperimen yang dihitung). `jejak` mencegah perhitungan berputar.
  */
-export function biayaResepTambahan(db, idResep, jejak = new Set([idResep])) {
+export function biayaResepTambahan(db, idResep, { porsi, jejak = new Set([idResep]) } = {}) {
+  if (porsi === undefined) {
+    const induk = db.ambil('Resep', idResep);
+    const eks = induk ? eksperimenUntukHitung(db, induk, targetResep(db, idResep)) : null;
+    porsi = eks ? Number(eks.porsi) || 0 : 0;
+  }
   const rincian = resepTambahan(db, idResep).map((rt) => {
     const resep = db.ambil('Resep', rt.idResepKomponen);
     const jumlah = Number(rt.jumlah) || 0;
-    if (!resep) return { ...rt, resep: null, eksperimen: null, biaya: NaN, alasan: 'resepnya sudah dihapus' };
-    if (jejak.has(resep.id)) return { ...rt, resep, eksperimen: null, biaya: NaN, alasan: 'saling memakai (berputar)' };
+    const dipakaiPer = rt.dipakaiPer === 'porsi' ? 'porsi' : 'resep';
+    const gagal = (alasan, lain = {}) => ({ ...rt, dipakaiPer, resep, eksperimen: null, biaya: NaN, biayaPorsi: NaN, biayaResep: NaN, alasan, ...lain });
+    if (!resep) return gagal('resepnya sudah dihapus', { resep: null });
+    if (jejak.has(resep.id)) return gagal('saling memakai (berputar)');
     const eksperimen = eksperimenUntukHitung(db, resep, targetResep(db, resep.id));
-    if (!eksperimen) return { ...rt, resep, eksperimen: null, biaya: NaN, alasan: 'belum punya eksperimen' };
+    if (!eksperimen) return gagal('belum punya eksperimen');
+    const porsiKomponen = Number(eksperimen.porsi) || 0;
     const bahan = biayaBahanEksperimen(db, eksperimen.id);
-    const dalam = biayaResepTambahan(db, resep.id, new Set([...jejak, resep.id]));
+    const dalam = biayaResepTambahan(db, resep.id, { porsi: porsiKomponen, jejak: new Set([...jejak, resep.id]) });
     const perResep = bahan.total + dalam.total;
-    const porsi = Number(eksperimen.porsi) || 0;
-    const perPorsi = porsi > 0 ? perResep / porsi : NaN;
+    const perPorsi = porsiKomponen > 0 ? perResep / porsiKomponen : NaN;
     const biaya = rt.satuan === 'resep' ? perResep * jumlah : perPorsi * jumlah;
+    const biayaPorsi = dipakaiPer === 'porsi' ? biaya : porsi > 0 ? biaya / porsi : NaN;
+    const biayaResep = dipakaiPer === 'porsi' ? biaya * porsi : biaya;
     let alasan = '';
     if (!Number.isFinite(biaya)) alasan = 'jumlah hasil jadinya belum diisi';
     else if (bahan.bermasalah.length || dalam.bermasalah.length) alasan = 'ada bahan yang biayanya belum bisa dihitung';
-    return { ...rt, resep, eksperimen, perResep, perPorsi, satuanPorsi: eksperimen.satuanPorsi || 'porsi', biaya, alasan };
+    return { ...rt, dipakaiPer, resep, eksperimen, perResep, perPorsi, satuanPorsi: eksperimen.satuanPorsi || 'porsi', biaya, biayaPorsi, biayaResep, alasan };
   });
-  const total = rincian.reduce((jml, r) => jml + (Number.isFinite(r.biaya) ? r.biaya : 0), 0);
-  return { rincian, total, bermasalah: rincian.filter((r) => r.alasan) };
+  const jumlahkan = (kunci) => rincian.reduce((jml, r) => jml + (Number.isFinite(r[kunci]) ? r[kunci] : 0), 0);
+  return { rincian, total: jumlahkan('biayaResep'), totalPorsi: jumlahkan('biayaPorsi'), bermasalah: rincian.filter((r) => r.alasan), porsi };
 }
 
 /** Apakah resep `idDari` (langsung atau lewat resep lain) memakai resep `idTujuan`? */
@@ -387,7 +403,17 @@ export function pilihanResepTambahan(db, idResep) {
 }
 
 export function tambahResepTambahan(db, idResep, idResepKomponen) {
-  return db.simpan('ResepTambahan', { idResep, idResepKomponen, jumlah: 1, satuan: 'porsi', urutan: resepTambahan(db, idResep).length });
+  return db.simpan('ResepTambahan', { idResep, idResepKomponen, jumlah: 1, satuan: 'porsi', dipakaiPer: 'porsi', urutan: resepTambahan(db, idResep).length });
+}
+
+/** HPP satu eksperimen tertentu dari sebuah resep (bahan + resep tambahan + biaya lain resep itu). */
+export function hppEksperimen(db, idResep, eksperimen) {
+  const porsi = eksperimen ? Number(eksperimen.porsi) || 0 : 0;
+  const biaya = eksperimen ? biayaBahanEksperimen(db, eksperimen.id) : { rincian: [], total: 0, bermasalah: [] };
+  const tambahan = biayaResepTambahan(db, idResep, { porsi });
+  const biayaLain = biayaLainResep(db, idResep);
+  const hpp = hitungHPP({ biayaBahan: biaya.total, biayaResepLain: tambahan.total, biayaLain, porsi });
+  return { biaya, tambahan, biayaLain, hpp, porsi };
 }
 
 /** Semua angka yang dibutuhkan layar HPP & Harga untuk satu resep. */
@@ -396,12 +422,7 @@ export function dataHPP(db, idResep) {
   if (!resep) return null;
   const target = targetResep(db, idResep);
   const eksperimen = eksperimenUntukHitung(db, resep, target);
-  const biaya = eksperimen ? biayaBahanEksperimen(db, eksperimen.id) : { rincian: [], total: 0, bermasalah: [] };
-  const tambahan = biayaResepTambahan(db, idResep);
-  const biayaLain = biayaLainResep(db, idResep);
-  const porsi = eksperimen ? Number(eksperimen.porsi) || 0 : 0;
-  const hpp = hitungHPP({ biayaBahan: biaya.total, biayaResepLain: tambahan.total, biayaLain, porsi });
-  return { resep, target, eksperimen, biaya, tambahan, biayaLain, hpp, porsi };
+  return { resep, target, eksperimen, ...hppEksperimen(db, idResep, eksperimen) };
 }
 
 /**
@@ -411,17 +432,14 @@ export function dataHPP(db, idResep) {
 export function dataEksporResep(db, idResep) {
   const resep = db.ambil('Resep', idResep);
   if (!resep) return null;
-  const tambahan = biayaResepTambahan(db, idResep);
-  const biayaLain = biayaLainResep(db, idResep);
   const eksperimen = eksperimenResep(db, idResep).map((e) => {
-    const biaya = biayaBahanEksperimen(db, e.id);
-    const porsi = Number(e.porsi) || 0;
+    const { biaya, hpp } = hppEksperimen(db, idResep, e);
     return {
       eksperimen: e,
       juara: resep.idJuara === e.id,
       foto: fotoSrc(e, 'fotoHasilLokal', 'fotoHasilUrl'),
       biaya,
-      hpp: hitungHPP({ biayaBahan: biaya.total, biayaResepLain: tambahan.total, biayaLain, porsi }),
+      hpp,
       skor: skorDariDB(db, e.id),
       penilaian: penilaianEksperimen(db, e.id),
     };
@@ -433,6 +451,59 @@ export function dataEksporResep(db, idResep) {
     hpp: dataHPP(db, idResep),
     eksperimen,
   };
+}
+
+// ---------- Paket (beberapa resep dijual dalam satu kemasan) ----------
+
+export function daftarPaket(db) {
+  return db.semua('Paket').sort((a, b) => (b.dibuat || 0) - (a.dibuat || 0));
+}
+
+export function buatPaket(db, nama) {
+  return db.simpan('Paket', { nama: (nama || '').trim() || 'Paket baru', marginTarget: 40, hargaJual: 0, dibuat: Date.now() });
+}
+
+export function hapusPaket(db, idPaket) {
+  for (const t of ['IsiPaket', 'BiayaPaket']) db.semua(t, (r) => r.idPaket === idPaket).forEach((r) => db.hapus(t, r.id));
+  db.hapus('Paket', idPaket);
+}
+
+export function isiPaket(db, idPaket) {
+  return db.semua('IsiPaket', (r) => r.idPaket === idPaket).sort((a, b) => (a.urutan ?? 0) - (b.urutan ?? 0));
+}
+
+export function biayaPaketList(db, idPaket) {
+  return db.semua('BiayaPaket', (r) => r.idPaket === idPaket).sort((a, b) => (a.urutan ?? 0) - (b.urutan ?? 0));
+}
+
+/**
+ * Hitungan satu paket. Setiap resep di dalamnya memakai biaya produksi per porsi
+ * (bahan + resep tambahan + biaya per resep ÷ porsi), TANPA biaya per porsi resep itu
+ * (kemasan, label, ongkir), karena paket punya kemasannya sendiri yang dihitung sekali.
+ */
+export function dataPaket(db, idPaket) {
+  const paket = db.ambil('Paket', idPaket);
+  if (!paket) return null;
+  const isi = isiPaket(db, idPaket).map((i) => {
+    const d = dataHPP(db, i.idResep);
+    const ada = d && d.eksperimen;
+    const alasan = !d ? 'resepnya sudah dihapus' : !d.eksperimen ? 'belum punya eksperimen' : !Number.isFinite(d.hpp.produksiPorsi) ? 'jumlah porsinya belum diisi' : '';
+    return {
+      ...i,
+      resep: d ? d.resep : null,
+      satuanPorsi: ada ? d.eksperimen.satuanPorsi || 'porsi' : 'porsi',
+      biayaProduksi: ada ? d.hpp.produksiPorsi : NaN,
+      biayaPorsiResep: ada ? d.hpp.alur.biayaPorsi : NaN,
+      alasan,
+    };
+  });
+  const biaya = biayaPaketList(db, idPaket);
+  const hitung = hitungPaket({ isi, biayaPaket: biaya });
+  return { paket, biaya, ...hitung, isi: hitung.rincian };
+}
+
+export function tambahIsiPaket(db, idPaket, idResep) {
+  return db.simpan('IsiPaket', { idPaket, idResep, jumlah: 1, urutan: isiPaket(db, idPaket).length });
 }
 
 // ---------- Merek (nama dan logo aplikasi) ----------

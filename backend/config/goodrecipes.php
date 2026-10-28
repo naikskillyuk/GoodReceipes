@@ -86,7 +86,10 @@ return [
         // Resep lain yang dipakai sebagai komponen HPP (mis. saus B di dalam makanan A).
         'ResepTambahan' => [
             'db' => 'resep_tambahan',
-            'kolom' => ['id' => 't', 'idResep' => 't', 'idResepKomponen' => 't', 'jumlah' => 'n', 'satuan' => 't', 'urutan' => 'n'],
+            'kolom' => [
+                'id' => 't', 'idResep' => 't', 'idResepKomponen' => 't', 'jumlah' => 'n', 'satuan' => 't', 'dipakaiPer' => 't',
+                'urutan' => 'n',
+            ],
         ],
         'Target' => [
             'db' => 'target',
@@ -94,6 +97,19 @@ return [
                 'id' => 't', 'idResep' => 't', 'idEksperimenHitung' => 't', 'marginTarget' => 'n', 'hargaJual' => 'n',
                 'modalAwal' => 'n', 'labaTargetBulanan' => 'n',
             ],
+        ],
+        // Paket: beberapa resep dijual bersama dalam satu kemasan.
+        'Paket' => [
+            'db' => 'paket',
+            'kolom' => ['id' => 't', 'nama' => 't', 'marginTarget' => 'n', 'hargaJual' => 'n', 'dibuat' => 'n'],
+        ],
+        'IsiPaket' => [
+            'db' => 'isi_paket',
+            'kolom' => ['id' => 't', 'idPaket' => 't', 'idResep' => 't', 'jumlah' => 'n', 'urutan' => 'n'],
+        ],
+        'BiayaPaket' => [
+            'db' => 'biaya_paket',
+            'kolom' => ['id' => 't', 'idPaket' => 't', 'jenis' => 't', 'nilai' => 'n', 'urutan' => 'n'],
         ],
         'Marketing' => [
             'db' => 'marketing',

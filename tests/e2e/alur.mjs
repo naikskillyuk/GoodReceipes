@@ -48,6 +48,9 @@ function pantau(page, nama) {
 }
 
 const teks = (page, sel) => page.locator(sel).first().innerText();
+// 12345 -> '12\.345' (pola regex angka berformat Indonesia)
+const angkaRp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\\.');
+let rutePaket = '/paket';
 
 try {
   await tungguServer();
@@ -229,6 +232,34 @@ try {
   assert.equal(Math.round(hppSesudah.hpp.totalResep - hppSebelum), Math.round(hppSesudah.tambahan.total));
   assert.equal(await page.locator('select[aria-label="Tambah resep tambahan"]').count(), 0, 'tidak ada resep lain yang bisa ditambahkan lagi');
 
+  tahap('HPP: harga yang diinginkan menampilkan margin dan markup');
+  await page.goto(BASE + `/#/resep/${idResep}/hpp`);
+  await page.getByRole('button', { name: 'Dari harga saya' }).click();
+  const hppPorsiUji = await page.evaluate(async (id) => (await import('/js/lib/repo.js')).dataHPP(window.__app.db, id).hpp.hppPorsi, idResep);
+  const hargaUji = Math.ceil(hppPorsiUji * 2 / 100) * 100;
+  await page.getByPlaceholder('mis. 8.000').fill(String(hargaUji));
+  const marginUji = ((hargaUji - hppPorsiUji) / hargaUji) * 100;
+  await page.getByText(marginUji.toFixed(1).replace('.', ',') + '%').first().waitFor();
+
+  tahap('HPP paket: biaya kemasan paket dihitung sekali');
+  await page.goto(BASE + '/#/resep?tujuan=hpp');
+  await page.getByRole('link', { name: /Hitung HPP paket/ }).click();
+  await page.getByLabel('Nama paket').fill('Paket Uji');
+  await page.getByRole('button', { name: 'Buat' }).click();
+  await page.getByLabel('Tambah resep ke paket').selectOption(idResep);
+  await page.getByRole('button', { name: /Kotak/ }).click();
+  await page.getByLabel('Nilai Kotak / dus').fill('2000');
+  const paketUji = await page.evaluate(async () => {
+    const repo = await import('/js/lib/repo.js');
+    const db = window.__app.db;
+    const p = repo.daftarPaket(db)[0];
+    return { d: repo.dataPaket(db, p.id), hpp: repo.dataHPP(db, repo.isiPaket(db, p.id)[0].idResep).hpp };
+  });
+  assert.equal(paketUji.d.isi.length, 1);
+  assert.equal(Math.round(paketUji.d.hppPaket), Math.round(paketUji.hpp.produksiPorsi + 2000), 'kemasan per porsi resep tidak ikut, kotak paket sekali');
+  assert.match(await teks(page, '.kartu-hpp'), new RegExp(angkaRp(Math.round(paketUji.d.hppPaket))));
+  rutePaket = `/paket/${paketUji.d.paket.id}`;
+
   tahap('semua perubahan tersimpan ke server sendiri (tanpa tombol), foto ikut terunggah');
   await page.goto(BASE + '/#/pengaturan');
   await page.getByRole('heading', { name: 'Akun' }).waitFor();
@@ -301,7 +332,7 @@ try {
   await page.getByText('Belum ada ulasan').waitFor();
 
   tahap('tidak ada layar yang melebar keluar di HP, tablet, dan laptop');
-  const rute = ['/', '/resep', '/resep?tujuan=hpp', '/resep/baru', '/bahan', '/ulasan', '/pengaturan', `/resep/${idResep}`, `/resep/${idResep}/hpp`, `/resep/${idResep}/marketing`, `/resep/${idResep}/bandingkan`, `/resep/${idResep}/ubah`, `/eksperimen/${idEks2}`, `/eksperimen/${idEks2}/ubah`, `/eksperimen/${idEks2}/bagikan`, `/resep/${idResep}/eksperimen/baru?dari=${idEks2}`];
+  const rute = ['/', '/resep', '/resep?tujuan=hpp', '/resep/baru', '/bahan', '/ulasan', '/pengaturan', `/resep/${idResep}`, `/resep/${idResep}/hpp`, `/resep/${idResep}/marketing`, `/resep/${idResep}/bandingkan`, `/resep/${idResep}/ubah`, `/eksperimen/${idEks2}`, `/eksperimen/${idEks2}/ubah`, `/eksperimen/${idEks2}/bagikan`, `/resep/${idResep}/eksperimen/baru?dari=${idEks2}`, '/paket', rutePaket];
   for (const [lebar, tinggi] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
     await page.setViewportSize({ width: lebar, height: tinggi });
     for (const r of rute) {

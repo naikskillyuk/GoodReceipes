@@ -54,6 +54,10 @@ export function DaftarResep({ k }) {
         </a>`,
       )}
     </nav>
+    ${tujuan === 'hpp' &&
+    html`<div style="padding:12px 20px 0">
+      <a class="pil navy" href=${tautan('/paket')}>Hitung HPP paket (beberapa resep, satu kemasan)<span class="ujung"><${Ikon} nama="kalkulator" /></span></a>
+    </div>`}
     <div style="padding:12px 20px 0">
       <input class="input" type="search" placeholder="Cari nama resep…" aria-label="Cari resep" value=${cari} onInput=${(e) => setCari(e.target.value)} />
     </div>

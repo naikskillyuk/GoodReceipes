@@ -22,6 +22,7 @@ import { Bagikan } from './layar/bagikan.js';
 import { LayarPenilai } from './layar/penilai.js';
 import { Ulasan } from './layar/ulasan.js';
 import { Pengaturan } from './layar/pengaturan.js';
+import { DaftarPaket, DetailPaket } from './layar/paket.js';
 
 // Data utama ada di database server. Perangkat hanya menyimpan salinan supaya cepat dan tetap
 // terbuka saat sinyal putus; setiap perubahan dikirim ke server sesaat setelah disimpan.
@@ -47,6 +48,7 @@ function Layar({ k }) {
     if (c === 'bagikan') return html`<${Bagikan} k=${k} id=${b} />`;
     return html`<${DetailEksperimen} k=${k} id=${b} />`;
   }
+  if (a === 'paket') return b ? html`<${DetailPaket} key=${b} k=${k} id=${b} />` : html`<${DaftarPaket} k=${k} />`;
   if (a === 'bahan') return html`<${DaftarBahan} k=${k} />`;
   if (a === 'ulasan') return html`<${Ulasan} k=${k} />`;
   if (a === 'pengaturan') return html`<${Pengaturan} k=${k} />`;

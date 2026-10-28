@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hargaPerDasar, biayaTakaran, hargaPerSatuanResep, satuanResep, tabelKonversi, keDasar } from '../js/lib/units.js';
-import { biayaEksperimen, hitungHPP, hargaMinimum, bulatkanHarga, analisisPenjualan } from '../js/lib/hpp.js';
+import { biayaEksperimen, hitungHPP, hitungPaket, hargaMinimum, marginDariHarga, bulatkanHarga, analisisPenjualan } from '../js/lib/hpp.js';
 import { skorPenilaian, skorEksperimen, sahkanNilai } from '../js/lib/skor.js';
 import { angka, rupiah, desimal1, persen, bacaRupiah, bacaJumlah, tampilJumlah } from '../js/lib/util.js';
 
@@ -87,6 +87,12 @@ test('HPP, harga minimum, margin, BEP, dan target (angka mockup)', () => {
   });
   assert.equal(hpp.totalResep, 73660);
   assert.equal(angka(hpp.hppPorsi), '4.604');
+  // Alur per porsi: bahan 38.960/16 + (3.500 + 12.000)/16 + kemasan 1.200 = 2.435 + 968,75 + 1.200
+  assert.equal(hpp.alur.bahan, 2435);
+  assert.equal(hpp.alur.biayaResep, 968.75);
+  assert.equal(hpp.alur.biayaPorsi, 1200);
+  assert.equal(hpp.produksiPorsi, 3403.75);
+  assert.equal(hpp.alur.bahan + hpp.alur.resepTambahan + hpp.alur.biayaResep + hpp.alur.biayaPorsi, hpp.hppPorsi);
 
   const min = hargaMinimum(hpp.hppPorsi, 40);
   assert.equal(angka(min), '7.673');
@@ -152,4 +158,26 @@ test('format angka Indonesia', () => {
   assert.ok(Number.isNaN(bacaJumlah('')));
   assert.equal(tampilJumlah(1.5), '1,5');
   assert.equal(tampilJumlah(80), '80');
+});
+
+test('margin dari harga yang diinginkan, dan bedanya dengan markup', () => {
+  const m = marginDariHarga(5000, 7000);
+  assert.equal(m.laba, 2000);
+  assert.equal(persen(m.marginPersen), '28,6%');
+  assert.equal(persen(m.markupPersen), '40,0%');
+  // Margin 40% berarti harga 8.333, bukan 7.000 (itu markup 40%).
+  assert.equal(angka(hargaMinimum(5000, 40)), '8.333');
+  assert.equal(persen(marginDariHarga(5000, hargaMinimum(5000, 40)).marginPersen), '40,0%');
+  assert.ok(Number.isNaN(marginDariHarga(5000, 0).marginPersen));
+});
+
+test('HPP paket: biaya paket dihitung sekali', () => {
+  const p = hitungPaket({
+    isi: [{ biayaProduksi: 6000, jumlah: 1 }, { biayaProduksi: 3000, jumlah: 2 }],
+    biayaPaket: [{ nilai: 2500 }, { nilai: 500 }],
+  });
+  assert.equal(p.totalIsi, 12000);
+  assert.equal(p.totalBiaya, 3000);
+  assert.equal(p.hppPaket, 15000);
+  assert.equal(hitungPaket({ isi: [{ biayaProduksi: NaN, jumlah: 1 }] }).bermasalah.length, 1);
 });

@@ -1,14 +1,20 @@
-// HPP & Harga: biaya bahan dari eksperimen + biaya lain -> HPP per porsi, harga jual, margin, BEP, target.
+// HPP & Harga: semua biaya dibawa ke "per 1 porsi", lalu harga jual, margin, BEP, dan target.
+//   1. Bahan resep ÷ jumlah porsi
+//   2. Resep tambahan (takaran per porsi, atau per satu kali masak ÷ jumlah porsi)
+//   3. Biaya per resep (gas, tenaga, sewa) ÷ jumlah porsi
+//   4. Biaya per porsi (kemasan, label, ongkir)
+//   HPP per porsi = 1 + 2 + 3 + 4
 
 import { html } from '../../vendor/preact-htm.js';
 import { Kosong, InputRupiah, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan } from '../ui/router.js';
+import { KartuHarga } from '../ui/harga.js';
 import {
   dataHPP, eksperimenResep, targetResep, biayaLainResep, pilihanResepTambahan, tambahResepTambahan,
 } from '../lib/repo.js';
-import { hargaMinimum, bulatkanHarga, analisisPenjualan } from '../lib/hpp.js';
-import { rupiah, angka, persen, tampilJumlah } from '../lib/util.js';
+import { analisisPenjualan } from '../lib/hpp.js';
+import { rupiah, angka, tampilJumlah } from '../lib/util.js';
 
 const PRESET = [
   { jenis: 'Kemasan', per: 'porsi' },
@@ -20,6 +26,15 @@ const PRESET = [
 ];
 
 const TARGET_AWAL = { marginTarget: 40, hargaJual: 0, modalAwal: 0, labaTargetBulanan: 0 };
+
+/** Satu baris tabel alur: nama, biaya satu kali masak, biaya per porsi. */
+function BarisAlur({ nama, ket, resep, porsi, utama }) {
+  return html`<tr class=${utama ? 'utama' : ''}>
+    <td>${nama}${ket && html`<small class="teks-kecil"> · ${ket}</small>`}</td>
+    <td>${rupiah(resep)}</td>
+    <td>${rupiah(porsi)}</td>
+  </tr>`;
+}
 
 export function PanelHPP({ k, resep }) {
   const { db } = k;
@@ -35,10 +50,11 @@ export function PanelHPP({ k, resep }) {
   const data = dataHPP(db, resep.id);
   const target = { ...TARGET_AWAL, ...(data.target || {}) };
   const { hpp, biaya, tambahan, eksperimen: dipakai, porsi } = data;
+  const satuan = dipakai && dipakai.satuanPorsi ? dipakai.satuanPorsi : 'porsi';
   const pilihan = pilihanResepTambahan(db, resep.id);
   const ubahTambahan = (rt, patch) => {
-    const { id, idResep, idResepKomponen, jumlah, satuan, urutan } = rt;
-    db.simpan('ResepTambahan', { id, idResep, idResepKomponen, jumlah, satuan, urutan, ...patch });
+    const { id, idResep, idResepKomponen, jumlah, satuan, dipakaiPer, urutan } = rt;
+    db.simpan('ResepTambahan', { id, idResep, idResepKomponen, jumlah, satuan, dipakaiPer, urutan, ...patch });
   };
   const hppPorsi = hpp.hppPorsi;
 
@@ -52,8 +68,6 @@ export function PanelHPP({ k, resep }) {
   };
   const ubahBiaya = (b, patch) => db.simpan('BiayaLain', { ...b, ...patch });
 
-  const minimum = hargaMinimum(hppPorsi, target.marginTarget);
-  const disarankan = bulatkanHarga(minimum);
   const analisis = analisisPenjualan({
     hppPorsi,
     hargaJual: target.hargaJual,
@@ -63,6 +77,51 @@ export function PanelHPP({ k, resep }) {
   });
   const adaHarga = target.hargaJual > 0;
   const sudahDipakai = new Set(hpp.lain.map((b) => b.jenis.toLowerCase()));
+  const lainResep = hpp.lain.filter((b) => b.dihitungPer !== 'porsi');
+  const lainPorsi = hpp.lain.filter((b) => b.dihitungPer === 'porsi');
+  const jumlahPorsi = `${angka(porsi, porsi % 1 ? 1 : 0)} ${satuan}`;
+
+  const alur = html`<div class="kartu">
+    <div class="label-kecil" style="margin-bottom:4px">Alur hitung HPP</div>
+    <p class="bantu" style="margin:0 0 8px">Satu kali masak Eksperimen ${dipakai ? dipakai.nomor : '–'} menghasilkan <b>${jumlahPorsi}</b>. Semua biaya dibawa ke per ${satuan}, lalu dijumlahkan.</p>
+    <div class="tabel-gulir">
+      <table class="tabel-biaya tabel-alur">
+        <thead>
+          <tr><th></th><th>1 kali masak</th><th>Per ${satuan}</th></tr>
+        </thead>
+        <tbody>
+          <tr class="kepala-langkah"><td colspan="3"><span class="no-langkah">1</span>Bahan resep <small class="teks-kecil">(÷ ${jumlahPorsi})</small></td></tr>
+          <${BarisAlur} nama=${`Bahan Eksperimen ${dipakai ? dipakai.nomor : '–'}`} resep=${hpp.biayaBahan} porsi=${hpp.alur.bahan} />
+
+          <tr class="kepala-langkah"><td colspan="3"><span class="no-langkah">2</span>Resep tambahan</td></tr>
+          ${tambahan.rincian.length === 0
+            ? html`<tr><td colspan="3" class="teks-kecil">Tidak ada</td></tr>`
+            : tambahan.rincian.map(
+                (t) => html`<${BarisAlur}
+                  key=${t.id}
+                  nama=${t.resep ? t.resep.nama : 'Resep terhapus'}
+                  ket=${`${tampilJumlah(Number(t.jumlah) || 0)} ${t.satuan === 'resep' ? 'resep' : t.satuanPorsi || 'porsi'} ${t.dipakaiPer === 'porsi' ? `tiap ${satuan}` : 'tiap masak'}`}
+                  resep=${t.biayaResep}
+                  porsi=${t.biayaPorsi}
+                />`,
+              )}
+
+          <tr class="kepala-langkah"><td colspan="3"><span class="no-langkah">3</span>Biaya per resep <small class="teks-kecil">(÷ ${jumlahPorsi})</small></td></tr>
+          ${lainResep.length === 0
+            ? html`<tr><td colspan="3" class="teks-kecil">Tidak ada</td></tr>`
+            : lainResep.map((b) => html`<${BarisAlur} key=${b.id} nama=${b.jenis} resep=${b.total} porsi=${b.perPorsi} />`)}
+
+          <tr class="kepala-langkah"><td colspan="3"><span class="no-langkah">4</span>Biaya per porsi <small class="teks-kecil">(× ${jumlahPorsi})</small></td></tr>
+          ${lainPorsi.length === 0
+            ? html`<tr><td colspan="3" class="teks-kecil">Tidak ada</td></tr>`
+            : lainPorsi.map((b) => html`<${BarisAlur} key=${b.id} nama=${b.jenis} resep=${b.total} porsi=${b.perPorsi} />`)}
+        </tbody>
+        <tfoot>
+          <tr><td>HPP (1 + 2 + 3 + 4)</td><td>${rupiah(hpp.totalResep)}</td><td>${rupiah(hppPorsi)}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>`;
 
   const kiri = html`<div class="kolom">
     <label class="bidang">
@@ -80,54 +139,41 @@ export function PanelHPP({ k, resep }) {
       Periksa harga, isi kemasan, atau konversi satuannya di <a href=${tautan('/bahan')} style="text-decoration:underline">Daftar Bahan</a>.
     </div>`}
 
-    <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:6px">Rincian biaya per resep</div>
-      <table class="tabel-biaya">
-        <tbody>
-          <tr>
-            <td>Bahan (Eksperimen ${dipakai ? dipakai.nomor : '–'})</td>
-            <td>${rupiah(hpp.biayaBahan)}</td>
-          </tr>
-          ${tambahan.rincian.map((t) => html`<tr key=${t.id}>
-            <td>${t.resep ? t.resep.nama : 'Resep terhapus'}<small class="teks-kecil"> · ${tampilJumlah(Number(t.jumlah) || 0)} ${t.satuan === 'resep' ? 'resep' : t.satuanPorsi || 'porsi'}</small></td>
-            <td>${rupiah(t.biaya)}</td>
-          </tr>`)}
-          ${hpp.lain.map((b) => html`<tr key=${b.id}>
-            <td>${b.jenis}${b.dihitungPer === 'porsi' ? html`<small class="teks-kecil"> · ${rupiah(Number(b.nilai))} × ${angka(porsi)}</small>` : ''}</td>
-            <td>${rupiah(b.total)}</td>
-          </tr>`)}
-        </tbody>
-        <tfoot>
-          <tr><td>Total per resep</td><td>${rupiah(hpp.totalResep)}</td></tr>
-        </tfoot>
-      </table>
-    </div>
+    ${alur}
 
     <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:4px">Resep tambahan</div>
-      <p class="bantu" style="margin:0 0 10px">Resep lain yang ikut dipakai di resep ini, mis. saus atau isian. Biayanya diambil dari bahan eksperimen yang dihitung di resep itu (tanpa biaya lainnya).</p>
+      <div class="label-kecil" style="margin-bottom:4px"><span class="no-langkah">2</span>Resep tambahan</div>
+      <p class="bantu" style="margin:0 0 10px">Resep lain yang ikut dipakai, mis. saus atau isian. Isi takarannya, lalu pilih takaran itu untuk <b>tiap ${satuan}</b> (mis. 30 gram saus per piring) atau untuk <b>1 kali masak</b> resep ini (mis. 1 resep saus untuk ${jumlahPorsi}).</p>
       ${tambahan.bermasalah.length > 0 &&
       html`<div class="peringatan" role="alert" style="margin-bottom:10px">
         <b>Ada resep tambahan yang biayanya belum lengkap:</b>
         ${tambahan.bermasalah.map((t) => `${t.resep ? t.resep.nama : 'resep terhapus'} (${t.alasan})`).join(', ')}.
       </div>`}
       <div class="kolom">
-        ${tambahan.rincian.map(
-          (t) => html`<div class="biaya-lain-baris" key=${t.id}>
+        ${tambahan.rincian.map((t) => {
+          const nama = t.resep ? t.resep.nama : '';
+          return html`<div class="biaya-lain-baris tambahan-baris" key=${t.id}>
             ${t.resep
               ? html`<a class="bl-nama" href=${tautan(`/resep/${t.resep.id}/hpp`)} style="font-weight:700;text-decoration:underline">${t.resep.nama}</a>`
               : html`<span class="bl-nama">Resep terhapus</span>`}
-            <${InputAngka} kelas="input kecil bl-nilai" nilai=${t.jumlah} aria-label=${'Jumlah ' + (t.resep ? t.resep.nama : '')} onUbah=${(n) => Number.isFinite(n) && ubahTambahan(t, { jumlah: n })} />
-            <select class="pilih kecil bl-per" aria-label=${'Satuan ' + (t.resep ? t.resep.nama : '')} value=${t.satuan} onChange=${(e) => ubahTambahan(t, { satuan: e.target.value })}>
-              <option value="porsi" selected=${t.satuan !== 'resep'}>${t.satuanPorsi || 'porsi'}</option>
-              <option value="resep" selected=${t.satuan === 'resep'}>resep penuh</option>
-            </select>
-            <span style="min-width:84px;text-align:right;font-weight:700">${rupiah(t.biaya)}</span>
-            <button class="ikon-btn" aria-label=${'Hapus ' + (t.resep ? t.resep.nama : 'resep tambahan')} onClick=${() => db.hapus('ResepTambahan', t.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
+            <button class="ikon-btn" aria-label=${'Hapus ' + (nama || 'resep tambahan')} onClick=${() => db.hapus('ResepTambahan', t.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
+            <div class="tambahan-isian">
+              <${InputAngka} kelas="input kecil bl-nilai" nilai=${t.jumlah} aria-label=${'Jumlah ' + nama} onUbah=${(n) => Number.isFinite(n) && ubahTambahan(t, { jumlah: n })} />
+              <select class="pilih kecil bl-per" aria-label=${'Satuan ' + nama} value=${t.satuan} onChange=${(e) => ubahTambahan(t, { satuan: e.target.value })}>
+                <option value="porsi" selected=${t.satuan !== 'resep'}>${t.satuanPorsi || 'porsi'}</option>
+                <option value="resep" selected=${t.satuan === 'resep'}>resep penuh</option>
+              </select>
+              <select class="pilih kecil bl-per" aria-label=${'Dipakai untuk ' + nama} value=${t.dipakaiPer} onChange=${(e) => ubahTambahan(t, { dipakaiPer: e.target.value })}>
+                <option value="porsi" selected=${t.dipakaiPer === 'porsi'}>untuk tiap ${satuan}</option>
+                <option value="resep" selected=${t.dipakaiPer !== 'porsi'}>untuk 1 kali masak</option>
+              </select>
+            </div>
             ${t.resep && Number.isFinite(t.perPorsi) &&
-            html`<small class="teks-kecil" style="flex-basis:100%">${rupiah(t.perPorsi)} per ${t.satuanPorsi || 'porsi'} · ${rupiah(t.perResep)} per resep (Eksperimen ${t.eksperimen.nomor})</small>`}
-          </div>`,
-        )}
+            html`<small class="teks-kecil" style="flex-basis:100%">
+              ${rupiah(t.perPorsi)} per ${t.satuanPorsi || 'porsi'} (Eksperimen ${t.eksperimen.nomor}) → <b>${rupiah(t.biayaPorsi)} per ${satuan}</b> ${resep.nama}
+            </small>`}
+          </div>`;
+        })}
         ${pilihan.length > 0
           ? html`<select class="pilih kecil" aria-label="Tambah resep tambahan" value="" onChange=${(e) => e.target.value && tambahResepTambahan(db, resep.id, e.target.value)}>
               <option value="" selected>+ Tambah resep lain…</option>
@@ -138,7 +184,8 @@ export function PanelHPP({ k, resep }) {
     </div>
 
     <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:10px">Biaya lain</div>
+      <div class="label-kecil" style="margin-bottom:4px"><span class="no-langkah">3</span><span class="no-langkah">4</span>Biaya lain</div>
+      <p class="bantu" style="margin:0 0 10px"><b>Per resep</b>: dibayar sekali tiap masak lalu dibagi ${jumlahPorsi} (gas, tenaga, sewa). <b>Per porsi</b>: setiap ${satuan} kena biaya ini (kemasan, label, ongkir).</p>
       <div class="kolom">
         ${biayaLainResep(db, resep.id).map(
           (b) => html`<div class="biaya-lain-baris" key=${b.id}>
@@ -163,48 +210,16 @@ export function PanelHPP({ k, resep }) {
 
   const kanan = html`<div class="kolom">
     <div class="kartu-hpp">
-      <div class="label-kecil">HPP per porsi</div>
+      <div class="label-kecil">HPP per ${satuan}</div>
       <div class="besar">${rupiah(hppPorsi)}</div>
-      <small>${rupiah(hpp.totalResep)} ÷ ${angka(porsi)} ${dipakai && dipakai.satuanPorsi ? dipakai.satuanPorsi : 'porsi'}</small>
-    </div>
-
-    <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:10px">Harga jual</div>
-      <div class="baris-pisah">
-        <span>Margin yang diinginkan</span>
-        <div class="stepper">
-          <button aria-label="Kurangi margin" onClick=${() => aturTarget({ marginTarget: Math.max(5, target.marginTarget - 5) })}><${Ikon} nama="minus" /></button>
-          <output aria-live="polite">${target.marginTarget}%</output>
-          <button aria-label="Tambah margin" onClick=${() => aturTarget({ marginTarget: Math.min(90, target.marginTarget + 5) })}><${Ikon} nama="plus" /></button>
-        </div>
-      </div>
-      <div class="hasil-baris">
-        <span>Harga jual minimum</span>
-        <b>${rupiah(minimum)}</b>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-        ${Number.isFinite(disarankan) && html`<button class="btn" onClick=${() => aturTarget({ hargaJual: disarankan })}>Pakai ${rupiah(disarankan)} (dibulatkan)</button>`}
-        <label class="bidang">
-          <span>Harga jual per porsi</span>
-          <${InputRupiah} kelas="input" nilai=${target.hargaJual} onUbah=${(n) => aturTarget({ hargaJual: n })} placeholder="mis. 8.000" />
-        </label>
+      <small>${rupiah(hpp.totalResep)} ÷ ${jumlahPorsi}</small>
+      <div class="hpp-pecah">
+        <span>Biaya produksi (1 + 2 + 3)</span><b>${rupiah(hpp.produksiPorsi)}</b>
+        <span>Biaya per porsi (4)</span><b>${rupiah(hpp.alur.biayaPorsi)}</b>
       </div>
     </div>
 
-    ${adaHarga && !analisis.untung &&
-    html`<div class="peringatan" role="alert"><b>Harga jual di bawah atau sama dengan HPP.</b>Setiap porsi yang terjual merugi ${rupiah(Math.abs(analisis.labaPorsi))}.</div>`}
-
-    <div class="kartu">
-      <div class="label-kecil" style="margin-bottom:4px">Untung per porsi</div>
-      <div class="hasil-baris">
-        <span>Laba per porsi</span>
-        <b class=${adaHarga ? (analisis.untung ? 'baik' : 'buruk') : ''}>${adaHarga ? rupiah(analisis.labaPorsi) : '–'}</b>
-      </div>
-      <div class="hasil-baris">
-        <span>Margin sebenarnya</span>
-        <b class=${adaHarga ? (analisis.marginPersen >= target.marginTarget ? 'baik' : 'buruk') : ''}>${adaHarga ? persen(analisis.marginPersen) : '–'}</b>
-      </div>
-    </div>
+    <${KartuHarga} key=${resep.id} hpp=${hppPorsi} marginTarget=${target.marginTarget} hargaJual=${target.hargaJual} onUbah=${aturTarget} unit=${satuan} />
 
     <div class="kartu">
       <div class="label-kecil" style="margin-bottom:10px">Titik impas dan target</div>
@@ -228,6 +243,8 @@ export function PanelHPP({ k, resep }) {
         ${!adaHarga && html`<p class="bantu" style="margin-top:6px">Isi harga jual untuk melihat BEP dan target penjualan.</p>`}
       </div>
     </div>
+
+    <a class="pil navy" href=${tautan('/paket')}>Hitung HPP paket<span class="ujung"><${Ikon} nama="kalkulator" /></span></a>
   </div>`;
 
   return html`<div class="isi"><div class="kolom-2">${kiri}${kanan}</div></div>`;

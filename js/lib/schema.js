@@ -54,9 +54,10 @@ export const TABEL = {
   },
   // Resep lain yang dipakai sebagai komponen saat menghitung HPP (mis. saus B di dalam makanan A).
   // satuan: 'porsi' (satuan hasil jadi resep komponen, mis. porsi atau gram) atau 'resep' (satu kali masak).
+  // dipakaiPer: 'porsi' (takaran untuk tiap porsi resep ini) atau 'resep' (untuk satu kali masak resep ini).
   ResepTambahan: {
     awalan: 'rtb',
-    kolom: { id: 't', idResep: 't', idResepKomponen: 't', jumlah: 'n', satuan: 't', urutan: 'n' },
+    kolom: { id: 't', idResep: 't', idResepKomponen: 't', jumlah: 'n', satuan: 't', dipakaiPer: 't', urutan: 'n' },
   },
   Target: {
     awalan: 'tgt',
@@ -64,6 +65,19 @@ export const TABEL = {
       id: 't', idResep: 't', idEksperimenHitung: 't', marginTarget: 'n', hargaJual: 'n',
       modalAwal: 'n', labaTargetBulanan: 'n',
     },
+  },
+  // Paket: beberapa resep dijual bersama dalam satu kemasan. Biaya paket (kotak, label) dihitung sekali.
+  Paket: {
+    awalan: 'pkt',
+    kolom: { id: 't', nama: 't', marginTarget: 'n', hargaJual: 'n', dibuat: 'n' },
+  },
+  IsiPaket: {
+    awalan: 'ipk',
+    kolom: { id: 't', idPaket: 't', idResep: 't', jumlah: 'n', urutan: 'n' },
+  },
+  BiayaPaket: {
+    awalan: 'bpk',
+    kolom: { id: 't', idPaket: 't', jenis: 't', nilai: 'n', urutan: 'n' },
   },
   Marketing: {
     awalan: 'mkt',
