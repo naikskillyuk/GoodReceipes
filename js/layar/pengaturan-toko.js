@@ -1,0 +1,195 @@
+// Pengaturan khusus akun dapur: akun toko (kasir), pembayaran online Mayar, dan toko + link pemesanan.
+
+import { html, useState, useEffect } from '../../vendor/preact-htm.js';
+import { Ikon } from '../ui/ikon.js';
+import { Modal, tanya, tampilToast } from '../ui/pesan.js';
+import { buatQR, salin } from './bagikan.js';
+import { akunToko, pengaturanMayar, ambilToko, simpanToko, aturTokenToko, tautanToko } from '../lib/toko.js';
+import { MIN_SANDI } from '../lib/akun.js';
+import { tanggal } from '../lib/util.js';
+
+function DialogAkunToko({ k, akun, onTutup, onSimpan }) {
+  const baru = !akun;
+  const [nama, setNama] = useState(akun ? akun.nama : '');
+  const [username, setUsername] = useState(akun ? akun.username : '');
+  const [sandi, setSandi] = useState('');
+  const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const kirim = async (e) => {
+    e.preventDefault();
+    if (nama.trim().length < 2) return setGalat('Isi nama, mis. Kasir Pagi.');
+    if (baru && !/^[a-z0-9._]{4,40}$/.test(username.trim().toLowerCase())) return setGalat('Username 4-40 karakter: huruf kecil, angka, titik, atau garis bawah.');
+    if ((baru || sandi) && sandi.length < MIN_SANDI) return setGalat(`Kata sandi minimal ${MIN_SANDI} karakter.`);
+    setSibuk(true);
+    try {
+      const hasil = baru
+        ? await akunToko.buat(k.db, { nama: nama.trim(), username: username.trim().toLowerCase(), kataSandi: sandi })
+        : await akunToko.ubah(k.db, akun.id, { nama: nama.trim(), ...(sandi ? { kataSandi: sandi } : {}) });
+      tampilToast(baru ? `Akun toko ${hasil.username} dibuat.` : 'Akun toko disimpan.');
+      onSimpan();
+    } catch (err) {
+      setGalat(err.message);
+      setSibuk(false);
+    }
+  };
+  return html`<${Modal} judul=${baru ? 'Akun toko baru' : 'Ubah akun toko'} onTutup=${onTutup}>
+    <form class="kolom" style="gap:12px" onSubmit=${kirim} novalidate>
+      <label class="bidang"><span>Nama</span><input class="input" maxlength="60" value=${nama} placeholder="mis. Kasir Pagi" onInput=${(e) => setNama(e.target.value)} /></label>
+      <label class="bidang"><span>Username untuk masuk</span><input class="input" maxlength="40" autocapitalize="none" disabled=${!baru} value=${username} placeholder="mis. kasir.pagi" onInput=${(e) => setUsername(e.target.value)} /></label>
+      <label class="bidang"><span>${baru ? 'Kata sandi' : 'Kata sandi baru (kosongkan bila tetap)'}</span><input class="input" type="text" autocomplete="off" maxlength="100" value=${sandi} onInput=${(e) => setSandi(e.target.value)} /><span class="bantu">Minimal ${MIN_SANDI} karakter. Berikan ke kasir; ${baru ? '' : 'mengganti kata sandi membuat kasir keluar dari semua perangkat.'}</span></label>
+      ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <div class="baris-btn">
+        <button class="btn abu lebar" type="button" onClick=${onTutup}>Batal</button>
+        <button class="btn solid lebar" type="submit" disabled=${sibuk}>${sibuk ? 'Menyimpan…' : 'Simpan'}</button>
+      </div>
+    </form>
+  <//>`;
+}
+
+/** Akun toko: kasir yang hanya bisa membuka menu, stok makanan, pesanan, dan pembayaran. */
+export function KartuAkunToko({ k }) {
+  const { db } = k;
+  const [daftar, setDaftar] = useState(null);
+  const [galat, setGalat] = useState('');
+  const [dialog, setDialog] = useState(null);
+  const muat = () =>
+    akunToko
+      .daftar(db)
+      .then((d) => (setDaftar(d), setGalat('')))
+      .catch((e) => setGalat(e.message));
+  useEffect(() => void muat(), []);
+  const aktifkan = async (a) => {
+    try {
+      await akunToko.ubah(db, a.id, { aktif: !a.aktif });
+      tampilToast(a.aktif ? `${a.nama} dinonaktifkan dan keluar dari semua perangkat.` : `${a.nama} aktif lagi.`);
+      muat();
+    } catch (e) {
+      tampilToast(e.message);
+    }
+  };
+  const hapus = async (a) => {
+    if (!(await tanya({ judul: `Hapus akun ${a.username}?`, teks: 'Kasir ini tidak bisa masuk lagi. Pesanan yang pernah dibuatnya tetap tersimpan.', ya: 'Hapus akun', bahaya: true }))) return;
+    try {
+      await akunToko.hapus(db, a.id);
+      muat();
+    } catch (e) {
+      tampilToast(e.message);
+    }
+  };
+  return html`<section class="kartu kolom" aria-labelledby="h-akun-toko">
+    <h2 class="judul-kecil" id="h-akun-toko">Akun toko (kasir)</h2>
+    <p class="bantu">Akun toko masuk di halaman Masuk dengan username dan kata sandinya. Akun ini hanya bisa membuka Kasir, Pesanan, Stok makanan, Menu, dan Pelanggan; resep, bahan, dan HPP tidak terlihat.</p>
+    ${galat && html`<p class="galat-teks">${galat} <button class="tautan-kecil" onClick=${muat}>Coba lagi</button></p>`}
+    ${daftar && daftar.length === 0 && html`<p class="bantu">Belum ada akun toko.</p>`}
+    ${(daftar || []).map(
+      (a) => html`<div class="hasil-baris" key=${a.id}>
+        <span><b class="biasa">${a.nama}</b> ${!a.aktif && html`<small class="teks-buruk">nonaktif</small>`}<br /><small class="teks-kecil">${a.username}${a.terakhirDipakai ? ' · terakhir dipakai ' + tanggal(a.terakhirDipakai) : ''}</small></span>
+        <span class="baris-aksi">
+          <button class="btn kecil" onClick=${() => setDialog(a)}>Ubah</button>
+          <button class="btn kecil" onClick=${() => aktifkan(a)}>${a.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
+          <button class="ikon-btn kecil" aria-label=${'Hapus akun ' + a.username} onClick=${() => hapus(a)}><${Ikon} nama="sampah" ukuran=${16} /></button>
+        </span>
+      </div>`,
+    )}
+    <button class="btn solid" onClick=${() => setDialog('baru')}><${Ikon} nama="plus" ukuran=${18} />Buat akun toko</button>
+    ${dialog && html`<${DialogAkunToko} k=${k} akun=${dialog === 'baru' ? null : dialog} onTutup=${() => setDialog(null)} onSimpan=${() => (setDialog(null), muat())} />`}
+  </section>`;
+}
+
+/** Kunci API Mayar milik usaha (disimpan terenkripsi di server, tidak pernah dikirim balik ke aplikasi). */
+export function KartuMayar({ k }) {
+  const { db } = k;
+  const [info, setInfo] = useState(null);
+  const [kunci, setKunci] = useState('');
+  const [sandbox, setSandbox] = useState(false);
+  const [galat, setGalat] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  useEffect(() => {
+    pengaturanMayar
+      .info(db)
+      .then((i) => (setInfo(i), setSandbox(!!i.sandbox)))
+      .catch((e) => setGalat(e.message));
+  }, []);
+  const simpan = async () => {
+    setSibuk(true);
+    setGalat('');
+    try {
+      const i = await pengaturanMayar.simpan(db, { kunciApi: kunci.trim(), sandbox });
+      setInfo(i);
+      setKunci('');
+      setPesan(i.pesan || '');
+    } catch (e) {
+      setGalat(e.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+  const matikan = async () => {
+    if (!(await tanya({ judul: 'Matikan pembayaran online?', teks: 'Kasir tidak bisa membuat QR pembayaran dan link pemesanan tidak bisa menerima pesanan sampai kunci diisi lagi.', ya: 'Matikan', bahaya: true }))) return;
+    try {
+      setInfo(await pengaturanMayar.matikan(db));
+      setPesan('');
+    } catch (e) {
+      setGalat(e.message);
+    }
+  };
+  return html`<section class="kartu kolom" aria-labelledby="h-mayar">
+    <h2 class="judul-kecil" id="h-mayar">Pembayaran online (Mayar)</h2>
+    ${info && html`<div class="hasil-baris"><span>Status</span><b class=${info.aktif ? 'baik' : 'biasa'}>${info.aktif ? `Aktif${info.sandbox ? ' · mode uji (sandbox)' : ''}` : 'Belum aktif'}</b></div>`}
+    <p class="bantu">Pembeli membayar lewat QRIS, e-wallet, atau transfer bank; uang masuk ke akun Mayar Anda. Ambil kunci API (Read & Write) di dashboard Mayar: Integrasi → API Key.</p>
+    <label class="bidang"><span>${info && info.aktif ? 'Ganti kunci API' : 'Kunci API Mayar'}</span><input class="input" type="password" autocomplete="off" value=${kunci} onInput=${(e) => setKunci(e.target.value)} placeholder="Tempel kunci API di sini" /></label>
+    <label class="saklar"><input type="checkbox" checked=${sandbox} onChange=${(e) => setSandbox(e.target.checked)} /><span>Kunci dari web.mayar.club / mayar.io (mode uji / sandbox)</span></label>
+    ${info && info.webhook && html`<div class="bidang"><span>Alamat webhook</span>
+      <div class="cari-baris"><input class="input kecil" readonly value=${info.webhook} aria-label="Alamat webhook" /><button class="btn" onClick=${async () => tampilToast((await salin(info.webhook)) ? 'Alamat disalin.' : 'Gagal menyalin.')}>Salin</button></div>
+      <span class="bantu">Didaftarkan otomatis saat kunci disimpan. Bila gagal, tempel di dashboard Mayar: Integrasi → Webhook.</span></div>`}
+    ${pesan && html`<p class="bantu teks-baik" role="status">${pesan}</p>`}
+    ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+    <div class="baris-btn">
+      <button class="btn solid" disabled=${sibuk || kunci.trim().length < 20} onClick=${simpan}>${sibuk ? 'Menyimpan…' : 'Simpan kunci'}</button>
+      ${info && info.aktif && html`<button class="btn bahaya" onClick=${matikan}>Matikan</button>`}
+    </div>
+  </section>`;
+}
+
+/** Nama toko, buka/tutup, dan link pemesanan untuk pembeli. */
+export function KartuTokoOnline({ k }) {
+  const { db } = k;
+  const t = ambilToko(db);
+  const [d, setD] = useState(t);
+  const [qr, setQr] = useState(false);
+  useEffect(() => setD(ambilToko(db)), [t.diubah]);
+  const berubah = ['namaToko', 'alamatToko', 'waToko', 'catatanToko'].some((x) => (d[x] || '') !== (t[x] || ''));
+  const tautan = t.tokenToko ? tautanToko(t.tokenToko, db.pengaturan.scriptUrl) : '';
+  const buatLink = () => {
+    aturTokenToko(db);
+    tampilToast('Link pemesanan dibuat.');
+  };
+  const gantiLink = async () => {
+    if (!(await tanya({ judul: 'Ganti link pemesanan?', teks: 'Link lama berhenti berfungsi. Bagikan link yang baru ke pembeli.', ya: 'Ganti link', bahaya: true }))) return;
+    aturTokenToko(db, { ganti: true });
+  };
+  return html`<section class="kartu kolom" aria-labelledby="h-toko-online">
+    <h2 class="judul-kecil" id="h-toko-online">Toko & link pemesanan</h2>
+    <label class="bidang"><span>Nama toko</span><input class="input" maxlength="60" value=${d.namaToko || ''} onInput=${(e) => setD({ ...d, namaToko: e.target.value })} /></label>
+    <div class="dua-kolom">
+      <label class="bidang"><span>Alamat / area</span><input class="input" maxlength="120" value=${d.alamatToko || ''} onInput=${(e) => setD({ ...d, alamatToko: e.target.value })} /></label>
+      <label class="bidang"><span>WhatsApp toko</span><input class="input" inputmode="tel" maxlength="20" value=${d.waToko || ''} onInput=${(e) => setD({ ...d, waToko: e.target.value })} /></label>
+    </div>
+    <label class="bidang"><span>Pengumuman untuk pembeli (opsional)</span><input class="input" maxlength="300" value=${d.catatanToko || ''} placeholder="mis. Pesanan diambil H+1, gratis ongkir area kota" onInput=${(e) => setD({ ...d, catatanToko: e.target.value })} /></label>
+    ${berubah && html`<button class="btn solid" onClick=${() => (simpanToko(db, d), tampilToast('Data toko disimpan.'))}>Simpan data toko</button>`}
+    <label class="saklar"><input type="checkbox" checked=${!!t.tokoBuka} onChange=${(e) => simpanToko(db, { tokoBuka: e.target.checked })} /><span>Toko buka: link pemesanan menerima pesanan</span></label>
+    ${tautan
+      ? html`<div class="bidang"><span>Link pemesanan</span>
+          <div class="cari-baris"><input class="input kecil" readonly value=${tautan} aria-label="Link pemesanan" /><button class="btn" onClick=${async () => tampilToast((await salin(tautan)) ? 'Link disalin.' : 'Gagal menyalin.')}>Salin</button></div>
+          <div class="baris-btn">
+            <button class="btn" onClick=${() => setQr(!qr)}><${Ikon} nama="qr" ukuran=${18} />${qr ? 'Sembunyikan QR' : 'Tampilkan QR'}</button>
+            <a class="btn" href=${tautan} target="_blank" rel="noopener">Buka</a>
+            <button class="btn" onClick=${gantiLink}>Ganti link</button>
+          </div>
+          ${qr && html`<div class="qr-bayar" role="img" aria-label="Kode QR link pemesanan" dangerouslySetInnerHTML=${{ __html: buatQR(tautan, { cellSize: 4, margin: 2, scalable: true }) }}></div>`}
+        </div>`
+      : html`<button class="btn solid" onClick=${buatLink}><${Ikon} nama="tautan" ukuran=${18} />Buat link pemesanan</button>`}
+    <p class="bantu">Pembeli memesan dan langsung membayar lewat Mayar. Pesanan masuk ke menu Pesanan setelah lunas. Hanya menu yang ditandai "Tampil di link pemesanan" yang muncul.</p>
+  </section>`;
+}

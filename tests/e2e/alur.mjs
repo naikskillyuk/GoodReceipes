@@ -269,7 +269,7 @@ try {
 
   tahap('semua perubahan tersimpan ke server sendiri (tanpa tombol), foto ikut terunggah');
   await page.goto(BASE + '/#/pengaturan');
-  await page.getByRole('heading', { name: 'Akun' }).waitFor();
+  await page.getByRole('heading', { name: 'Akun', exact: true }).waitFor();
   assert.equal(await page.getByText('chefuji').count(), 1, 'username tampil');
   assert.equal(await page.getByRole('button', { name: /Sinkron/ }).count(), 0, 'tidak ada tombol sinkron');
   await page.waitForFunction(() => window.__app.db.jumlahKotor() === 0, null, { timeout: 15000 });

@@ -20,20 +20,26 @@ class Sinkron
         return Cache::lock('goodrecipes-tulis-'.$idPengguna, 30)->block(25, $fn);
     }
 
-    /** Semua baca/tulis dibatasi pada data milik akun $idPengguna. */
-    public function jalankan(int $idPengguna, array $masuk, int $sejak): array
+    /**
+     * Semua baca/tulis dibatasi pada data milik akun $idPengguna (pemilik data usaha).
+     * $tulis / $baca: daftar tabel yang boleh (akun toko), null = semua tabel (akun dapur).
+     */
+    public function jalankan(int $idPengguna, array $masuk, int $sejak, ?array $tulis = null, ?array $baca = null): array
     {
+        $semua = array_keys(Skema::tabel());
+        $tabelTulis = $tulis === null ? $semua : array_values(array_intersect($semua, $tulis));
+        $tabelBaca = $baca === null ? $semua : array_values(array_intersect($semua, $baca));
         $jumlah = 0;
-        foreach (array_keys(Skema::tabel()) as $tabel) {
+        foreach ($semua as $tabel) {
             $jumlah += is_array($masuk[$tabel] ?? null) ? count($masuk[$tabel]) : 0;
         }
         if ($jumlah > config('goodrecipes.maks_baris_per_permintaan')) {
             throw new RuntimeException('Terlalu banyak baris dalam satu permintaan.');
         }
 
-        return self::denganKunci($idPengguna, function () use ($idPengguna, $masuk, $sejak) {
-            DB::transaction(function () use ($idPengguna, $masuk) {
-                foreach (array_keys(Skema::tabel()) as $tabel) {
+        return self::denganKunci($idPengguna, function () use ($idPengguna, $masuk, $sejak, $tabelTulis, $tabelBaca) {
+            DB::transaction(function () use ($idPengguna, $masuk, $tabelTulis) {
+                foreach ($tabelTulis as $tabel) {
                     if (! empty($masuk[$tabel]) && is_array($masuk[$tabel])) {
                         $this->tulis($idPengguna, $tabel, $masuk[$tabel]);
                     }
@@ -41,7 +47,7 @@ class Sinkron
             });
 
             $keluar = [];
-            foreach (array_keys(Skema::tabel()) as $tabel) {
+            foreach ($tabelBaca as $tabel) {
                 $baru = DB::table(Skema::namaDb($tabel))->where('id_pengguna', $idPengguna)->where('diubah', '>', $sejak)->get()
                     ->map(fn ($r) => Skema::dariDb($tabel, $r))->all();
                 if ($baru) {

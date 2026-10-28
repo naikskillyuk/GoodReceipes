@@ -7,8 +7,9 @@
     "test": "node --test tests/*.test.mjs",
     "dev": "node tools/dev-server.mjs",
     "sw": "node tools/perbarui-sw.mjs",
-    "e2e": "node tests/e2e/alur.mjs && node tests/e2e/masuk.mjs",
+    "e2e": "node tests/e2e/alur.mjs && node tests/e2e/masuk.mjs && node tests/e2e/toko.mjs",
     "e2e:masuk": "node tests/e2e/masuk.mjs",
+    "e2e:toko": "node tests/e2e/toko.mjs",
     "test:api": "node --test tests/api-laravel.mjs",
     "api": "cd backend && php artisan serve"
   },

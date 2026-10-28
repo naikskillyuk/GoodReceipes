@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-10c3e8969b';
+const VERSI = 'resep-efa4f72e7c';
 const FILE = [
   // <daftar-file>
   'config.js',
@@ -47,6 +47,7 @@ const FILE = [
   'js/layar/bagikan.js',
   'js/layar/bahan.js',
   'js/layar/beranda.js',
+  'js/layar/catat-pesanan.js',
   'js/layar/cetak-resep.js',
   'js/layar/daftar-resep.js',
   'js/layar/detail-eksperimen.js',
@@ -54,10 +55,19 @@ const FILE = [
   'js/layar/form-eksperimen.js',
   'js/layar/form-resep.js',
   'js/layar/hpp.js',
+  'js/layar/kasir.js',
   'js/layar/marketing.js',
+  'js/layar/menu-jual.js',
   'js/layar/paket.js',
+  'js/layar/pelanggan.js',
+  'js/layar/pengaturan-toko.js',
   'js/layar/pengaturan.js',
   'js/layar/penilai.js',
+  'js/layar/pesan-online.js',
+  'js/layar/pesanan.js',
+  'js/layar/produksi.js',
+  'js/layar/stok-bahan.js',
+  'js/layar/stok-makanan.js',
   'js/layar/ulasan.js',
   'js/lib/akun.js',
   'js/lib/db.js',
@@ -67,6 +77,7 @@ const FILE = [
   'js/lib/seed.js',
   'js/lib/skor.js',
   'js/lib/sync.js',
+  'js/lib/toko.js',
   'js/lib/units.js',
   'js/lib/util.js',
   'js/main.js',

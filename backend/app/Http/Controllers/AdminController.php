@@ -75,7 +75,9 @@ class AdminController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $status = (string) $request->query('status', 'semua');
+        // Akun toko (dibuat akun dapur) bukan pembeli aplikasi, jadi tidak ditampilkan di sini.
         $akun = User::query()
+            ->whereNull('id_pemilik')
             ->with('pembelian')
             ->withCount('sesi')
             ->when($q !== '', fn ($b) => $b->where(fn ($w) => $w
@@ -90,10 +92,10 @@ class AdminController extends Controller
             ->withQueryString();
 
         $ringkas = [
-            'akun' => User::count(),
+            'akun' => User::whereNull('id_pemilik')->count(),
             'lunas' => DB::table('pembelian')->where('lunas', true)->count(),
-            'belum' => User::whereDoesntHave('pembelian', fn ($p) => $p->where('lunas', true))->count(),
-            'nonaktif' => User::where('aktif', false)->count(),
+            'belum' => User::whereNull('id_pemilik')->whereDoesntHave('pembelian', fn ($p) => $p->where('lunas', true))->count(),
+            'nonaktif' => User::whereNull('id_pemilik')->where('aktif', false)->count(),
             'pendapatan' => (int) DB::table('pembelian')->where('lunas', true)->sum('jumlah'),
         ];
 

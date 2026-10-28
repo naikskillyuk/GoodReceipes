@@ -6,7 +6,8 @@ import { Ikon } from '../ui/ikon.js';
 import { IkonKategori } from '../ui/ikon-kategori.js';
 import { tautan } from '../ui/router.js';
 import { daftarJuara, ambilMerek, ringkasResep } from '../lib/repo.js';
-import { desimal1 } from '../lib/util.js';
+import { desimal1, rupiah } from '../lib/util.js';
+import { peranAkun, ringkasPenjualan, daftarPesanan, daftarStokBahan, daftarStokMakanan, STATUS_PESANAN } from '../lib/toko.js';
 
 function sapaan() {
   const j = new Date().getHours();
@@ -99,7 +100,76 @@ const MENU = [
   { href: '/resep?tujuan=marketing', label: 'Marketing', gambar: 'marketing' },
 ];
 
+// Baris kedua: dapur sampai penjualan.
+const MENU_JUAL = [
+  { href: '/stok-bahan', label: 'Stok & belanja', ikon: 'kotak', warna: '#e8f4df', tinta: '#2f6e1c' },
+  { href: '/produksi', label: 'Produksi', ikon: 'panci', warna: '#fde3d6', tinta: '#b4461b' },
+  { href: '/menu', label: 'Menu jual', ikon: 'buku', warna: '#fff1cc', tinta: '#8a5a00' },
+  { href: '/kasir', label: 'Kasir', ikon: 'struk', warna: '#e2e9f6', tinta: '#2a4170' },
+];
+const MENU_TOKO = [
+  { href: '/kasir', label: 'Kasir', ikon: 'struk', warna: '#e8f4df', tinta: '#2f6e1c' },
+  { href: '/pesanan', label: 'Pesanan', ikon: 'dompet', warna: '#fde3d6', tinta: '#b4461b' },
+  { href: '/stok-makanan', label: 'Stok makanan', ikon: 'kue', warna: '#fff1cc', tinta: '#8a5a00' },
+  { href: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan', warna: '#e2e9f6', tinta: '#2a4170' },
+];
+
+function UbinIkon({ m, hitung }) {
+  return html`<a class="menu-kotak" href=${tautan(m.href)}>
+    <span class="menu-gambar" style=${`background:${m.warna};color:${m.tinta}`}><${Ikon} nama=${m.ikon} ukuran=${28} /></span>
+    <span class="menu-label">${m.label}</span>
+    ${hitung > 0 && html`<span class="lencana" aria-label=${hitung + ' perlu perhatian'}>${hitung}</span>`}
+  </a>`;
+}
+
+/** Ringkasan penjualan hari ini (dapur dan toko). */
+function RingkasHariIni({ db }) {
+  const r = ringkasPenjualan(db);
+  return html`<a class="ringkas-jual" href=${tautan('/pesanan')} aria-label="Penjualan hari ini">
+    <div><small>Hari ini</small><b>${rupiah(r.omzet)}</b></div>
+    <div><small>Pesanan</small><b>${r.jumlahPesanan}</b></div>
+    <div class=${r.aktif ? 'sorot' : ''}><small>Perlu diproses</small><b>${r.aktif}</b></div>
+  </a>`;
+}
+
+/** Beranda akun toko: ringkasan hari ini, menu kasir, pesanan aktif, dan stok habis. */
+function BerandaToko({ k }) {
+  const { db } = k;
+  const nama = ((db.pengaturan.akun && db.pengaturan.akun.nama) || '').trim();
+  const merek = ambilMerek(db);
+  const aktif = daftarPesanan(db).filter((p) => ['baru', 'diproses', 'siap'].includes(p.status));
+  const habis = daftarStokMakanan(db).filter((s) => s.stok <= 0);
+  const hitung = { '/pesanan': aktif.length, '/stok-makanan': habis.length };
+  return html`<${Kerangka} k=${k} aktif="rumah" plus=${{ href: '/kasir', label: 'Pesanan baru' }}>
+    <header class="sapa">
+      <div class="sapa-isi">
+        <h1>Halo${nama ? ', ' + nama.split(/\s+/)[0] : ''} <span aria-hidden="true">👋</span></h1>
+        <p class="sapa-teks">${sapaan()} · <span class="sapa-merek-nama">${merek.nama}</span></p>
+      </div>
+    </header>
+    <div style="padding:16px 20px 0"><${RingkasHariIni} db=${db} /></div>
+    <nav class="menu-empat" aria-label="Menu">${MENU_TOKO.map((m) => html`<${UbinIkon} m=${m} hitung=${hitung[m.href]} />`)}</nav>
+    <div class="judul-bagian"><h2>Pesanan aktif</h2>${aktif.length > 0 && html`<a class="tautan-hijau" href=${tautan('/pesanan')}>Lihat semua</a>`}</div>
+    <div style="padding:0 20px" class="kolom">
+      ${aktif.length === 0 && html`<p class="bantu">Belum ada pesanan yang perlu diproses.</p>`}
+      ${aktif.slice(0, 6).map(
+        (p) => html`<a class="kartu-pesanan" key=${p.id} href=${tautan('/pesanan/' + p.id)}>
+          <div class="baris-pisah"><b>#${p.nomor}${p.nama ? ' · ' + p.nama : ''}</b><span class=${'lencana-status s-' + p.status}>${STATUS_PESANAN[p.status]}</span></div>
+          <small class="teks-kecil">${(p.item || []).map((i) => `${i.jumlah}× ${i.nama}`).join(', ')}</small>
+        </a>`,
+      )}
+      ${habis.length > 0 && html`<p class="bantu teks-buruk">Stok habis: ${habis.map((s) => s.resep.nama).join(', ')}.</p>`}
+    </div>
+    <div style="height:12px"></div>
+  <//>`;
+}
+
 export function Beranda({ k }) {
+  if (peranAkun(k.db) === 'toko') return html`<${BerandaToko} k=${k} />`;
+  return html`<${BerandaDapur} k=${k} />`;
+}
+
+function BerandaDapur({ k }) {
   const { db } = k;
   const juara = daftarJuara(db);
   const kembang = resepDikembangkan(db);
@@ -108,6 +178,8 @@ export function Beranda({ k }) {
   const nama = (db.pengaturan.namaPemilik || '').trim();
   const merek = ambilMerek(db);
   const hitung = { '/resep': jumlahResep, '/bahan': db.semua('Bahan').length };
+  const adaJualan = db.semua('Menu').length > 0 || db.semua('Pesanan').length > 0;
+  const hitungJual = { '/stok-bahan': daftarStokBahan(db).filter((x) => x.menipis && db.semua('MutasiBahan', (m) => m.idBahan === x.bahan.id).length).length };
 
   return html`<${Kerangka} k=${k} aktif="rumah" plus=${{ href: '/resep/baru', label: 'Resep baru' }}>
     <header class="sapa">
@@ -137,6 +209,8 @@ export function Beranda({ k }) {
         </a>`,
       )}
     </nav>
+    <nav class="menu-empat" aria-label="Dapur dan penjualan">${MENU_JUAL.map((m) => html`<${UbinIkon} m=${m} hitung=${hitungJual[m.href]} />`)}</nav>
+    ${adaJualan && html`<div style="padding:10px 20px 0"><${RingkasHariIni} db=${db} /></div>`}
 
     <div class="judul-bagian">
       <h2>Resep juara</h2>

@@ -68,6 +68,16 @@ class Akun
     /** Pesan untuk akun yang tidak boleh masuk, atau null bila boleh. */
     public function alasanDitolak(User $user): ?string
     {
+        if ($user->adalahToko()) {
+            if (! $user->aktif) {
+                return 'Akun toko ini sedang dinonaktifkan oleh akun dapur.';
+            }
+            if (! $user->pemilik || ! $user->pemilik->bolehMasuk()) {
+                return 'Akun dapur pemilik toko ini sedang tidak aktif.';
+            }
+
+            return null;
+        }
         if (! $user->aktif) {
             return 'Akun ini sedang tidak aktif. Hubungi penjual aplikasi.';
         }
@@ -89,7 +99,7 @@ class Akun
         if ($alasan = $this->alasanDitolak($user)) {
             return ['ok' => false, 'kode' => 'NONAKTIF', 'galat' => $alasan];
         }
-        if (! $user->email_verified_at) {
+        if (! $user->email_verified_at && ! $user->adalahToko()) {
             // Kata sandi pertama dikirim lewat email, jadi berhasil masuk = email terbukti miliknya.
             $user->forceFill(['email_verified_at' => now()])->save();
         }
@@ -169,6 +179,9 @@ class Akun
     public function lupaSandi(mixed $login): array
     {
         $user = $this->cari($login);
+        if ($user && $user->adalahToko()) {
+            return ['ok' => true, 'pesan' => 'Kata sandi akun toko diatur oleh akun dapur. Minta akun dapur membuat kata sandi baru di Pengaturan.'];
+        }
         if ($user && $user->aktif) {
             $token = Password::broker()->createToken($user);
             $url = rtrim((string) config('goodrecipes.frontend_url'), '/')
@@ -199,6 +212,111 @@ class Akun
         DB::table('sesi_masuk')->where('user_id', $user->id)->delete();
 
         return ['ok' => true, 'pesan' => 'Kata sandi baru tersimpan. Silakan masuk.', 'username' => $user->username];
+    }
+
+    // ---------- Akun toko (dikelola akun dapur) ----------
+
+    /** Daftar akun toko milik akun dapur ini. */
+    public function daftarToko(User $dapur): array
+    {
+        return ['ok' => true, 'akun' => $dapur->akunToko()->orderBy('id')->get()->map(fn (User $u) => $this->ringkasToko($u))->all()];
+    }
+
+    /** Buat akun toko. Username dipilih sendiri (huruf kecil, angka, titik, garis bawah). */
+    public function buatToko(User $dapur, mixed $nama, mixed $username, mixed $sandi): array
+    {
+        $nama = $this->teks($nama, 60);
+        $username = Str::lower($this->teks($username, 40));
+        if (mb_strlen($nama) < 2) {
+            return ['ok' => false, 'galat' => 'Nama akun toko minimal 2 huruf.'];
+        }
+        if (! preg_match('/^[a-z0-9._]{4,40}$/', $username)) {
+            return ['ok' => false, 'galat' => 'Username 4-40 karakter: huruf kecil, angka, titik, atau garis bawah.'];
+        }
+        if (User::where('username', $username)->exists()) {
+            return ['ok' => false, 'galat' => 'Username itu sudah dipakai. Pilih yang lain.'];
+        }
+        if ($galat = $this->periksaSandi($sandi)) {
+            return ['ok' => false, 'galat' => str_replace('baru ', '', $galat)];
+        }
+        if ($dapur->akunToko()->count() >= 20) {
+            return ['ok' => false, 'galat' => 'Maksimal 20 akun toko.'];
+        }
+        $u = User::create([
+            'name' => $nama,
+            'username' => $username,
+            // Email wajib unik di tabel users; akun toko tidak memakai email.
+            'email' => 'toko-'.bin2hex(random_bytes(6)).'@toko.invalid',
+            'password' => $sandi,
+            'aktif' => true,
+            'peran' => 'toko',
+            'id_pemilik' => $dapur->id,
+        ]);
+
+        return ['ok' => true, 'akun' => $this->ringkasToko($u)];
+    }
+
+    /** Ubah akun toko: nama, aktif, dan/atau kata sandi baru (semua sesinya keluar). */
+    public function ubahToko(User $dapur, mixed $id, array $req): array
+    {
+        $u = $this->tokoMilik($dapur, $id);
+        if (! $u) {
+            return ['ok' => false, 'galat' => 'Akun toko tidak ditemukan.'];
+        }
+        if (array_key_exists('nama', $req)) {
+            $nama = $this->teks($req['nama'], 60);
+            if (mb_strlen($nama) < 2) {
+                return ['ok' => false, 'galat' => 'Nama akun toko minimal 2 huruf.'];
+            }
+            $u->name = $nama;
+        }
+        $keluarkan = false;
+        if (array_key_exists('aktif', $req)) {
+            $u->aktif = (bool) $req['aktif'];
+            $keluarkan = ! $u->aktif;
+        }
+        if (isset($req['kataSandi']) && $req['kataSandi'] !== '') {
+            if ($galat = $this->periksaSandi($req['kataSandi'])) {
+                return ['ok' => false, 'galat' => $galat];
+            }
+            $u->password = $req['kataSandi'];
+            $keluarkan = true;
+        }
+        $u->save();
+        if ($keluarkan) {
+            DB::table('sesi_masuk')->where('user_id', $u->id)->delete();
+        }
+
+        return ['ok' => true, 'akun' => $this->ringkasToko($u)];
+    }
+
+    public function hapusToko(User $dapur, mixed $id): array
+    {
+        $u = $this->tokoMilik($dapur, $id);
+        if (! $u) {
+            return ['ok' => false, 'galat' => 'Akun toko tidak ditemukan.'];
+        }
+        $u->delete();
+
+        return ['ok' => true];
+    }
+
+    private function tokoMilik(User $dapur, mixed $id): ?User
+    {
+        return is_numeric($id) ? $dapur->akunToko()->where('id', (int) $id)->first() : null;
+    }
+
+    private function ringkasToko(User $u): array
+    {
+        $terakhir = DB::table('sesi_masuk')->where('user_id', $u->id)->max('terakhir_dipakai');
+
+        return [
+            'id' => $u->id,
+            'nama' => $u->name,
+            'username' => $u->username,
+            'aktif' => (bool) $u->aktif,
+            'terakhirDipakai' => $terakhir ? strtotime((string) $terakhir) * 1000 : null,
+        ];
     }
 
     public function cari(mixed $login): ?User

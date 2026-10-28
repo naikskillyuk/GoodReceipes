@@ -16,14 +16,14 @@ export function buatTautanNilai(token, scriptUrl) {
   return `${dasar}#/nilai/${token}` + (tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`);
 }
 
-function buatQR(teks, opsi) {
+export function buatQR(teks, opsi) {
   const qr = window.qrcode(0, 'M');
   qr.addData(teks);
   qr.make();
   return qr.createSvgTag(opsi);
 }
 
-async function salin(teks) {
+export async function salin(teks) {
   try {
     await navigator.clipboard.writeText(teks);
     return true;

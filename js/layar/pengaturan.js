@@ -8,6 +8,8 @@ import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { kompresLogo } from '../ui/gambar.js';
 import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
 import { daftarKategori, tambahKategori, pakaiKategori, WARNA_KATEGORI, ambilMerek, simpanMerek, NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
+import { peranAkun } from '../lib/toko.js';
+import { KartuAkunToko, KartuMayar, KartuTokoOnline } from './pengaturan-toko.js';
 
 function BarisKategori({ db, kat }) {
   const [warnaBuka, setWarnaBuka] = useState(false);
@@ -153,7 +155,8 @@ function KartuAkun({ k }) {
       ${namaBerubah && html`<button class="btn solid" style="align-self:flex-end" disabled=${sibuk} onClick=${simpanNama}>Simpan</button>`}
     </div>
     <div class="hasil-baris"><span>Username</span><b class="biasa">${akun.username || '–'}</b></div>
-    <div class="hasil-baris"><span>Email</span><b class="biasa" style="word-break:break-all">${akun.email || '–'}</b></div>
+    ${akun.email && html`<div class="hasil-baris"><span>Email</span><b class="biasa" style="word-break:break-all">${akun.email}</b></div>`}
+    <div class="hasil-baris"><span>Jenis akun</span><b class="biasa">${akun.peran === 'toko' ? 'Toko (kasir)' : 'Dapur (pemilik)'}</b></div>
     <div class="baris-btn">
       <button class="btn" onClick=${() => setDialog(true)}><${Ikon} nama="gembok" ukuran=${18} />Ganti kata sandi akun</button>
       <button class="btn bahaya" disabled=${sibuk} onClick=${keluar}>Keluar</button>
@@ -166,6 +169,15 @@ export function Pengaturan({ k }) {
   const { db } = k;
   const [katBaru, setKatBaru] = useState('');
   const kategori = daftarKategori(db);
+  if (peranAkun(db) === 'toko') {
+    return html`<${Kerangka} k=${k} aktif="pengaturan">
+      <${Hero} warna="var(--navy)" label="Pengaturan" judul="Pengaturan" kembali="/" />
+      <div class="isi"><div class="kolom" style="max-width:640px">
+        <${KartuAkun} k=${k} />
+        ${k.bisaPasang && html`<section class="kartu kolom"><h2 class="judul-kecil">Pasang aplikasi</h2><button class="btn solid" onClick=${k.pasang}>Pasang aplikasi</button></section>`}
+      </div></div>
+    <//>`;
+  }
 
   return html`<${Kerangka} k=${k} aktif="pengaturan">
     <${Hero} warna="var(--navy)" label="Pengaturan" judul="Pengaturan" kembali="/" />
@@ -176,6 +188,8 @@ export function Pengaturan({ k }) {
 
           <${KartuTampilan} k=${k} />
 
+          <${KartuTokoOnline} k=${k} />
+
           ${k.bisaPasang &&
           html`<section class="kartu kolom"><h2 class="judul-kecil">Pasang aplikasi</h2>
             <p class="bantu">Pasang ke layar utama supaya terbuka seperti aplikasi biasa, dan tetap bisa dipakai tanpa internet.</p>
@@ -183,6 +197,10 @@ export function Pengaturan({ k }) {
         </div>
 
         <div class="kolom">
+          <${KartuAkunToko} k=${k} />
+
+          <${KartuMayar} k=${k} />
+
           <section class="kartu kolom" aria-labelledby="h-kategori">
             <h2 class="judul-kecil" id="h-kategori">Kategori resep</h2>
             ${kategori.map((c) => html`<${BarisKategori} key=${c.id} db=${db} kat=${c} />`)}

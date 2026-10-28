@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Services\Akun;
 use App\Services\Foto;
+use App\Services\Mayar;
 use App\Services\Penilai;
+use App\Services\Penjualan;
 use App\Services\Sinkron;
 use App\Services\Situs;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -19,7 +22,8 @@ use Throwable;
  * Satu alamat /api. Isi permintaan: JSON {aksi, kunci?, ...}, dikirim sebagai text/plain agar
  * browser tidak mengirim preflight CORS.
  *
- * - Tanpa login : masuk, lupaSandi, aturSandi (akun), infoNilai, kirimNilai (penilai QR), dan infoSitus.
+ * - Tanpa login : masuk, lupaSandi, aturSandi (akun), infoNilai, kirimNilai (penilai QR), infoSitus,
+ *   dan infoToko, pesanOnline, statusPesanan (link pemesanan pembeli).
  *   Akun dibuat oleh admin di /admin; tidak ada pendaftaran sendiri.
  * - Dengan login: `kunci` berisi token sesi dari aksi `masuk`.
  */
@@ -31,7 +35,7 @@ class ApiController extends Controller
         return response()->json(['ok' => true, 'nama' => 'Good Receipes', 'versi' => config('goodrecipes.versi'), 'akun' => true]);
     }
 
-    public function handle(Request $request, Akun $akun, Sinkron $sinkron, Foto $foto, Penilai $penilai, Situs $situs): JsonResponse
+    public function handle(Request $request, Akun $akun, Sinkron $sinkron, Foto $foto, Penilai $penilai, Situs $situs, Penjualan $jual, Mayar $mayar): JsonResponse
     {
         $req = json_decode($request->getContent(), true);
         if (! is_array($req)) {
@@ -52,6 +56,23 @@ class ApiController extends Controller
             }
             if ($aksi === 'kirimNilai') {
                 return $this->keluar($penilai->kirim($req));
+            }
+
+            // Link pemesanan pembeli: hanya butuh token toko.
+            if ($aksi === 'infoToko') {
+                return $this->keluar($jual->infoToko($req['token'] ?? null));
+            }
+            if ($aksi === 'pesanOnline' || $aksi === 'statusPesanan') {
+                $k = 'toko:'.$aksi.':'.$request->ip();
+                $maks = $aksi === 'pesanOnline' ? (int) config('goodrecipes.pesanan_online_per_jam_per_ip') : 120;
+                if (RateLimiter::tooManyAttempts($k, $maks)) {
+                    return $this->keluar(['ok' => false, 'galat' => 'Terlalu banyak permintaan. Coba lagi beberapa saat lagi.']);
+                }
+                RateLimiter::hit($k, 3600);
+
+                return $this->keluar($aksi === 'pesanOnline'
+                    ? $jual->pesanOnline($req)
+                    : $jual->statusPesanan($req['token'] ?? null, $req['idPesanan'] ?? null));
             }
 
             // Akun tanpa login, dengan batas percobaan per alamat IP (dan per akun untuk masuk).
@@ -82,10 +103,31 @@ class ApiController extends Controller
                 return $this->keluar(['ok' => false, 'kode' => 'SESI', 'galat' => 'Sesi Anda sudah berakhir. Silakan masuk lagi.']);
             }
 
+            // Aksi khusus akun dapur (pemilik usaha).
+            $khususDapur = ['akunToko', 'buatAkunToko', 'ubahAkunToko', 'hapusAkunToko', 'infoMayar', 'aturMayar'];
+            if ($user->adalahToko() && in_array($aksi, $khususDapur, true)) {
+                return $this->keluar(['ok' => false, 'galat' => 'Hanya akun dapur yang bisa melakukan ini.']);
+            }
+            $toko = $user->adalahToko();
+
             return $this->keluar(match ($aksi) {
                 'ping' => ['ok' => true, 'versi' => config('goodrecipes.versi'), 'pengguna' => $user->untukAplikasi()],
-                'sinkron' => $sinkron->jalankan($user->id, is_array($req['baris'] ?? null) ? $req['baris'] : [], (int) ($req['sejak'] ?? 0)),
-                'unggahFoto' => ['ok' => true, 'url' => $foto->unggah(
+                'sinkron' => $sinkron->jalankan(
+                    $user->idData(),
+                    is_array($req['baris'] ?? null) ? $req['baris'] : [],
+                    (int) ($req['sejak'] ?? 0),
+                    $toko ? config('goodrecipes.tabel_toko_tulis') : null,
+                    $toko ? config('goodrecipes.tabel_toko_baca') : null,
+                ),
+                'akunToko' => $akun->daftarToko($user),
+                'buatAkunToko' => $akun->buatToko($user, $req['nama'] ?? '', $req['username'] ?? '', $req['kataSandi'] ?? ''),
+                'ubahAkunToko' => $akun->ubahToko($user, $req['id'] ?? null, array_intersect_key($req, array_flip(['nama', 'aktif', 'kataSandi']))),
+                'hapusAkunToko' => $akun->hapusToko($user, $req['id'] ?? null),
+                'infoMayar' => $this->infoMayar($request, $user),
+                'aturMayar' => $this->aturMayar($request, $user, $mayar, $req),
+                'bayarMayar' => $jual->bayarMayarKasir($user, $req),
+                'cekBayar' => $jual->cekBayar($user, $req['idPembayaran'] ?? null),
+                'unggahFoto' => $toko ? ['ok' => false, 'galat' => 'Akun toko tidak bisa mengunggah foto.'] : ['ok' => true, 'url' => $foto->unggah(
                     $user->id,
                     (string) ($req['mime'] ?? ''),
                     (string) ($req['base64'] ?? ''),
@@ -106,6 +148,62 @@ class ApiController extends Controller
 
             return $this->keluar(['ok' => false, 'galat' => $pesan]);
         }
+    }
+
+    /** Webhook Mayar. Selalu menjawab 200 supaya Mayar tidak mengulang terus; status dicek ulang ke API Mayar. */
+    public function webhookMayar(Request $request, string $token, Penjualan $jual): JsonResponse
+    {
+        try {
+            $isi = json_decode($request->getContent(), true);
+            $jual->webhook($token, is_array($isi) ? $isi : []);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function alamatWebhook(Request $request, User $user): string
+    {
+        return $user->token_webhook ? rtrim($request->getSchemeAndHttpHost(), '/').'/api/mayar/'.$user->token_webhook : '';
+    }
+
+    private function infoMayar(Request $request, User $user): array
+    {
+        return [
+            'ok' => true,
+            'aktif' => (string) $user->mayar_kunci !== '',
+            'sandbox' => (bool) $user->mayar_sandbox,
+            'webhook' => $this->alamatWebhook($request, $user),
+        ];
+    }
+
+    /** Simpan / hapus kunci API Mayar akun dapur, lalu daftarkan alamat webhook ke Mayar. */
+    private function aturMayar(Request $request, User $user, Mayar $mayar, array $req): array
+    {
+        if (! empty($req['hapus'])) {
+            $user->forceFill(['mayar_kunci' => null])->save();
+
+            return $this->infoMayar($request, $user) + ['pesan' => 'Pembayaran online dimatikan.'];
+        }
+        $kunci = is_string($req['kunciApi'] ?? null) ? trim($req['kunciApi']) : '';
+        if (strlen($kunci) < 20 || strlen($kunci) > 2000 || preg_match('/\s/', $kunci)) {
+            return ['ok' => false, 'galat' => 'Kunci API Mayar tidak valid. Salin dari menu Integrasi > API Key di dashboard Mayar.'];
+        }
+        $user->forceFill([
+            'mayar_kunci' => $kunci,
+            'mayar_sandbox' => ! empty($req['sandbox']),
+            'token_webhook' => $user->token_webhook ?: Str::random(40),
+        ])->save();
+        $webhook = $this->alamatWebhook($request, $user);
+        $terdaftar = $mayar->daftarWebhook($user, $webhook);
+
+        return $this->infoMayar($request, $user) + [
+            'webhookTerdaftar' => $terdaftar,
+            'pesan' => $terdaftar
+                ? 'Kunci Mayar tersimpan dan alamat webhook sudah didaftarkan.'
+                : 'Kunci Mayar tersimpan, tetapi alamat webhook belum bisa didaftarkan otomatis. Tempel alamat webhook di dashboard Mayar (Integrasi > Webhook).',
+        ];
     }
 
     private const BATAS = ['masuk' => 10, 'lupaSandi' => 5, 'aturSandi' => 10];

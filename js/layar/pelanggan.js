@@ -1,0 +1,157 @@
+// Pelanggan (tercatat otomatis dari nomor WhatsApp di setiap pesanan) dan kode promo.
+
+import { html, useState } from '../../vendor/preact-htm.js';
+import { Kerangka, Hero, Stat, Kosong, Tab, InputRupiah, InputAngka, unduhBerkas } from '../ui/komponen.js';
+import { Ikon } from '../ui/ikon.js';
+import { tanya, tampilToast } from '../ui/pesan.js';
+import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, peranAkun } from '../lib/toko.js';
+import { rupiah, tanggal, tampilJumlah } from '../lib/util.js';
+
+const UNTUK = { semua: 'Semua pembeli', baru: 'Pelanggan baru (pesanan pertama)', lama: 'Pelanggan lama (pernah memesan)' };
+
+function csv(daftar) {
+  const sel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const baris = [['Nama', 'WhatsApp', 'Jumlah pesanan', 'Total belanja', 'Pesanan terakhir', 'Terdaftar']];
+  for (const d of daftar) baris.push([d.pelanggan.nama, tampilHp(d.pelanggan.hp), d.jumlahPesanan, Math.round(d.totalBelanja), d.terakhir ? tanggal(d.terakhir) : '', tanggal(d.pelanggan.dibuat)]);
+  return '﻿' + baris.map((b) => b.map(sel).join(',')).join('\n');
+}
+
+function Pelanggan({ db }) {
+  const [cari, setCari] = useState('');
+  const semua = daftarPelanggan(db);
+  const q = cari.trim().toLowerCase();
+  const daftar = semua.filter((d) => !q || `${d.pelanggan.nama} ${d.pelanggan.hp} ${tampilHp(d.pelanggan.hp)}`.toLowerCase().includes(q));
+  return html`<div class="kolom">
+    <p class="bantu">Pelanggan tercatat otomatis dari nomor WhatsApp yang diisi di kasir atau di link pemesanan. Pakai untuk mengirim promo lewat WhatsApp.</p>
+    <div class="cari-baris">
+      <input class="input" type="search" placeholder="Cari nama atau nomor…" aria-label="Cari pelanggan" value=${cari} onInput=${(e) => setCari(e.target.value)} />
+      <button class="btn" disabled=${!semua.length} onClick=${() => unduhBerkas('pelanggan.csv', csv(semua), 'text/csv;charset=utf-8')}><${Ikon} nama="unduh" ukuran=${18} />CSV</button>
+    </div>
+    ${semua.length === 0 && html`<${Kosong} judul="Belum ada pelanggan" teks="Isi nomor WhatsApp pembeli saat membuat pesanan." />`}
+    <div class="daftar daftar-lebar">
+      ${daftar.map(
+        (d) => html`<div class="baris-stok" key=${d.pelanggan.id}>
+          <span class="teks"><b>${d.pelanggan.nama || 'Tanpa nama'}</b><small>${tampilHp(d.pelanggan.hp)} · ${d.jumlahPesanan} pesanan${d.terakhir ? ' · terakhir ' + tanggal(d.terakhir) : ''}</small></span>
+          <span class="baris-aksi">
+            <b>${rupiah(d.totalBelanja)}</b>
+            <a class="ikon-btn kecil" href=${`https://wa.me/${d.pelanggan.hp}`} target="_blank" rel="noopener" aria-label=${'WhatsApp ' + (d.pelanggan.nama || d.pelanggan.hp)}><${Ikon} nama="kirim" ukuran=${16} /></a>
+          </span>
+        </div>`,
+      )}
+    </div>
+  </div>`;
+}
+
+const PROMO_BARU = { kode: '', nama: '', jenis: 'persen', nilai: 10, maksDiskon: 0, minBelanja: 0, untuk: 'semua', mulai: null, sampai: null, kuota: 0, aktif: true, online: true };
+const keTanggal = (ts) => (ts ? new Date(ts - new Date(ts).getTimezoneOffset() * 60000).toISOString().slice(0, 10) : '');
+const dariTanggal = (teks, akhir = false) => (teks ? new Date(teks + (akhir ? 'T23:59:59' : 'T00:00:00')).getTime() : null);
+
+function FormPromo({ db, promo, onSelesai }) {
+  const [d, setD] = useState(() => ({ ...PROMO_BARU, ...(promo || {}) }));
+  const [galat, setGalat] = useState('');
+  const ubah = (patch) => (setD({ ...d, ...patch }), setGalat(''));
+  const simpan = () => {
+    const kode = d.kode.trim().toUpperCase().replace(/\s+/g, '');
+    if (!/^[A-Z0-9_-]{3,20}$/.test(kode)) return setGalat('Kode 3-20 huruf/angka tanpa spasi, mis. HEMAT10.');
+    const lain = cariPromo(db, kode);
+    if (lain && lain.id !== d.id) return setGalat('Kode itu sudah dipakai promo lain.');
+    if (!(d.nilai > 0)) return setGalat('Isi besar diskon.');
+    if (d.jenis === 'persen' && d.nilai > 100) return setGalat('Diskon persen maksimal 100.');
+    db.simpan('Promo', { ...d, kode, nama: d.nama.trim(), maksDiskon: d.maksDiskon || 0, minBelanja: d.minBelanja || 0, kuota: d.kuota || 0 });
+    tampilToast(`Promo ${kode} disimpan.`);
+    onSelesai();
+  };
+  const hapus = async () => {
+    if (await tanya({ judul: `Hapus promo ${d.kode}?`, teks: 'Pesanan yang sudah memakai kode ini tidak berubah.', ya: 'Hapus', bahaya: true })) {
+      db.hapus('Promo', d.id);
+      onSelesai();
+    }
+  };
+  return html`<section class="kartu aktif-hijau kolom">
+    <div class="dua-kolom">
+      <label class="bidang"><span>Kode promo</span><input class="input" maxlength="20" style="text-transform:uppercase" value=${d.kode} placeholder="HEMAT10" onInput=${(e) => ubah({ kode: e.target.value })} /></label>
+      <label class="bidang"><span>Nama (opsional)</span><input class="input" maxlength="60" value=${d.nama} placeholder="Promo pembukaan" onInput=${(e) => ubah({ nama: e.target.value })} /></label>
+    </div>
+    <div class="chips" role="group" aria-label="Jenis diskon">
+      <button type="button" class=${'chip' + (d.jenis === 'persen' ? ' aktif' : '')} onClick=${() => ubah({ jenis: 'persen' })}>Persen (%)</button>
+      <button type="button" class=${'chip' + (d.jenis === 'nominal' ? ' aktif' : '')} onClick=${() => ubah({ jenis: 'nominal' })}>Potongan (Rp)</button>
+    </div>
+    <div class="dua-kolom">
+      ${d.jenis === 'persen'
+        ? html`<label class="bidang"><span>Diskon (%)</span><${InputAngka} kelas="input" nilai=${d.nilai} onUbah=${(n) => ubah({ nilai: n })} /></label>
+            <label class="bidang"><span>Maks. potongan (Rp, opsional)</span><${InputRupiah} kelas="input" nilai=${d.maksDiskon} onUbah=${(n) => ubah({ maksDiskon: n })} /></label>`
+        : html`<label class="bidang"><span>Potongan (Rp)</span><${InputRupiah} kelas="input" nilai=${d.nilai} onUbah=${(n) => ubah({ nilai: n })} /></label>`}
+    </div>
+    <div class="dua-kolom">
+      <label class="bidang"><span>Minimal belanja (Rp)</span><${InputRupiah} kelas="input" nilai=${d.minBelanja} onUbah=${(n) => ubah({ minBelanja: n })} /></label>
+      <label class="bidang"><span>Kuota pemakaian (0 = tanpa batas)</span><${InputAngka} kelas="input" nilai=${d.kuota} onUbah=${(n) => ubah({ kuota: n })} /></label>
+    </div>
+    <label class="bidang"><span>Untuk siapa</span>
+      <select class="pilih" value=${d.untuk} onChange=${(e) => ubah({ untuk: e.target.value })}>
+        ${Object.entries(UNTUK).map(([k, v]) => html`<option value=${k} selected=${d.untuk === k}>${v}</option>`)}
+      </select>
+    </label>
+    <div class="dua-kolom">
+      <label class="bidang"><span>Mulai (opsional)</span><input class="input" type="date" value=${keTanggal(d.mulai)} onInput=${(e) => ubah({ mulai: dariTanggal(e.target.value) })} /></label>
+      <label class="bidang"><span>Sampai (opsional)</span><input class="input" type="date" value=${keTanggal(d.sampai)} onInput=${(e) => ubah({ sampai: dariTanggal(e.target.value, true) })} /></label>
+    </div>
+    <div class="baris-saklar">
+      <label class="saklar"><input type="checkbox" checked=${!!d.aktif} onChange=${(e) => ubah({ aktif: e.target.checked })} /><span>Aktif</span></label>
+      <label class="saklar"><input type="checkbox" checked=${!!d.online} onChange=${(e) => ubah({ online: e.target.checked })} /><span>Berlaku di link pemesanan</span></label>
+    </div>
+    ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+    <div class="baris-btn">
+      <button class="btn solid lebar" onClick=${simpan}>Simpan promo</button>
+      <button class="btn abu lebar" onClick=${onSelesai}>Batal</button>
+    </div>
+    ${d.id && html`<button class="btn bahaya lebar" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${18} />Hapus promo</button>`}
+  </section>`;
+}
+
+function ringkasPromo(p) {
+  const besar = p.jenis === 'persen' ? `${tampilJumlah(p.nilai)}%${p.maksDiskon > 0 ? ' maks. ' + rupiah(p.maksDiskon) : ''}` : rupiah(p.nilai);
+  return [
+    besar,
+    p.minBelanja > 0 && 'min. ' + rupiah(p.minBelanja),
+    p.untuk !== 'semua' && (p.untuk === 'baru' ? 'pelanggan baru' : 'pelanggan lama'),
+    p.sampai && 's.d. ' + tanggal(p.sampai),
+    p.online ? 'kasir + online' : 'kasir saja',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function Promo({ db, bisaUbah }) {
+  const [buka, setBuka] = useState('');
+  const daftar = daftarPromo(db);
+  return html`<div class="kolom">
+    ${bisaUbah && buka !== 'baru' && html`<button class="btn solid" onClick=${() => setBuka('baru')}><${Ikon} nama="tag" ukuran=${18} />Promo baru</button>`}
+    ${buka === 'baru' && html`<${FormPromo} db=${db} promo=${null} onSelesai=${() => setBuka('')} />`}
+    ${daftar.length === 0 && buka !== 'baru' && html`<${Kosong} judul="Belum ada promo" teks=${bisaUbah ? 'Buat kode promo untuk pelanggan baru, pelanggan setia, atau momen tertentu.' : 'Akun dapur belum membuat promo.'} />`}
+    <div class="daftar daftar-lebar">
+      ${daftar.map(({ promo: p, dipakai }) =>
+        buka === p.id
+          ? html`<div style="grid-column:1/-1" key=${p.id}><${FormPromo} db=${db} promo=${p} onSelesai=${() => setBuka('')} /></div>`
+          : html`<button class=${'baris-stok' + (p.aktif ? '' : ' mati')} key=${p.id} disabled=${!bisaUbah} onClick=${() => setBuka(p.id)}>
+              <span class="teks"><b>${p.kode}${p.nama ? ' · ' + p.nama : ''}</b><small>${ringkasPromo(p)}</small></span>
+              <span class="angka-stok"><b>${dipakai}${p.kuota > 0 ? '/' + p.kuota : ''}</b><small>${p.aktif ? 'dipakai' : 'nonaktif'}</small></span>
+            </button>`,
+      )}
+    </div>
+  </div>`;
+}
+
+export function PelangganPromo({ k }) {
+  const { db, rute } = k;
+  const tab = rute.kueri.tab === 'promo' ? 'promo' : 'pelanggan';
+  return html`<${Kerangka} k=${k} aktif="pelanggan">
+    <${Hero} warna="var(--navy)" label="Toko" judul="Pelanggan & promo" kembali="/" stat=${html`<${Stat} nilai=${db.semua('Pelanggan').length} label="pelanggan" />`} />
+    <div class="isi">
+      <${Tab} item=${[
+        { label: 'Pelanggan', href: '/pelanggan', aktif: tab === 'pelanggan' },
+        { label: 'Kode promo', href: '/pelanggan?tab=promo', aktif: tab === 'promo' },
+      ]} />
+      ${tab === 'pelanggan' ? html`<${Pelanggan} db=${db} />` : html`<${Promo} db=${db} bisaUbah=${peranAkun(db) === 'dapur'} />`}
+    </div>
+  <//>`;
+}

@@ -8,6 +8,7 @@ import { kompres } from './gambar.js';
 import { tampilToast } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
+import { peranAkun } from '../lib/toko.js';
 
 /** Nama aplikasi untuk judul: kata terakhir diberi warna hijau (mis. "Good <em>Receipes</em>"). */
 export function NamaMerek({ nama }) {
@@ -32,12 +33,31 @@ export function LogoMerek({ src, ukuran = 40, kelas = '' }) {
   />`;
 }
 
-const MENU = [
-  { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah' },
-  { kunci: 'resep', jalur: '/resep', label: 'Daftar Resep', ikon: 'resep' },
-  { kunci: 'bahan', jalur: '/bahan', label: 'Daftar Bahan', ikon: 'keranjang' },
+// pil = tampil di navigasi bawah HP (maks. 5). Semua tampil di sisi kiri laptop.
+const MENU_DAPUR = [
+  { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
+  { kunci: 'resep', jalur: '/resep', label: 'Daftar Resep', ikon: 'resep', pil: true },
+  { kunci: 'bahan', jalur: '/bahan', label: 'Daftar Bahan', ikon: 'keranjang', pil: true },
+  { kunci: 'stok-bahan', jalur: '/stok-bahan', label: 'Stok & Belanja', ikon: 'kotak' },
+  { kunci: 'produksi', jalur: '/produksi', label: 'Produksi', ikon: 'panci' },
+  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Makanan', ikon: 'kue' },
+  { kunci: 'menu', jalur: '/menu', label: 'Menu Jual', ikon: 'buku' },
+  { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk' },
+  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
+  { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
+  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan & Promo', ikon: 'pelanggan' },
   { kunci: 'ulasan', jalur: '/ulasan', label: 'Ulasan', ikon: 'obrolan' },
-  { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi' },
+  { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
+];
+const MENU_TOKO = [
+  { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
+  { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk', pil: true },
+  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
+  { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
+  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Makanan', ikon: 'kue', pil: true },
+  { kunci: 'menu', jalur: '/menu', label: 'Menu Jual', ikon: 'buku' },
+  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan & Promo', ikon: 'pelanggan' },
+  { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
 ];
 
 /**
@@ -47,7 +67,9 @@ const MENU = [
  */
 export function Kerangka({ k, aktif, plus, children }) {
   const { db } = k;
-  const kategori = daftarKategori(db);
+  const toko = peranAkun(db) === 'toko';
+  const MENU = toko ? MENU_TOKO : MENU_DAPUR;
+  const kategori = toko ? [] : daftarKategori(db);
   const kategoriAktif = k.rute.kueri.kat || '';
   const merek = ambilMerek(db);
   return html`<div class="app">
@@ -76,7 +98,7 @@ export function Kerangka({ k, aktif, plus, children }) {
       <div class="halaman">${children}</div>
       <div class="bawah">
         <nav class="nav-pil" aria-label="Navigasi">
-          ${MENU.map(
+          ${MENU.filter((m) => m.pil).map(
             (m) => html`<a href=${tautan(m.jalur)} class=${aktif === m.kunci ? 'aktif' : ''} aria-label=${m.label} aria-current=${aktif === m.kunci ? 'page' : null}>
               <${Ikon} nama=${m.ikon} />
             </a>`,

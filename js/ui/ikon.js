@@ -46,6 +46,14 @@ const JALUR = {
   mata: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
   gembok: 'M6 11h12v9H6v-9zM8 11V8a4 4 0 018 0v3',
   kirim: 'M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z',
+  struk: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3zM9 8h6M9 12h6M9 16h3',
+  kotak: 'M3 7l9-4 9 4v10l-9 4-9-4V7zM3 7l9 4 9-4M12 11v10',
+  panci: 'M4 10h16v6a4 4 0 01-4 4H8a4 4 0 01-4-4v-6zM2 10h20M9 7c0-1.5 1-2 1-4M14 7c0-1.5 1-2 1-4',
+  tag: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
+  pelanggan: 'M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2 20a7 7 0 0114 0M16 4.5a3.5 3.5 0 010 6.5M18 14a6 6 0 014 6',
+  dompet: 'M4 7h15a1 1 0 011 1v11a1 1 0 01-1 1H4V7zM4 7l12-3v3M16 13.5h.01',
+  toko: 'M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6',
+  buku: 'M5 4h13v16H7a2 2 0 01-2-2V4zM5 18a2 2 0 012-2h11M9 8h6M9 11h4',
 };
 
 export function Ikon({ nama, ukuran = 24, tebal = 2.2, kelas = '' }) {

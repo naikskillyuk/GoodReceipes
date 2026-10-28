@@ -71,7 +71,8 @@ export async function masukAkun(db, url, { login, kataSandi }, opsi) {
   if (db.meta.idPengguna !== pengguna.id) {
     await db.hapusSemua();
     db.aturMeta({ idPengguna: pengguna.id });
-    pastikanKategoriAwal(db);
+    // Akun toko memakai kategori milik akun dapur (tidak membuat sendiri).
+    if (pengguna.peran !== 'toko') pastikanKategoriAwal(db);
   }
   db.aturPengaturan({ scriptUrl: url, kunci: jawab.sesi, akun: pengguna, namaPemilik: pengguna.nama });
   // Simpan sesi seketika (bukan menunggu jeda tulis), supaya tidak hilang bila halaman langsung dimuat ulang.

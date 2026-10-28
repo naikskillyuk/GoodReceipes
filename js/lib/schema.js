@@ -30,6 +30,8 @@ export const TABEL = {
     kolom: {
       id: 't', nama: 't', merek: 't', beliDi: 't', fotoUrl: 't', hargaBeli: 'n', isiKemasan: 'n',
       satuanBeli: 't', hargaDiperbarui: 'n',
+      // Batas stok menipis, dalam satuan dasar (g / ml / pcs).
+      stokMinimum: 'n',
     },
     lokal: ['fotoLokal'],
   },
@@ -85,15 +87,79 @@ export const TABEL = {
     awalan: 'mkt',
     kolom: { id: 't', idResep: 't', jenis: 't', judul: 't', alasan: 't', status: 't', dibuat: 'n' },
   },
+  // ---------- Stok, produksi, penjualan ----------
+  // Stok = jumlah semua mutasi (baris hanya ditambah), supaya aman dipakai banyak perangkat.
+  // MutasiBahan.jumlah dalam satuan dasar bahan (g / ml / pcs): + masuk (beli), − keluar (produksi).
+  // jenis: 'beli' | 'produksi' | 'koreksi'. harga = total harga belanja (jenis 'beli').
+  MutasiBahan: {
+    awalan: 'mbh',
+    kolom: { id: 't', idBahan: 't', jumlah: 'n', jenis: 't', idRef: 't', harga: 'n', catatan: 't', waktu: 'n' },
+  },
+  // Satu kali produksi di dapur: `kali` resep dari eksperimen idEksperimen, menghasilkan `hasil` porsi.
+  Produksi: {
+    awalan: 'prd',
+    kolom: { id: 't', idResep: 't', idEksperimen: 't', kali: 'n', hasil: 'n', hppPorsi: 'n', catatan: 't', waktu: 'n' },
+  },
+  // Stok makanan jadi per resep (dalam satuan porsi resep). jenis: 'produksi' | 'jual' | 'koreksi' | 'rusak'.
+  MutasiMakanan: {
+    awalan: 'mmk',
+    kolom: { id: 't', idResep: 't', jumlah: 'n', jenis: 't', idRef: 't', catatan: 't', waktu: 'n' },
+  },
+  // Menu yang dijual toko. jenis 'resep' | 'paket'; idRef = id resep/paket. online = tampil di link pemesanan.
+  Menu: {
+    awalan: 'mnu',
+    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n' },
+  },
+  // Pesanan. item = [{idMenu, nama, harga, jumlah}] (idMenu kosong = item di luar menu). sumber 'kasir' | 'online' | 'manual'.
+  // Pesanan manual: saluran (WhatsApp, Telepon, ...), jadwal ambil/antar (ms), alamat antar, ongkir.
+  // status: 'menunggu' (online, belum dibayar) | 'baru' | 'diproses' | 'siap' | 'selesai' | 'batal'.
+  // Status bayar dibaca dari tabel Pembayaran (ada yang lunas = lunas).
+  Pesanan: {
+    awalan: 'psn',
+    kolom: {
+      id: 't', nomor: 't', sumber: 't', idPelanggan: 't', nama: 't', hp: 't', catatan: 't', item: 'j',
+      subtotal: 'n', diskon: 'n', kodePromo: 't', total: 'n', status: 't', oleh: 't', waktu: 'n',
+      saluran: 't', jadwal: 'n', alamat: 't', ongkir: 'n',
+    },
+  },
+  // metode 'tunai' | 'transfer' | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.
+  Pembayaran: {
+    awalan: 'byr',
+    kolom: {
+      id: 't', idPesanan: 't', metode: 't', jumlah: 'n', diterima: 'n', kembalian: 'n', status: 't',
+      idMayar: 't', linkMayar: 't', waktu: 'n', lunasPada: 'n',
+    },
+  },
+  // Pelanggan dikenali dari nomor WhatsApp (hp: hanya angka, diawali 62).
+  Pelanggan: {
+    awalan: 'plg',
+    kolom: { id: 't', nama: 't', hp: 't', catatan: 't', dibuat: 'n' },
+  },
+  // Kode promo. jenis 'persen' | 'nominal'. untuk: 'semua' | 'baru' (belum pernah pesan) | 'lama'.
+  Promo: {
+    awalan: 'prm',
+    kolom: {
+      id: 't', kode: 't', nama: 't', jenis: 't', nilai: 'n', minBelanja: 'n', maksDiskon: 'n', untuk: 't',
+      mulai: 'n', sampai: 'n', kuota: 'n', aktif: 'b', online: 'b',
+    },
+  },
   // Satu baris saja (id tetap 'stl_merek'): nama dan logo aplikasi, ikut tersinkron dan tampil di halaman penilai.
   Setelan: {
     awalan: 'stl',
-    kolom: { id: 't', namaAplikasi: 't', logoUrl: 't' },
+    // Baris 'stl_toko': nama toko, link pemesanan (tokenToko), buka/tutup, alamat, WhatsApp.
+    kolom: {
+      id: 't', namaAplikasi: 't', logoUrl: 't',
+      namaToko: 't', tokenToko: 't', tokoBuka: 'b', alamatToko: 't', waToko: 't', catatanToko: 't',
+    },
     lokal: ['logoLokal'],
   },
 };
 
 export const NAMA_TABEL = Object.keys(TABEL);
+
+// Akun toko hanya menerima dan mengirim tabel berikut (sama dengan backend/config/goodrecipes.php).
+export const TABEL_TOKO_BACA = ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan'];
+export const TABEL_TOKO_TULIS = ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'];
 
 const META = { diubah: 'n', dihapus: 'b' };
 

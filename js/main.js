@@ -23,6 +23,16 @@ import { LayarPenilai } from './layar/penilai.js';
 import { Ulasan } from './layar/ulasan.js';
 import { Pengaturan } from './layar/pengaturan.js';
 import { DaftarPaket, DetailPaket } from './layar/paket.js';
+import { StokBahan } from './layar/stok-bahan.js';
+import { Produksi } from './layar/produksi.js';
+import { StokMakanan } from './layar/stok-makanan.js';
+import { MenuJual } from './layar/menu-jual.js';
+import { Kasir } from './layar/kasir.js';
+import { CatatPesanan } from './layar/catat-pesanan.js';
+import { DaftarPesanan, DetailPesanan } from './layar/pesanan.js';
+import { PelangganPromo } from './layar/pelanggan.js';
+import { PesanOnline, TiruanMayar } from './layar/pesan-online.js';
+import { peranAkun, RUTE_TOKO } from './lib/toko.js';
 
 // Data utama ada di database server. Perangkat hanya menyimpan salinan supaya cepat dan tetap
 // terbuka saat sinyal putus; setiap perubahan dikirim ke server sesaat setelah disimpan.
@@ -30,10 +40,29 @@ const KIRIM_SETELAH_MS = 1000;
 const AMBIL_TIAP_MS = 20 * 1000; // penilaian QR dan perubahan dari perangkat lain
 const JEDA_PESAN_GAGAL_MS = 60 * 1000;
 
+// Halaman tanpa login: penilai QR, link pemesanan pembeli, dan halaman bayar tiruan (server uji).
+const RUTE_TERBUKA = ['nilai', 'pesan', 'tiruan-mayar'];
+
+function TidakAda() {
+  return html`<div class="penilai"><div class="isi"><${Kosong} judul="Halaman tidak ditemukan" teks="Alamat ini tidak dikenal."><a class="btn solid" href="#/">Ke Beranda</a><//></div></div>`;
+}
+
 function Layar({ k }) {
   const [a, b, c, d] = k.rute.bagian;
-  if (!a) return html`<${Beranda} k=${k} />`;
   if (a === 'nilai' && b) return html`<${LayarPenilai} key=${b} k=${k} token=${b} />`;
+  if (a === 'pesan' && b) return html`<${PesanOnline} key=${b} k=${k} token=${b} />`;
+  if (a === 'tiruan-mayar' && b) return html`<${TiruanMayar} k=${k} id=${b} />`;
+  // Akun toko hanya membuka halaman penjualan.
+  if (peranAkun(k.db) === 'toko' && !RUTE_TOKO.includes(a || '')) return html`<${TidakAda} />`;
+  if (!a) return html`<${Beranda} k=${k} />`;
+  if (a === 'stok-bahan') return html`<${StokBahan} k=${k} />`;
+  if (a === 'produksi') return html`<${Produksi} k=${k} />`;
+  if (a === 'stok-makanan') return html`<${StokMakanan} k=${k} />`;
+  if (a === 'menu') return html`<${MenuJual} k=${k} />`;
+  if (a === 'kasir') return html`<${Kasir} k=${k} />`;
+  if (a === 'catat-pesanan') return html`<${CatatPesanan} key=${k.rute.kueri.id || 'baru'} k=${k} />`;
+  if (a === 'pesanan') return b ? html`<${DetailPesanan} key=${b} k=${k} id=${b} />` : html`<${DaftarPesanan} k=${k} />`;
+  if (a === 'pelanggan') return html`<${PelangganPromo} k=${k} />`;
   if (a === 'resep') {
     if (!b) return html`<${DaftarResep} k=${k} />`;
     if (b === 'baru') return html`<${FormResep} k=${k} />`;
@@ -52,7 +81,7 @@ function Layar({ k }) {
   if (a === 'bahan') return html`<${DaftarBahan} k=${k} />`;
   if (a === 'ulasan') return html`<${Ulasan} k=${k} />`;
   if (a === 'pengaturan') return html`<${Pengaturan} k=${k} />`;
-  return html`<div class="penilai"><div class="isi"><${Kosong} judul="Halaman tidak ditemukan" teks="Alamat ini tidak dikenal."><a class="btn solid" href="#/">Ke Beranda</a><//></div></div>`;
+  return html`<${TidakAda} />`;
 }
 
 function App({ db, penyinkron, peringatan, pasangan }) {
@@ -61,9 +90,9 @@ function App({ db, penyinkron, peringatan, pasangan }) {
   const [status, setStatus] = useState(() => penyinkron.status);
   const [galat, ulangi] = useErrorBoundary((e) => console.error(e));
 
-  const rutePenilai = rute.bagian[0] === 'nilai';
+  const rutePenilai = RUTE_TERBUKA.includes(rute.bagian[0]);
   const ruteAturSandi = rute.bagian[0] === 'atur-sandi';
-  // Penilai dan tautan atur kata sandi selalu terbuka; selain itu wajib masuk akun.
+  // Penilai, link pemesanan, dan tautan atur kata sandi selalu terbuka; selain itu wajib masuk akun.
   const perluAkun = !rutePenilai && !ruteAturSandi && !sudahMasuk(db);
 
   // Nama dan logo aplikasi di judul dan ikon tab (layar penilai memakai merek dari server, bukan dari perangkat ini).
@@ -109,7 +138,7 @@ function App({ db, penyinkron, peringatan, pasangan }) {
       const p = db.pengaturan;
       if (!p.scriptUrl || !p.kunci) return;
       if (navigator.onLine === false) return;
-      if (bacaHash().bagian[0] === 'nilai') return;
+      if (RUTE_TERBUKA.includes(bacaHash().bagian[0]) && !sudahMasuk(db)) return;
       sinkronSekarang().catch(() => {});
     };
     let tunda = null;
@@ -169,7 +198,8 @@ async function mulai() {
     await db.muat();
     peringatan = 'Browser ini tidak menyimpan salinan di perangkat (mungkin mode pribadi). Data tetap tersimpan ke server selama ada internet.';
   }
-  if (bacaHash().bagian[0] !== 'nilai') pastikanKategoriAwal(db);
+  const terbuka = RUTE_TERBUKA.includes(bacaHash().bagian[0]);
+  if (!terbuka && sudahMasuk(db) && peranAkun(db) !== 'toko') pastikanKategoriAwal(db);
   const tetap = window.APP_CONFIG && window.APP_CONFIG.scriptUrl;
   // Alamat server dari config.js berlaku selama belum masuk (alamat manual hanya untuk uji).
   if (tetap && db.pengaturan.scriptUrl !== tetap && !(db.pengaturan.akun && db.pengaturan.kunci)) db.aturPengaturan({ scriptUrl: tetap });
@@ -193,7 +223,7 @@ async function mulai() {
   };
 
   const penyinkron = buatPenyinkron(db);
-  if (bacaHash().bagian[0] !== 'nilai') perbaruiTampilanSitus(db); // logo dan latar Login dari admin
+  if (!terbuka) perbaruiTampilanSitus(db); // logo dan latar Login dari admin
   render(html`<${App} db=${db} penyinkron=${penyinkron} peringatan=${peringatan} pasangan=${pasangan} />`, akar);
   window.__app = { db, penyinkron };
 

@@ -16,6 +16,14 @@ Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, 
 - **Export PDF satu resep**: data resep, HPP, dan setiap eksperimen (bahan dan biaya, langkah, catatan, foto, skor, serta penilaian beserta komentar), lewat tombol **Export PDF** di halaman resep lalu *Simpan sebagai PDF*.
 - **Hapus resep** dari halaman resep; eksperimen, penilaian, HPP, dan marketing-nya ikut terhapus.
 - **Nama dan logo aplikasi** yang bisa diganti sendiri dan tampil di beranda, halaman masuk, kode QR, dan halaman penilai.
+- **Akun dapur dan akun toko**: akun pembeli aplikasi adalah akun dapur (semua menu). Di Pengaturan, akun dapur membuat **akun toko** (kasir) dengan username dan kata sandi sendiri. Akun toko memakai data usaha yang sama, tetapi hanya bisa membuka Kasir, Pesanan, Stok makanan, Menu, dan Pelanggan; resep, bahan, dan HPP tidak dikirim ke perangkatnya.
+- **Stok bahan dan belanja**: catat belanja (stok bertambah, harga bahan untuk HPP ikut diperbarui), hitung ulang stok, dan batas stok menipis.
+- **Produksi**: masak X kali resep; stok bahan berkurang sesuai takaran eksperimen juara, stok makanan jadi bertambah.
+- **Menu jual**: resep dan **paket**, harga saran dari HPP Jual. Paket yang terjual memotong stok setiap isinya.
+- **Kasir dan pesanan**: keranjang, pembeli (nama + WhatsApp), kode promo, bayar **tunai** (dengan kembalian) atau **online lewat Mayar** (QR / link, lunas otomatis). Status pesanan Baru → Diproses → Siap → Selesai, atau Batal (stok kembali).
+- **Catat pesanan manual** (akun dapur dan toko): untuk pesanan dari WhatsApp, telepon, atau DM. Bisa memakai menu jual dan item di luar menu (mis. kue custom), jadwal ambil/antar, alamat + ongkir, lalu dicatat belum bayar, lunas tunai, lunas transfer, atau dikirimi link Mayar. Pesanan yang belum dibayar bisa diubah; stok dihitung ulang.
+- **Link pemesanan** untuk pembeli tanpa login: pilih menu, isi nama dan WhatsApp, bayar lewat Mayar; pesanan masuk setelah lunas.
+- **Pelanggan dan promo**: pelanggan tercatat otomatis dari nomor WhatsApp (bisa diunduh CSV). Kode promo persen atau potongan, dengan minimal belanja, batas tanggal, kuota, dan khusus pelanggan baru/lama.
 - Bisa dipasang ke layar utama (PWA). Saat sinyal putus, aplikasi tetap terbuka dan perubahan menunggu lalu terkirim begitu tersambung lagi.
 
 ## Mencoba di komputer
@@ -176,6 +184,15 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 
 **Ikon dan nama di layar utama HP tidak ikut berubah.** Keduanya dibaca browser dari berkas `manifest.webmanifest` dan folder `icons/` saat aplikasi dipasang, sehingga tidak bisa diganti dari dalam aplikasi. Untuk mengubahnya: ganti `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (latar penuh), `icon-180.png` (latar penuh), dan `logo.png` (tanpa kotak, untuk halaman Login) dengan logo Anda (ukuran sama), ubah `name` dan `short_name` di `manifest.webmanifest`, jalankan `npm run sw`, terbitkan ulang, lalu hapus dan pasang ulang aplikasinya di HP.
 
+## Pembayaran online (Mayar)
+
+1. Daftar di [Mayar](https://mayar.id) (uji coba: web.mayar.club), lalu buat kunci API **Read & Write** di dashboard: Integrasi → API Key.
+2. Di aplikasi, masuk sebagai akun dapur → **Pengaturan → Pembayaran online (Mayar)** → tempel kunci, centang *mode uji* bila kuncinya dari sandbox, lalu **Simpan kunci**. Kunci disimpan terenkripsi di server (tidak pernah dikirim ke aplikasi) dan alamat webhook didaftarkan otomatis. Bila gagal, salin alamat webhook yang tampil ke dashboard Mayar: Integrasi → Webhook.
+3. Status lunas tidak dipercaya dari isi webhook saja: server selalu menanyakan ulang ke API Mayar (`GET /payments/{id}`). Kasir dan halaman pembeli juga mengecek berkala, jadi tetap jalan walau webhook terlambat.
+4. Isi `FRONTEND_URL` di server supaya pembeli diarahkan kembali ke halaman status pesanan setelah membayar.
+
+Di server uji (`npm run dev`), Mayar ditiru: link bayar membuka halaman **Mayar (tiruan)** dengan tombol *Bayar*.
+
 ## Cara kerja penilaian lewat QR
 
 - Di halaman eksperimen, pilih **Bagikan kode QR**. Tautan berisi token acak 16 karakter untuk eksperimen itu.
@@ -226,6 +243,7 @@ npm i             # sekali saja, memasang playwright-core
 npm run e2e       # semua alur di browser Chromium: bahan, resep, eksperimen, HPP, QR, penilai, offline,
                   # lalu Login, simpan otomatis ke server, export PDF, hapus resep, keluar, nama dan logo aplikasi
 npm run e2e:masuk # hanya alur masuk dan merek (SS=/folder untuk menyimpan tangkapan layar)
+npm run e2e:toko  # stok, produksi, menu, kasir, Mayar tiruan, link pemesanan, dan akun toko
 npm run test:api  # backend Laravel sungguhan (lihat bagian Backend Laravel + Supabase)
 ```
 

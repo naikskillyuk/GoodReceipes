@@ -61,7 +61,7 @@ return [
             'db' => 'bahan',
             'kolom' => [
                 'id' => 't', 'nama' => 't', 'merek' => 't', 'beliDi' => 't', 'fotoUrl' => 't', 'hargaBeli' => 'n',
-                'isiKemasan' => 'n', 'satuanBeli' => 't', 'hargaDiperbarui' => 'n',
+                'isiKemasan' => 'n', 'satuanBeli' => 't', 'hargaDiperbarui' => 'n', 'stokMinimum' => 'n',
             ],
         ],
         'KonversiSatuan' => [
@@ -117,9 +117,78 @@ return [
             'db' => 'marketing',
             'kolom' => ['id' => 't', 'idResep' => 't', 'jenis' => 't', 'judul' => 't', 'alasan' => 't', 'status' => 't', 'dibuat' => 'n'],
         ],
+        // Stok = jumlah semua mutasi. MutasiBahan.jumlah dalam satuan dasar bahan (g / ml / pcs).
+        'MutasiBahan' => [
+            'db' => 'mutasi_bahan',
+            'kolom' => ['id' => 't', 'idBahan' => 't', 'jumlah' => 'n', 'jenis' => 't', 'idRef' => 't', 'harga' => 'n', 'catatan' => 't', 'waktu' => 'n'],
+        ],
+        'Produksi' => [
+            'db' => 'produksi',
+            'kolom' => ['id' => 't', 'idResep' => 't', 'idEksperimen' => 't', 'kali' => 'n', 'hasil' => 'n', 'hppPorsi' => 'n', 'catatan' => 't', 'waktu' => 'n'],
+        ],
+        'MutasiMakanan' => [
+            'db' => 'mutasi_makanan',
+            'kolom' => ['id' => 't', 'idResep' => 't', 'jumlah' => 'n', 'jenis' => 't', 'idRef' => 't', 'catatan' => 't', 'waktu' => 'n'],
+        ],
+        'Menu' => [
+            'db' => 'menu',
+            'kolom' => [
+                'id' => 't', 'jenis' => 't', 'idRef' => 't', 'nama' => 't', 'harga' => 'n', 'fotoUrl' => 't', 'keterangan' => 't',
+                'aktif' => 'b', 'online' => 'b', 'urutan' => 'n',
+            ],
+        ],
+        'Pesanan' => [
+            'db' => 'pesanan',
+            'kolom' => [
+                'id' => 't', 'nomor' => 't', 'sumber' => 't', 'idPelanggan' => 't', 'nama' => 't', 'hp' => 't', 'catatan' => 't', 'item' => 'j',
+                'subtotal' => 'n', 'diskon' => 'n', 'kodePromo' => 't', 'total' => 'n', 'status' => 't', 'oleh' => 't', 'waktu' => 'n',
+                'saluran' => 't', 'jadwal' => 'n', 'alamat' => 't', 'ongkir' => 'n',
+            ],
+        ],
+        'Pembayaran' => [
+            'db' => 'pembayaran',
+            'kolom' => [
+                'id' => 't', 'idPesanan' => 't', 'metode' => 't', 'jumlah' => 'n', 'diterima' => 'n', 'kembalian' => 'n', 'status' => 't',
+                'idMayar' => 't', 'linkMayar' => 't', 'waktu' => 'n', 'lunasPada' => 'n',
+            ],
+        ],
+        'Pelanggan' => [
+            'db' => 'pelanggan',
+            'kolom' => ['id' => 't', 'nama' => 't', 'hp' => 't', 'catatan' => 't', 'dibuat' => 'n'],
+        ],
+        'Promo' => [
+            'db' => 'promo',
+            'kolom' => [
+                'id' => 't', 'kode' => 't', 'nama' => 't', 'jenis' => 't', 'nilai' => 'n', 'minBelanja' => 'n', 'maksDiskon' => 'n', 'untuk' => 't',
+                'mulai' => 'n', 'sampai' => 'n', 'kuota' => 'n', 'aktif' => 'b', 'online' => 'b',
+            ],
+        ],
         'Setelan' => [
             'db' => 'setelan',
-            'kolom' => ['id' => 't', 'namaAplikasi' => 't', 'logoUrl' => 't'],
+            'kolom' => [
+                'id' => 't', 'namaAplikasi' => 't', 'logoUrl' => 't',
+                'namaToko' => 't', 'tokenToko' => 't', 'tokoBuka' => 'b', 'alamatToko' => 't', 'waToko' => 't', 'catatanToko' => 't',
+            ],
         ],
     ],
+
+    // Akun toko (dibuat oleh akun dapur) hanya menerima dan mengirim tabel ini. Sama dengan js/lib/schema.js.
+    'tabel_toko_baca' => ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan'],
+    'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'],
+
+    // Kolom angka berisi waktu (ms): disimpan sebagai bilangan bulat besar.
+    'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal'],
+
+    // Mayar (payment gateway). Kunci API milik tiap akun dapur disimpan terenkripsi di tabel users.
+    'mayar' => [
+        'produksi' => 'https://api.mayar.id/hl/v2',
+        'sandbox' => 'https://api.mayar.io/hl/v2',
+        // Lama link pembayaran berlaku (menit).
+        'menit_berlaku' => 60,
+    ],
+
+    // Batas pesanan dari link pemesanan pembeli.
+    'maks_item_pesanan' => 30,
+    'maks_jumlah_per_item' => 100,
+    'pesanan_online_per_jam_per_ip' => 20,
 ];

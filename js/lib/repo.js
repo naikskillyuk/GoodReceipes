@@ -71,6 +71,8 @@ export function hapusResep(db, idResep) {
   db.semua('ResepTambahan', (r) => r.idResepKomponen === idResep).forEach((r) => db.hapus('ResepTambahan', r.id));
   // ...dan dari paket yang berisinya.
   db.semua('IsiPaket', (r) => r.idResep === idResep).forEach((r) => db.hapus('IsiPaket', r.id));
+  // ...dan dari menu jual. Riwayat stok dan pesanan tetap disimpan.
+  db.semua('Menu', (m) => m.jenis === 'resep' && m.idRef === idResep).forEach((m) => db.hapus('Menu', m.id));
   db.hapus('Resep', idResep);
 }
 
@@ -502,6 +504,7 @@ export function buatPaket(db, nama) {
 
 export function hapusPaket(db, idPaket) {
   for (const t of ['IsiPaket', 'BiayaPaket']) db.semua(t, (r) => r.idPaket === idPaket).forEach((r) => db.hapus(t, r.id));
+  db.semua('Menu', (m) => m.jenis === 'paket' && m.idRef === idPaket).forEach((m) => db.hapus('Menu', m.id));
   db.hapus('Paket', idPaket);
 }
 
