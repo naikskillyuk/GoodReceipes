@@ -186,7 +186,11 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       simpanBaris('MutasiMakanan', { id, idResep, jumlah: -jumlah, jenis: 'jual', idRef: p.id, catatan: 'Pesanan #' + p.nomor, waktu: Date.now() });
     }
   }
-  const tokoDariToken = (token) => (typeof token === 'string' && token.length >= 10 ? hidup('Setelan', (s) => s.tokenToko === token)[0] || null : null);
+  // Tanpa token = toko utama di halaman depan (toko pertama yang sudah mengaktifkan toko online).
+  const tokoDariToken = (token) => {
+    if (!token) return hidup('Setelan', (s) => s.id === 'stl_toko' && !!s.tokenToko)[0] || null;
+    return typeof token === 'string' && token.length >= 10 ? hidup('Setelan', (s) => s.tokenToko === token)[0] || null : null;
+  };
   function nomorPesanan() {
     const d = new Date();
     return String(d.getDate()).padStart(2, '0') + String(d.getMonth() + 1).padStart(2, '0') + '-' + crypto.randomBytes(2).toString('hex').toUpperCase().slice(0, 3);

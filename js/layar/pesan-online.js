@@ -1,4 +1,4 @@
-// Etalase toko untuk pembeli (link pemesanan, tanpa login): beranda dengan banner, pilihan populer, kategori,
+// Etalase toko untuk pembeli (halaman depan situs "/" atau link #/pesan/token, tanpa login): beranda dengan banner, pilihan populer, kategori,
 // dan testimoni; daftar menu; detail produk; keranjang; lalu status pesanan dan cara bayar.
 // Bayar: transfer / QRIS toko (dicek manual oleh toko) atau Mayar bila diaktifkan admin.
 // Layar dipilih dari kueri ?l= (beranda | menu | produk | keranjang | pesanan) supaya tombol kembali HP bekerja.
@@ -22,7 +22,8 @@ const CEK_TIAP_MS = 5000;
 function alamatServer(k) {
   const tetap = (window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
   const dariTautan = k.rute.kueri.u || '';
-  return tetap || (scriptUrlAman(dariTautan) ? dariTautan : '') || k.db.pengaturan.scriptUrl || '';
+  // Server uji (npm run dev) menyajikan /api di alamat yang sama.
+  return tetap || (scriptUrlAman(dariTautan) ? dariTautan : '') || k.db.pengaturan.scriptUrl || location.origin + '/api';
 }
 
 // Ingatan di perangkat pembeli: pesanan terakhir dan isi keranjang (per toko).
@@ -55,7 +56,7 @@ function keLayar(k, token, l, extra = {}) {
   if (l) q.set('l', l);
   for (const [a, b] of Object.entries(extra)) if (b) q.set(a, b);
   const s = q.toString();
-  pergi('/pesan/' + token + (s ? '?' + s : ''));
+  pergi((token ? '/pesan/' + token : '/') + (s ? '?' + s : ''));
 }
 
 function waTautan(wa, teks) {
@@ -165,6 +166,7 @@ function Beranda({ info, jumlah, atur, buka, keMenu }) {
       ${info.alamat && html`<p><b>Alamat:</b> ${info.alamat}</p>`}
       ${info.wa && html`<a class="et-tombol garis" href=${waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.')} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Tanya lewat WhatsApp</a>`}
     </section>
+    <p class="et-kaki"><a href="/admin">Masuk admin & kasir</a></p>
   `;
 }
 

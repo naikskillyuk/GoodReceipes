@@ -213,17 +213,14 @@ export function KartuTokoOnline({ k }) {
   const [qr, setQr] = useState(false);
   useEffect(() => setD(ambilToko(db)), [t.diubah]);
   const berubah = ['namaToko', 'alamatToko', 'waToko', 'catatanToko'].some((x) => (d[x] || '') !== (t[x] || ''));
-  const tautan = t.tokenToko ? tautanToko(t.tokenToko, db.pengaturan.scriptUrl) : '';
+  // Alamat toko = halaman depan situs. Token hanya menandai bahwa toko online sudah diaktifkan.
+  const tautan = t.tokenToko ? tautanToko('', db.pengaturan.scriptUrl) : '';
   const buatLink = () => {
     aturTokenToko(db);
-    tampilToast('Link pemesanan dibuat.');
-  };
-  const gantiLink = async () => {
-    if (!(await tanya({ judul: 'Ganti link pemesanan?', teks: 'Link lama berhenti berfungsi. Bagikan link yang baru ke pembeli.', ya: 'Ganti link', bahaya: true }))) return;
-    aturTokenToko(db, { ganti: true });
+    tampilToast('Toko online diaktifkan.');
   };
   return html`<section class="kartu kolom" aria-labelledby="h-toko-online">
-    <h2 class="judul-kecil" id="h-toko-online">Toko & link pemesanan</h2>
+    <h2 class="judul-kecil" id="h-toko-online">Toko online</h2>
     <label class="bidang"><span>Nama toko</span><input class="input" maxlength="60" value=${d.namaToko || ''} onInput=${(e) => setD({ ...d, namaToko: e.target.value })} /></label>
     <div class="dua-kolom">
       <label class="bidang"><span>Alamat / area</span><input class="input" maxlength="120" value=${d.alamatToko || ''} onInput=${(e) => setD({ ...d, alamatToko: e.target.value })} /></label>
@@ -231,18 +228,17 @@ export function KartuTokoOnline({ k }) {
     </div>
     <label class="bidang"><span>Pengumuman untuk pembeli (opsional)</span><input class="input" maxlength="300" value=${d.catatanToko || ''} placeholder="mis. Pesanan diambil H+1, gratis ongkir area kota" onInput=${(e) => setD({ ...d, catatanToko: e.target.value })} /></label>
     ${berubah && html`<button class="btn solid" onClick=${() => (simpanToko(db, d), tampilToast('Data toko disimpan.'))}>Simpan data toko</button>`}
-    <label class="saklar"><input type="checkbox" checked=${!!t.tokoBuka} onChange=${(e) => simpanToko(db, { tokoBuka: e.target.checked })} /><span>Toko buka: link pemesanan menerima pesanan</span></label>
+    <label class="saklar"><input type="checkbox" checked=${!!t.tokoBuka} onChange=${(e) => simpanToko(db, { tokoBuka: e.target.checked })} /><span>Toko buka: etalase menerima pesanan</span></label>
     ${tautan
-      ? html`<div class="bidang"><span>Link pemesanan</span>
-          <div class="cari-baris"><input class="input kecil" readonly value=${tautan} aria-label="Link pemesanan" /><button class="btn" onClick=${async () => tampilToast((await salin(tautan)) ? 'Link disalin.' : 'Gagal menyalin.')}>Salin</button></div>
+      ? html`<div class="bidang"><span>Alamat toko untuk pembeli</span>
+          <div class="cari-baris"><input class="input kecil" readonly value=${tautan} aria-label="Alamat toko" /><button class="btn" onClick=${async () => tampilToast((await salin(tautan)) ? 'Alamat disalin.' : 'Gagal menyalin.')}>Salin</button></div>
           <div class="baris-btn">
             <button class="btn" onClick=${() => setQr(!qr)}><${Ikon} nama="qr" ukuran=${18} />${qr ? 'Sembunyikan QR' : 'Tampilkan QR'}</button>
-            <a class="btn" href=${tautan} target="_blank" rel="noopener">Buka</a>
-            <button class="btn" onClick=${gantiLink}>Ganti link</button>
+            <a class="btn" href=${tautan} target="_blank" rel="noopener">Buka etalase</a>
           </div>
-          ${qr && html`<div class="qr-bayar" role="img" aria-label="Kode QR link pemesanan" dangerouslySetInnerHTML=${{ __html: buatQR(tautan, { cellSize: 4, margin: 2, scalable: true }) }}></div>`}
+          ${qr && html`<div class="qr-bayar" role="img" aria-label="Kode QR alamat toko" dangerouslySetInnerHTML=${{ __html: buatQR(tautan, { cellSize: 4, margin: 2, scalable: true }) }}></div>`}
         </div>`
-      : html`<button class="btn solid" onClick=${buatLink}><${Ikon} nama="tautan" ukuran=${18} />Buat link pemesanan</button>`}
+      : html`<button class="btn solid" onClick=${buatLink}><${Ikon} nama="toko" ukuran=${18} />Aktifkan toko online</button>`}
     <p class="bantu">${pakaiMayar(db) ? 'Pembeli memesan dan langsung membayar lewat Mayar. Pesanan masuk setelah lunas.' : 'Pembeli memesan lalu transfer / scan QRIS toko. Pesanan masuk ke tab "Menunggu bayar"; tandai lunas setelah uang masuk.'} Hanya menu yang ditandai "Tampil di link pemesanan" yang muncul. Testimoni pembeli yang disetujui tampil di bawah halaman ini.</p>
   </section>`;
 }

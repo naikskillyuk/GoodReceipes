@@ -8,7 +8,7 @@ import { tampilToast } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
 import { ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
 import { alamatServer, serverTetap, masukAkun, mintaAturUlang, aturSandiBaru, MIN_SANDI } from '../lib/akun.js';
-import { halamanAdmin, ALAMAT_TOKO, ALAMAT_ADMIN } from '../lib/toko.js';
+import { ALAMAT_TOKO } from '../lib/toko.js';
 
 const LATAR_BAWAAN = 'gambar/latar-masuk.jpg';
 // Logo bawaan tanpa kotak (ikon aplikasi berlatar hijau tetap dipakai untuk layar utama HP dan tab).
@@ -135,14 +135,14 @@ export function LayarAkun({ k }) {
       <header class="sambut-judul">
         <div class="sambut-merek"><${LogoMerek} src=${merek.logo === LOGO_BAWAAN ? LOGO_POLOS : merek.logo} ukuran=${terbuka ? 64 : 88} kelas="polos" /></div>
         <h1><${NamaMerek} nama=${merek.nama} /></h1>
-        <p class="sambut-mode">${halamanAdmin() ? 'Halaman Admin' : 'Halaman Toko'}</p>
-        ${!terbuka && html`<p>${halamanAdmin() ? 'Resep, HPP, harga jual, stok bahan, stok produk, dan paket.' : 'Katalog, keranjang, pesanan, dan pembayaran toko.'}</p>`}
+        <p class="sambut-mode">Admin & Kasir</p>
+        ${!terbuka && html`<p>Masuk dengan akun admin untuk resep, HPP, harga, dan stok, atau akun kasir untuk melayani pesanan.</p>`}
       </header>
 
       ${!terbuka &&
       html`<div class="sambut-bawah">
         <button class="pil sambut-login" onClick=${() => ganti('masuk')}>Login<span class="ujung"><${Ikon} nama="panah" /></span></button>
-        <a class="tautan-kecil sambut-pindah" href=${halamanAdmin() ? ALAMAT_TOKO : ALAMAT_ADMIN}>${halamanAdmin() ? 'Ke halaman toko' : 'Masuk sebagai admin'}</a>
+        <a class="tautan-kecil sambut-pindah" href=${ALAMAT_TOKO}>Lihat etalase toko</a>
       </div>`}
 
       ${terbuka &&

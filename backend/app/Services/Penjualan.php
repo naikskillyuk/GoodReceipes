@@ -215,9 +215,23 @@ class Penjualan
     // ---------- Link pemesanan pembeli (tanpa login) ----------
 
     /** Baris setelan toko dari token link, beserta id pemilik data. */
+    /**
+     * Toko dari token link pemesanan. Tanpa token = toko utama di halaman depan situs:
+     * akun dengan email TOKO_UTAMA_EMAIL bila diisi, selain itu toko pertama yang sudah mengaktifkan toko online.
+     */
     private function tokoDariToken(mixed $token): ?array
     {
         $t = is_string($token) ? $token : '';
+        if ($t === '') {
+            $q = DB::table('setelan')->where('id', 'stl_toko')->where('dihapus', false)->whereNotNull('token_toko')->where('token_toko', '!=', '');
+            $email = (string) config('goodrecipes.toko_utama_email');
+            if ($email !== '') {
+                $q->whereIn('id_pengguna', User::where('email', $email)->select('id'));
+            }
+            $r = $q->orderByDesc('toko_buka')->orderBy('id_pengguna')->first();
+
+            return $r ? ['idData' => (int) $r->id_pengguna, 'setelan' => Skema::dariDb('Setelan', $r)] : null;
+        }
         if (strlen($t) < 10 || strlen($t) > 100) {
             return null;
         }
@@ -264,7 +278,7 @@ class Penjualan
     {
         $toko = $this->tokoDariToken($token);
         if (! $toko) {
-            return ['ok' => false, 'galat' => 'Link pemesanan tidak ditemukan atau sudah diganti.'];
+            return ['ok' => false, 'galat' => is_string($token) && $token !== '' ? 'Link pemesanan tidak ditemukan atau sudah diganti.' : 'Toko online belum diaktifkan. Admin bisa mengaktifkannya di Pengaturan → Toko online.'];
         }
         $id = $toko['idData'];
         $s = $toko['setelan'];

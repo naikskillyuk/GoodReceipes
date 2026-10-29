@@ -2,9 +2,9 @@
 
 /**
  * Masuk ke akun uji lewat layar Masuk, memakai tiruan akun dev-server (kata sandi kunci-dev).
- * jalur '/' = halaman toko (POS), '/admin' = halaman admin.
+ * Login hanya ada di /admin (akun admin dan akun kasir). "/" = etalase pembeli tanpa login.
  */
-export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'kunci-dev', jalur = '/' } = {}) {
+export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'kunci-dev', jalur = '/admin' } = {}) {
   await page.goto(base + jalur);
   // Layar sambutan: formulir baru muncul setelah tombol Login ditekan.
   const tombolLogin = page.getByRole('button', { name: 'Login', exact: true });

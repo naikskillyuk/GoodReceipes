@@ -6,10 +6,10 @@ Aplikasi toko dan dapur untuk brand **rasa.terasrumah**: dari eksperimen resep, 
 
 | Alamat | Untuk | Isi |
 | --- | --- | --- |
-| `https://rasaterasrumah.vercel.app/` | **Halaman toko (POS)**: akun toko (kasir) dan pemilik | Katalog + keranjang, catat pesanan manual, status pesanan, stok produk, pelanggan, akun |
-| `https://rasaterasrumah.vercel.app/admin` | **Halaman admin**: hanya akun pemilik (dapur) | Resep & eksperimen, HPP, harga jual (menu), paket produk, bahan, stok bahan & belanja, produksi, stok produk, laporan pesanan, pelanggan & promo, pengaturan (akun toko, Mayar, link pemesanan) |
+| `https://rasaterasrumah.vercel.app/` | **Etalase toko untuk pembeli**, tanpa login | Banner, pilihan populer, kategori, detail produk, keranjang, status pesanan + cara bayar, testimoni |
+| `https://rasaterasrumah.vercel.app/admin` | **Login admin & kasir** | Akun admin (dapur): resep & eksperimen, HPP, harga jual (menu), paket, bahan, stok bahan & belanja, produksi, stok produk, kasir, pesanan, pelanggan/promo/testimoni, pengaturan. Akun kasir (toko): katalog kasir, catat pesanan, status pesanan, stok produk, pelanggan |
 
-Keduanya memakai data yang sama: harga dan menu yang diatur di admin langsung tampil di katalog toko, dan pesanan dari toko langsung memotong stok produk yang terlihat di admin. Akun toko yang membuka `/admin` diarahkan kembali ke halaman toko. `/admin` dilayani oleh `index.html` yang sama lewat `rewrites` di `vercel.json`.
+Semua memakai data yang sama: harga dan menu yang diatur admin langsung tampil di etalase dan kasir, dan setiap pesanan memotong stok produk. Etalase menampilkan toko yang sudah **diaktifkan** di Pengaturan → Toko online (bila server dipakai beberapa toko, isi `TOKO_UTAMA_EMAIL` di backend dengan email akun admin toko utama). Tautan lama seperti `/#/kasir` otomatis dipindah ke `/admin#/kasir`. `/admin` dilayani oleh `index.html` yang sama lewat `rewrites` di `vercel.json`.
 
 **Mengganti domain** ke `rasaterasrumah.vercel.app`: di Vercel buka proyek frontend → *Settings → Domains* → tambahkan `rasaterasrumah.vercel.app` (atau ganti nama proyek menjadi `rasaterasrumah`). Lalu di proyek backend ubah `FRONTEND_URL=https://rasaterasrumah.vercel.app`, dan bila `CORS_ORIGINS` diisi, tambahkan domain baru itu. Pengguna yang sudah masuk di domain lama perlu masuk sekali lagi di domain baru (data ada di server, tidak hilang).
 

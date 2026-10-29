@@ -10,7 +10,7 @@ import { Kosong } from './ui/komponen.js';
 import { terapkanMerekDokumen } from './ui/merek.js';
 import { LayarAkun, AturSandi } from './layar/akun.js';
 import { CetakResep } from './layar/cetak-resep.js';
-import { sudahMasuk, sesiBerakhir, perbaruiTampilanSitus, keluarAkun } from './lib/akun.js';
+import { sudahMasuk, sesiBerakhir, perbaruiTampilanSitus } from './lib/akun.js';
 import { Beranda } from './layar/beranda.js';
 import { DaftarResep } from './layar/daftar-resep.js';
 import { FormResep } from './layar/form-resep.js';
@@ -32,7 +32,7 @@ import { CatatPesanan } from './layar/catat-pesanan.js';
 import { DaftarPesanan, DetailPesanan } from './layar/pesanan.js';
 import { PelangganPromo } from './layar/pelanggan.js';
 import { PesanOnline, TiruanMayar } from './layar/pesan-online.js';
-import { peranAkun, RUTE_TOKO, halamanAdmin, ALAMAT_TOKO } from './lib/toko.js';
+import { peranAkun, RUTE_TOKO, halamanAdmin, ALAMAT_ADMIN } from './lib/toko.js';
 
 // Data utama ada di database server. Perangkat hanya menyimpan salinan supaya cepat dan tetap
 // terbuka saat sinyal putus; setiap perubahan dikirim ke server sesaat setelah disimpan.
@@ -47,24 +47,22 @@ function TidakAda() {
   return html`<div class="penilai"><div class="isi"><${Kosong} judul="Halaman tidak ditemukan" teks="Alamat ini tidak dikenal."><a class="btn solid" href="#/">Ke Beranda</a><//></div></div>`;
 }
 
-/** Akun toko membuka /admin. */
-function KhususToko({ k }) {
-  const keluar = async () => {
-    await keluarAkun(k.db, { sinkronkan: () => k.penyinkron.sinkronkan() }).catch(() => {});
-  };
-  return html`<div class="penilai"><div class="isi"><${Kosong} judul="Khusus admin" teks="Akun toko hanya bisa membuka halaman toko. Masuk dengan akun admin untuk mengatur resep, HPP, harga, dan stok.">
-    <div class="baris-btn"><a class="btn solid" href=${ALAMAT_TOKO}>Ke halaman toko</a><button class="btn" onClick=${keluar}>Keluar dan ganti akun</button></div>
-  <//></div></div>`;
-}
+/**
+ * Alamat situs:
+ * - "/"       = etalase toko untuk pembeli, tanpa login (plus halaman terbuka: penilai QR, atur sandi).
+ * - "/admin"  = satu-satunya pintu login. Akun admin (dapur) melihat halaman admin, akun toko melihat kasir/POS.
+ * Rute aplikasi yang terbuka di "/" (mis. tautan lama "/#/kasir") dipindah ke "/admin".
+ */
+const RUTE_DEPAN = ['', 'nilai', 'pesan', 'tiruan-mayar', 'atur-sandi'];
+const harusKeAdmin = (rute) => !halamanAdmin() && !RUTE_DEPAN.includes(rute.bagian[0] || '');
 
 function Layar({ k }) {
   const [a, b, c, d] = k.rute.bagian;
   if (a === 'nilai' && b) return html`<${LayarPenilai} key=${b} k=${k} token=${b} />`;
   if (a === 'pesan' && b) return html`<${PesanOnline} key=${b} k=${k} token=${b} />`;
   if (a === 'tiruan-mayar' && b) return html`<${TiruanMayar} k=${k} id=${b} />`;
-  // "/" = halaman toko (POS); "/admin" = halaman admin. Akun toko tidak bisa masuk admin.
-  if (halamanAdmin() && peranAkun(k.db) === 'toko') return html`<${KhususToko} k=${k} />`;
-  if (!halamanAdmin()) {
+  // Akun toko (kasir) hanya membuka halaman penjualan; beranda-nya langsung katalog kasir.
+  if (peranAkun(k.db) === 'toko') {
     if (!RUTE_TOKO.includes(a || '')) return html`<${TidakAda} />`;
     if (!a) return html`<${Kasir} k=${k} />`;
   }
@@ -104,8 +102,14 @@ function App({ db, penyinkron, peringatan, pasangan }) {
   const [status, setStatus] = useState(() => penyinkron.status);
   const [galat, ulangi] = useErrorBoundary((e) => console.error(e));
 
-  const rutePenilai = RUTE_TERBUKA.includes(rute.bagian[0]);
+  // Halaman depan "/" tanpa rute = etalase toko utama untuk pembeli (tanpa login).
+  const etalase = !halamanAdmin() && !rute.bagian[0];
+  const rutePenilai = RUTE_TERBUKA.includes(rute.bagian[0]) || etalase;
   const ruteAturSandi = rute.bagian[0] === 'atur-sandi';
+  const keAdmin = harusKeAdmin(rute);
+  useEffect(() => {
+    if (keAdmin) location.replace(ALAMAT_ADMIN + location.search + location.hash);
+  }, [keAdmin]);
   // Penilai, link pemesanan, dan tautan atur kata sandi selalu terbuka; selain itu wajib masuk akun.
   const perluAkun = !rutePenilai && !ruteAturSandi && !sudahMasuk(db);
 
@@ -191,7 +195,11 @@ function App({ db, penyinkron, peringatan, pasangan }) {
   }
   return html`
     ${peringatan && html`<div class="peringatan" style="margin:8px;border-radius:16px" role="alert">${peringatan}</div>`}
-    ${ruteAturSandi
+    ${keAdmin
+      ? null
+      : etalase
+        ? html`<${PesanOnline} key="utama" k=${k} token="" />`
+        : ruteAturSandi
       ? html`<${AturSandi} k=${k} />`
       : perluAkun
         ? html`<${LayarAkun} k=${k} />`
@@ -212,7 +220,7 @@ async function mulai() {
     await db.muat();
     peringatan = 'Browser ini tidak menyimpan salinan di perangkat (mungkin mode pribadi). Data tetap tersimpan ke server selama ada internet.';
   }
-  const terbuka = RUTE_TERBUKA.includes(bacaHash().bagian[0]);
+  const terbuka = RUTE_TERBUKA.includes(bacaHash().bagian[0]) || (!halamanAdmin() && !bacaHash().bagian[0]);
   if (!terbuka && sudahMasuk(db) && peranAkun(db) !== 'toko') pastikanKategoriAwal(db);
   const tetap = window.APP_CONFIG && window.APP_CONFIG.scriptUrl;
   // Alamat server dari config.js berlaku selama belum masuk (alamat manual hanya untuk uji).

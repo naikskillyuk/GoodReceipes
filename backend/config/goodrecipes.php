@@ -16,6 +16,9 @@ return [
     // Alamat aplikasi (frontend) untuk tautan di email, mis. https://resep-anda.vercel.app
     'frontend_url' => env('FRONTEND_URL', ''),
 
+    // Toko yang tampil di halaman depan situs (tanpa token link). Kosong = toko pertama yang aktif.
+    'toko_utama_email' => env('TOKO_UTAMA_EMAIL', ''),
+
     'versi' => 2,
 
     // Vercel mengisi VERCEL=1 secara otomatis.

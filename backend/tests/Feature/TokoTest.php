@@ -173,6 +173,11 @@ class TokoTest extends TestCase
         $this->assertSame('Kue', $info['menu'][0]['kategori']);
         $this->assertSame(['Sari'], array_column($info['testimoni'], 'nama'), 'hanya testimoni yang tayang');
 
+        // Halaman depan situs (tanpa token) = toko utama yang sudah aktif.
+        $depan = $this->api(['aksi' => 'infoToko', 'token' => '']);
+        $this->assertTrue($depan['ok'], json_encode($depan));
+        $this->assertSame('Toko Uji', $depan['namaToko']);
+
         $pesan = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-manual-1', 'nama' => 'Budi', 'hp' => '0812345678', 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 2]]]);
         $this->assertTrue($pesan['ok'], json_encode($pesan));
         $this->assertSame('', $pesan['link']);

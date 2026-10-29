@@ -1,14 +1,14 @@
 // Pengaturan: akun, nama dan logo aplikasi, dan kategori.
 
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
-import { Kerangka, Hero, LogoMerek, FotoInput, pindahHalaman } from '../ui/komponen.js';
+import { Kerangka, Hero, LogoMerek, FotoInput } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { IkonKategori } from '../ui/ikon-kategori.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { kompresLogo } from '../ui/gambar.js';
 import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
 import { daftarKategori, tambahKategori, pakaiKategori, WARNA_KATEGORI, ambilMerek, simpanMerek, NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
-import { peranAkun, tampilanToko, ALAMAT_ADMIN } from '../lib/toko.js';
+import { peranAkun, tampilanToko } from '../lib/toko.js';
 import { KartuAkunToko, KartuMayar, KartuTokoOnline, KartuPembayaran } from './pengaturan-toko.js';
 
 function BarisKategori({ db, kat }) {
@@ -171,13 +171,9 @@ export function Pengaturan({ k }) {
   const kategori = daftarKategori(db);
   if (tampilanToko(db)) {
     return html`<${Kerangka} k=${k} aktif="pengaturan">
-      <${Hero} warna="var(--navy)" label="Halaman toko" judul="Akun" kembali="/" />
+      <${Hero} warna="var(--navy)" label="Kasir" judul="Akun" kembali="/" />
       <div class="isi"><div class="kolom" style="max-width:640px">
         <${KartuAkun} k=${k} />
-        ${peranAkun(db) === 'dapur' &&
-        html`<section class="kartu kolom"><h2 class="judul-kecil">Halaman admin</h2>
-          <p class="bantu">Resep, HPP, harga jual, stok bahan, stok produk, paket, akun toko, dan pembayaran diatur di halaman admin.</p>
-          <a class="btn solid" href=${ALAMAT_ADMIN} onClick=${(e) => (e.preventDefault(), pindahHalaman(k, ALAMAT_ADMIN))}>Buka halaman admin</a></section>`}
         ${k.bisaPasang && html`<section class="kartu kolom"><h2 class="judul-kecil">Pasang aplikasi</h2><button class="btn solid" onClick=${k.pasang}>Pasang aplikasi</button></section>`}
       </div></div>
     <//>`;

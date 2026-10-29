@@ -21,10 +21,10 @@ export function peranAkun(db) {
   return db.pengaturan.akun && db.pengaturan.akun.peran === 'toko' ? 'toko' : 'dapur';
 }
 
-/** Halaman toko / POS (bagian pertama alamat). Semua halaman lain hanya ada di /admin. */
+/** Halaman yang boleh dibuka akun toko / kasir (bagian pertama alamat, di /admin). */
 export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'stok-makanan', 'pelanggan', 'pengaturan'];
 
-// Situs punya dua pintu: "/" = halaman toko (POS), "/admin" = halaman admin resep, HPP, harga, dan stok.
+// Situs punya dua pintu: "/" = etalase toko untuk pembeli (tanpa login), "/admin" = login admin dan kasir.
 export const ALAMAT_TOKO = '/';
 export const ALAMAT_ADMIN = '/admin';
 
@@ -33,9 +33,9 @@ export function halamanAdmin(jalur = globalThis.location?.pathname || '/') {
   return /^\/admin\/?$/.test(jalur);
 }
 
-/** Tampilan toko dipakai di halaman utama, dan selalu untuk akun toko. */
+/** Tampilan kasir/POS terbatas: untuk akun toko. Akun admin (dapur) melihat semua menu. */
 export function tampilanToko(db) {
-  return !halamanAdmin() || peranAkun(db) === 'toko';
+  return peranAkun(db) === 'toko';
 }
 
 const jumlahkan = (daftar, kunci) => {
@@ -741,10 +741,16 @@ export function aturTokenToko(db, { ganti = false } = {}) {
 }
 
 /** Tautan pemesanan untuk pembeli. Alamat server ikut hanya saat uji (config.js menetapkannya di versi jual). */
-export function tautanToko(token, scriptUrl = '') {
+/**
+ * Alamat toko untuk pembeli = halaman depan situs. Tanpa token: toko utama (halaman depan).
+ * Dengan token: link khusus toko ini (tetap berlaku walau ada toko lain di server yang sama).
+ */
+export function tautanToko(token = '', scriptUrl = '') {
   const tetap = (globalThis.window && window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
-  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '').replace(/admin\/?$/, ''); // link publik selalu ke halaman utama
-  return `${dasar}#/pesan/${token}` + (tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`);
+  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '').replace(/admin\/?$/, '');
+  const u = tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`;
+  if (!token) return dasar + (u ? '#/' + u : '');
+  return `${dasar}#/pesan/${token}` + u;
 }
 
 // ---------- Permintaan ke server ----------

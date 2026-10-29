@@ -156,15 +156,16 @@ try {
   await page.getByPlaceholder('Tempel kunci API di sini').fill('kunci-mayar-uji-yang-panjang-12345');
   await page.getByRole('button', { name: 'Simpan kunci' }).click();
   await page.getByText('Aktif', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Buat link pemesanan' }).click();
-  await page.getByText('Toko buka: link pemesanan menerima pesanan').click();
+  await page.getByRole('button', { name: 'Aktifkan toko online' }).click();
+  await page.getByText('Toko buka: etalase menerima pesanan').click();
   await page.getByRole('button', { name: 'Buat akun toko' }).click();
   await page.getByPlaceholder('mis. Kasir Pagi').fill('Kasir Pagi');
   await page.getByPlaceholder('mis. kasir.pagi').fill('toko.pagi');
   await page.locator('[role=dialog] input[type=text]').last().fill('sandi-kasir-1');
   await page.getByRole('button', { name: 'Simpan', exact: true }).click();
   await page.getByText('Akun toko toko.pagi dibuat.').waitFor();
-  const link = await page.getByRole('textbox', { name: 'Link pemesanan', exact: true }).inputValue();
+  const link = await page.getByRole('textbox', { name: 'Alamat toko', exact: true }).inputValue();
+  assert.ok(link.startsWith(BASE + '/') && !link.includes('/admin') && !link.includes('/pesan/'), 'alamat toko = halaman depan: ' + link);
   await foto(page, '05-pengaturan');
 
   tahap('kasir bayar online: QR Mayar, dibayar, lunas otomatis');
@@ -251,7 +252,7 @@ try {
   await pembeli.getByRole('heading', { name: 'Kata pembeli' }).scrollIntoViewIfNeeded();
   await foto(pembeli, '07e-testimoni');
 
-  tahap('akun toko: halaman utama = katalog, lihat pesanan, tidak bisa membuka resep atau /admin');
+  tahap('akun kasir: login di /admin langsung ke katalog, tidak bisa membuka resep; halaman depan = etalase');
   const kasir = await browser.newPage({ viewport: { width: 390, height: 844 } });
   pantau(kasir, 'toko');
   await masukUji(kasir, BASE, { login: 'toko.pagi' });
@@ -261,9 +262,10 @@ try {
   assert.equal(await kasir.evaluate(() => window.__app.db.semua('Bahan').length), 0, 'akun toko tidak menerima data bahan');
   await kasir.goto(BASE + '/#/resep');
   await kasir.getByText('Halaman tidak ditemukan').waitFor();
+  // Halaman depan = etalase pembeli (tanpa login), walau sedang masuk sebagai kasir.
+  await kasir.goto(BASE + '/');
+  await kasir.getByRole('heading', { name: 'Pilihan populer' }).waitFor();
   await kasir.goto(ADMIN);
-  await kasir.getByText('Khusus admin').waitFor();
-  await kasir.getByRole('link', { name: 'Ke halaman toko' }).click();
   await kasir.getByRole('heading', { name: 'Katalog' }).waitFor();
   await kasir.goto(BASE + '/#/pesanan');
   await kasir.getByText('· Sari').waitFor({ timeout: 15000 });

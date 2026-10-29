@@ -8,7 +8,7 @@ import { kompres } from './gambar.js';
 import { tampilToast } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
-import { peranAkun, tampilanToko, ALAMAT_TOKO, ALAMAT_ADMIN } from '../lib/toko.js';
+import { tampilanToko, ALAMAT_TOKO } from '../lib/toko.js';
 
 /** Nama aplikasi untuk judul: kata terakhir diberi warna hijau (mis. "Good <em>Receipes</em>"). */
 export function NamaMerek({ nama }) {
@@ -38,8 +38,8 @@ export function LogoMerek({ src, ukuran = 40, kelas = '' }) {
 }
 
 // pil = tampil di navigasi bawah HP (maks. 5). Semua tampil di sisi kiri laptop.
-// luar = alamat situs lain (halaman toko "/" atau admin "/admin"), bukan rute di dalam halaman ini.
-// Halaman admin (/admin): resep, HPP, harga jual, stok bahan & produk, paket, dan pengaturan.
+// luar = alamat di luar halaman ini (etalase pembeli di "/"), bukan rute di dalam /admin.
+// Akun admin (dapur): resep, HPP, harga jual, stok bahan & produk, paket, kasir, pesanan, dan pengaturan.
 const MENU_ADMIN = [
   { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
   { kunci: 'resep', jalur: '/resep', label: 'Resep & HPP', ikon: 'resep', pil: true },
@@ -49,13 +49,15 @@ const MENU_ADMIN = [
   { kunci: 'produksi', jalur: '/produksi', label: 'Produksi', ikon: 'panci' },
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
   { kunci: 'menu', jalur: '/menu', label: 'Menu & Harga Jual', ikon: 'tag' },
-  { kunci: 'pesanan', jalur: '/pesanan', label: 'Laporan Pesanan', ikon: 'dompet', pil: true },
+  { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk' },
+  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
+  { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan, Promo & Testimoni', ikon: 'pelanggan' },
   { kunci: 'ulasan', jalur: '/ulasan', label: 'Ulasan', ikon: 'obrolan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
-  { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Buka Halaman Toko', ikon: 'toko', luar: true },
+  { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Lihat Etalase Toko', ikon: 'toko', luar: true },
 ];
-// Halaman toko (/): POS untuk kasir.
+// Akun toko (kasir): POS.
 const MENU_TOKO = [
   { kunci: 'kasir', jalur: '/', label: 'Katalog', ikon: 'struk', pil: true },
   { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah', pil: true },
@@ -64,7 +66,6 @@ const MENU_TOKO = [
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Akun', ikon: 'orang', pil: true },
 ];
-const KE_ADMIN = { kunci: 'ke-admin', jalur: ALAMAT_ADMIN, label: 'Buka Halaman Admin', ikon: 'gerigi', luar: true };
 const hrefMenu = (m) => (m.luar ? m.jalur : tautan(m.jalur));
 
 /**
@@ -90,14 +91,13 @@ const klikMenu = (k, m) => (m.luar ? (e) => (e.preventDefault(), pindahHalaman(k
 export function Kerangka({ k, aktif, plus, children }) {
   const { db } = k;
   const toko = tampilanToko(db);
-  // Pemilik (akun dapur) yang membuka halaman toko tetap punya jalan ke admin.
-  const MENU = toko ? (peranAkun(db) === 'dapur' ? [...MENU_TOKO, KE_ADMIN] : MENU_TOKO) : MENU_ADMIN;
+  const MENU = toko ? MENU_TOKO : MENU_ADMIN;
   const kategori = toko ? [] : daftarKategori(db);
   const kategoriAktif = k.rute.kueri.kat || '';
   const merek = ambilMerek(db);
   return html`<div class="app">
     <aside class="sisi" aria-label="Menu utama">
-      <div class="merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /><span>${merek.nama.split('.').map((b, i) => (i ? html`.<wbr />${b}` : b))}<small class="merek-mode">${toko ? 'Toko' : 'Admin'}</small></span></div>
+      <div class="merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /><span>${merek.nama.split('.').map((b, i) => (i ? html`.<wbr />${b}` : b))}<small class="merek-mode">${toko ? 'Kasir' : 'Admin'}</small></span></div>
       <nav>
         ${MENU.map(
           (m) => html`<a href=${hrefMenu(m)} onClick=${klikMenu(k, m)} class=${aktif === m.kunci && !(m.kunci === 'resep' && kategoriAktif) ? 'aktif' : ''} aria-current=${aktif === m.kunci ? 'page' : null}>

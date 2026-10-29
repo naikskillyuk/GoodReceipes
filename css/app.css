@@ -5135,3 +5135,11 @@ details.pembeli summary {
     max-height: 480px;
   }
 }
+.et-kaki {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+}
+.et-kaki a {
+  color: var(--e-muted);
+}
