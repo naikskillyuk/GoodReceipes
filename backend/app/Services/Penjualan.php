@@ -634,7 +634,36 @@ class Penjualan
             'bayarManual' => $tungguTransfer ? $this->bayarManual($toko['setelan']) : null,
             'wa' => (string) $toko['setelan']['waToko'],
             'bisaTestimoni' => $lunas && $p['status'] !== 'batal' && ! $testimoni,
+            // Untuk timeline pembeli.
+            'waktu' => (int) $p['waktu'],
+            'buktiPada' => (int) $p['buktiPada'],
+            'lunasPada' => (int) array_reduce($bayar, fn ($m, $b) => $b['status'] === 'lunas' ? max($m, (int) ($b['lunasPada'] ?: $b['waktu'])) : $m, 0),
+            'metodeBayar' => $link !== '' || (bool) array_filter($bayar, fn ($b) => $b['metode'] === 'mayar') ? 'mayar' : 'transfer',
+            'riwayat' => array_values(array_filter(is_array($p['riwayat']) ? $p['riwayat'] : [], fn ($r) => is_array($r) && isset($r['status'], $r['waktu']))),
+            'kendala' => $p['status'] === 'batal' || $p['status'] === 'selesai' ? '' : mb_substr((string) $p['kendala'], 0, 300),
         ];
+    }
+
+    /**
+     * Pembeli menekan "Kirim bukti bayar via WhatsApp": catat waktunya supaya toko tahu bukti sudah dikirim
+     * dan timeline pembeli maju. Hanya untuk pesanan online yang belum lunas; tidak mengubah status bayar.
+     */
+    public function kirimBukti(mixed $token, mixed $idPesanan): array
+    {
+        $toko = $this->tokoDariToken($token);
+        $id = $toko['idData'] ?? 0;
+        $p = $toko && is_string($idPesanan) && strlen($idPesanan) <= 100 ? $this->ambil($id, 'Pesanan', $idPesanan) : null;
+        if (! $p || $p['dihapus'] || $p['sumber'] !== 'online') {
+            return ['ok' => false, 'galat' => 'Pesanan tidak ditemukan.'];
+        }
+        if ($p['status'] === 'batal') {
+            return ['ok' => false, 'galat' => 'Pesanan ini sudah dibatalkan.'];
+        }
+        if (! $p['buktiPada']) {
+            Sinkron::denganKunci($id, fn () => $this->simpan($id, 'Pesanan', ['id' => $p['id'], 'buktiPada' => self::sekarang()]));
+        }
+
+        return ['ok' => true];
     }
 
     // ---------- Pembayaran Mayar dari kasir ----------
@@ -706,7 +735,7 @@ class Penjualan
             $this->simpan($id, 'Pembayaran', ['id' => $b['id'], 'status' => 'lunas', 'lunasPada' => self::sekarang()]);
             $p = $this->ambil($id, 'Pesanan', (string) $b['idPesanan']);
             if ($p && ! $p['dihapus'] && $p['sumber'] === 'online' && $p['status'] === 'menunggu') {
-                $this->simpan($id, 'Pesanan', ['id' => $p['id'], 'status' => 'baru']);
+                $this->simpan($id, 'Pesanan', ['id' => $p['id'], 'status' => 'baru', 'riwayat' => json_encode([...(is_array($p['riwayat']) ? $p['riwayat'] : []), ['status' => 'baru', 'waktu' => self::sekarang()]])]);
                 $this->potongStok($id, $p);
             }
         }));

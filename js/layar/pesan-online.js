@@ -509,23 +509,87 @@ function FormTestimoni({ url, token, idPesanan, nama }) {
   </form>`;
 }
 
-/** Status pesanan: cara bayar (transfer/QRIS atau Mayar), lalu kabar pesanan. Dicek berkala sampai lunas. */
+const CEK_SETELAH_LUNAS_MS = 30000;
+
+function waktuSingkat(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const hariIni = new Date().toDateString() === d.toDateString();
+  const jamMenit = String(d.getHours()).padStart(2, '0') + '.' + String(d.getMinutes()).padStart(2, '0');
+  return hariIni ? 'Hari ini ' + jamMenit : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ' ' + jamMenit;
+}
+
+/**
+ * Langkah timeline pesanan pembeli. Tiap langkah: {kunci, judul, teks, waktu, selesai}.
+ * Transfer/QRIS: dibuat -> bukti dikirim -> pembayaran dikonfirmasi -> diterima & disiapkan -> siap -> selesai.
+ * Mayar: tanpa langkah bukti (pembayaran tercatat otomatis).
+ */
+export function langkahPesanan(s) {
+  const kapan = (status) => {
+    const r = (s.riwayat || []).filter((x) => x.status === status);
+    return r.length ? r[r.length - 1].waktu : 0;
+  };
+  const urutan = ['baru', 'diproses', 'siap', 'selesai'];
+  const sampai = (status) => urutan.indexOf(s.status) >= urutan.indexOf(status);
+  const ojol = s.caraAmbil === 'ojol';
+  const mayar = s.metodeBayar === 'mayar';
+  const langkah = [{ kunci: 'dibuat', judul: 'Pesanan dibuat', teks: '', waktu: s.waktu, selesai: true }];
+  if (!mayar) {
+    langkah.push({ kunci: 'bukti', judul: 'Bukti bayar dikirim', teks: 'Transfer / scan QRIS, lalu kirim bukti lewat tombol WhatsApp di bawah.', waktu: s.buktiPada, selesai: !!(s.buktiPada || s.lunas) });
+  }
+  langkah.push(
+    { kunci: 'bayar', judul: mayar ? 'Pembayaran diterima' : 'Pembayaran dikonfirmasi toko', teks: mayar ? 'Selesaikan pembayaran lewat tombol Bayar sekarang.' : 'Toko sedang mengecek pembayaran Anda.', waktu: s.lunasPada, selesai: !!s.lunas },
+    { kunci: 'diproses', judul: 'Pesanan diterima & disiapkan', teks: s.status === 'diproses' ? 'Dapur sedang menyiapkan pesanan Anda.' : 'Pesanan akan segera disiapkan dapur.', waktu: kapan('diproses'), selesai: sampai('diproses') },
+    { kunci: 'siap', judul: ojol ? 'Siap dijemput driver' : 'Siap diambil', teks: ojol ? 'Pesan Gojek / Grab ke toko sekarang.' : 'Silakan datang ke toko.', waktu: kapan('siap'), selesai: sampai('siap') },
+    { kunci: 'selesai', judul: 'Selesai', teks: 'Terima kasih sudah berbelanja!', waktu: kapan('selesai'), selesai: s.status === 'selesai' },
+  );
+  return langkah;
+}
+
+function TimelinePesanan({ s }) {
+  const langkah = langkahPesanan(s);
+  const iAktif = langkah.findIndex((l) => !l.selesai);
+  return html`<ol class="et-timeline" aria-label="Status pesanan">
+    ${langkah.map((l, i) => {
+      const kelas = l.selesai ? 'selesai' : i === iAktif ? 'aktif' : 'nanti';
+      return html`<li class=${'et-langkah ' + kelas} key=${l.kunci} aria-current=${i === iAktif ? 'step' : null}>
+        <span class="et-titik" aria-hidden="true">${l.selesai ? html`<${Ikon} nama="centang" ukuran=${14} />` : ''}</span>
+        <div class="et-langkah-isi">
+          <b>${l.judul}</b>
+          ${l.selesai && l.waktu ? html`<small>${waktuSingkat(l.waktu)}</small>` : ''}
+          ${i === iAktif && l.teks ? html`<span>${l.teks}</span>` : ''}
+        </div>
+      </li>`;
+    })}
+  </ol>`;
+}
+
+/** Status pesanan: timeline, kendala dari dapur, cara bayar (transfer/QRIS atau Mayar). Dicek berkala sampai selesai. */
 function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
   const [s, setS] = useState(null);
   const [galat, setGalat] = useState('');
   useEffect(() => {
     let hidup = true;
     let t = null;
+    let terakhir = null;
     const cek = async () => {
+      if (document.visibilityState === 'hidden' && terakhir) {
+        t = setTimeout(cek, CEK_TIAP_MS);
+        return;
+      }
       try {
         const j = await pesanOnline.status(url, token, idPesanan);
         if (!hidup) return;
+        terakhir = j;
         setS(j);
         setGalat('');
-        if (!j.lunas && j.status !== 'batal') t = setTimeout(cek, CEK_TIAP_MS);
       } catch (e) {
-        if (hidup) setGalat(e.message);
+        // Gagal sesaat (sinyal / batas permintaan) tidak menghapus tampilan yang sudah ada.
+        if (!hidup) return;
+        if (!terakhir) return setGalat(e.message);
       }
+      if (!hidup || terakhir.status === 'batal' || terakhir.status === 'selesai') return;
+      t = setTimeout(cek, terakhir.lunas ? CEK_SETELAH_LUNAS_MS : CEK_TIAP_MS);
     };
     cek();
     return () => {
@@ -535,32 +599,62 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
   }, [idPesanan]);
   if (galat) return html`<${Kosong} judul="Pesanan tidak ditemukan" teks=${galat}><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Pesan lagi</button><//>`;
   if (!s) return html`<p role="status">Memeriksa pesanan…</p>`;
-  const LABEL = { baru: 'Pesanan diterima toko', diproses: 'Sedang disiapkan', siap: 'Siap diambil / dikirim', selesai: 'Selesai', batal: 'Pesanan dibatalkan', menunggu: 'Menunggu pembayaran' };
   const manual = !s.lunas && s.bayarManual;
   const ambil = s.caraAmbil && LABEL_AMBIL[s.caraAmbil] ? `${LABEL_AMBIL[s.caraAmbil]}${s.jadwal > 0 ? ', ' + teksJadwal(s.jadwal) : ''}` : '';
   const waBukti = manual ? waTautan(s.wa, `Halo, saya sudah bayar pesanan #${s.nomor} sebesar ${rupiah(s.total)} atas nama ${s.nama}.${ambil ? ` Cara ambil: ${ambil}.` : ''} Berikut bukti transfernya.`) : '';
+  const waToko = waTautan(s.wa, `Halo, saya mau tanya tentang pesanan #${s.nomor} atas nama ${s.nama}.`);
+  // Catat bahwa bukti dikirim (toko melihatnya di kasir); tautan WhatsApp tetap terbuka seperti biasa.
+  const catatBukti = () => {
+    if (!s.buktiPada) setS({ ...s, buktiPada: Date.now() });
+    pesanOnline.bukti(url, token, idPesanan).catch(() => {});
+  };
+  const ojol = s.caraAmbil === 'ojol';
+  const JUDUL = {
+    menunggu: s.buktiPada ? 'Bukti bayar terkirim' : 'Menunggu pembayaran',
+    baru: 'Pesanan diterima',
+    diproses: 'Pesanan sedang disiapkan',
+    siap: ojol ? 'Siap dijemput driver' : 'Pesanan siap diambil',
+    selesai: 'Pesanan selesai',
+    batal: 'Pesanan dibatalkan',
+  };
   return html`<div class="kolom" style="gap:16px">
     <h1 class="et-judul-layar">Pesanan Anda</h1>
-    <div class="kosong et-status" role="status">
-      <span class="skor-bulat" style=${`background:${s.lunas ? 'var(--hijau)' : s.status === 'batal' ? 'var(--bahaya)' : 'var(--kuning)'};color:#fff`}><${Ikon} nama=${s.lunas ? 'centang' : 'jam'} ukuran=${34} /></span>
-      <h3>${s.lunas ? 'Pembayaran diterima' : s.status === 'batal' ? 'Pesanan dibatalkan' : manual ? 'Silakan lakukan pembayaran' : 'Menunggu pembayaran'}</h3>
-      <p>Pesanan #${s.nomor} · ${LABEL[s.status] || s.status}</p>
-    </div>
+    <section class="et-panel kolom" aria-labelledby="h-status-pesanan">
+      <div class="et-status-kepala">
+        <div>
+          <small>Pesanan #${s.nomor}</small>
+          <h2 class="et-h2" id="h-status-pesanan">${JUDUL[s.status] || s.status}</h2>
+        </div>
+        <b>${rupiah(s.total)}</b>
+      </div>
+      ${s.kendala &&
+      html`<div class="et-kendala" role="alert">
+        <${Ikon} nama="info" ukuran=${20} />
+        <div><b>Info dari dapur</b><p>${s.kendala}</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Tanya toko via WhatsApp</a>`}</div>
+      </div>`}
+      ${s.status === 'batal'
+        ? html`<div class="et-kendala batal" role="alert">
+            <${Ikon} nama="info" ukuran=${20} />
+            <div><b>Pesanan dibatalkan</b><p>Hubungi toko bila ada pertanyaan${s.lunas ? ' atau untuk pengembalian dana' : ''}.</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Chat toko via WhatsApp</a>`}</div>
+          </div>`
+        : html`<${TimelinePesanan} s=${s} />`}
+    </section>
     ${manual &&
     html`<section class="et-panel kolom" aria-labelledby="h-cara-bayar">
       <h2 class="et-h2" id="h-cara-bayar">Cara bayar</h2>
       <div class="total-bayar"><small>Total yang dibayar</small><b>${rupiah(s.total)}</b></div>
       <${InfoTransfer} rekening=${s.bayarManual.rekening || []} qris=${s.bayarManual.qrisUrl || ''} total=${0} />
       <p class="bantu">Scan QRIS atau transfer ke rekening di atas, lalu kirim bukti bayar ke WhatsApp toko. Pesanan diproses setelah toko mengonfirmasi; halaman ini berubah otomatis.</p>
-      ${waBukti && html`<a class="et-tombol lebar" href=${waBukti} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Kirim bukti bayar via WhatsApp</a>`}
+      ${waBukti && html`<a class="et-tombol lebar" href=${waBukti} target="_blank" rel="noopener" onClick=${catatBukti}><${Ikon} nama="kirim" ukuran=${18} />${s.buktiPada ? 'Kirim ulang bukti bayar via WhatsApp' : 'Kirim bukti bayar via WhatsApp'}</a>`}
     </section>`}
-    <section class="et-panel kolom">
+    ${s.link && html`<a class="et-tombol lebar" href=${s.link}>Bayar sekarang</a>`}
+    <section class="et-panel kolom" aria-labelledby="h-rincian">
+      <h2 class="et-h2" id="h-rincian">Rincian pesanan</h2>
       ${(s.item || []).map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${namaItem(i)}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
       <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(s.total)}</b></div>
       ${ambil && html`<div class="hasil-baris"><span>Cara ambil</span><b class="biasa">${ambil}</b></div>`}
-      ${s.caraAmbil === 'ojol' && s.status !== 'batal' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} sesuai jam di atas. Toko tidak memesankan ojek.</p>`}
+      ${ojol && s.status !== 'batal' && s.status !== 'selesai' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} sesuai jam di atas. Toko tidak memesankan ojek.</p>`}
     </section>
-    ${s.link && html`<a class="et-tombol lebar" href=${s.link}>Bayar sekarang</a>`}
     ${s.bisaTestimoni && html`<${FormTestimoni} url=${url} token=${token} idPesanan=${idPesanan} nama=${s.nama} />`}
     <button type="button" class="et-tombol garis" onClick=${() => keMenu('')}>Buat pesanan lain</button>
     <${Testimoni} daftar=${info && info.testimoni} />

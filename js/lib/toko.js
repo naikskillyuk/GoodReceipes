@@ -713,7 +713,9 @@ export function statusBayar(db, idPesanan) {
 export function ubahStatusPesanan(db, idPesanan, status) {
   const p = db.ambil('Pesanan', idPesanan);
   if (!p || p.status === status) return p;
-  const baru = db.simpan('Pesanan', { ...p, status });
+  // Riwayat status untuk timeline pembeli dan kasir. Kendala dari dapur hilang saat pesanan selesai / batal.
+  const riwayat = [...(Array.isArray(p.riwayat) ? p.riwayat : []), { status, waktu: Date.now() }].slice(-30);
+  const baru = db.simpan('Pesanan', { ...p, status, riwayat, ...(status === 'selesai' || status === 'batal' ? { kendala: '' } : {}) });
   if (status === 'batal') {
     kembalikanStokPesanan(db, p);
     pembayaranPesanan(db, idPesanan)
@@ -723,6 +725,13 @@ export function ubahStatusPesanan(db, idPesanan, status) {
     potongStokPesanan(db, baru);
   }
   return baru;
+}
+
+/** Pesan kendala dari dapur untuk pembeli (mis. bahan habis, pesanan mundur). '' = kendala selesai. */
+export function aturKendala(db, idPesanan, teks) {
+  const p = db.ambil('Pesanan', idPesanan);
+  if (!p) return null;
+  return db.simpan('Pesanan', { ...p, kendala: String(teks || '').trim().slice(0, 300) });
 }
 
 export const LABEL_METODE = { tunai: 'Tunai', transfer: 'Transfer/QRIS', mayar: 'Online' };
@@ -816,6 +825,85 @@ export function ringkasPenjualan(db, { sejak = awalHari() } = {}) {
   };
 }
 
+const SEHARI_MS = 24 * 60 * 60 * 1000;
+
+/** Awal hari ke-n dari hari ini (n negatif = hari sebelumnya), waktu setempat. */
+function awalHariKe(n, sekarang = Date.now()) {
+  const d = new Date(awalHari(sekarang));
+  d.setDate(d.getDate() + n);
+  return d.getTime();
+}
+
+/**
+ * Tren penjualan `hari` hari terakhir (termasuk hari ini) untuk beranda kasir:
+ * pemasukan per hari (pembayaran lunas), jumlah pesanan, rata-rata per pesanan, menu favorit,
+ * dan pembanding periode sebelumnya yang sama panjang.
+ */
+export function trenPenjualan(db, { hari = 7, sekarang = Date.now() } = {}) {
+  const perHari = Array.from({ length: hari }, (_, i) => ({ mulai: awalHariKe(i - hari + 1, sekarang), pemasukan: 0, pesanan: 0 }));
+  const mulai = perHari[0].mulai;
+  const mulaiSebelum = awalHariKe(-2 * hari + 1, sekarang);
+  const indeks = (ts) => {
+    for (let i = perHari.length - 1; i >= 0; i--) if (ts >= perHari[i].mulai) return i;
+    return -1;
+  };
+  let pemasukanSebelum = 0;
+  for (const b of db.semua('Pembayaran', (x) => x.status === 'lunas')) {
+    const t = b.lunasPada || b.waktu || 0;
+    const n = Number(b.jumlah) || 0;
+    if (t >= mulai) perHari[indeks(t)].pemasukan += n;
+    else if (t >= mulaiSebelum) pemasukanSebelum += n;
+  }
+  const favorit = new Map();
+  let jumlahPesanan = 0;
+  let pesananSebelum = 0;
+  for (const p of db.semua('Pesanan', pesananSah)) {
+    const t = p.waktu || 0;
+    if (t < mulai) {
+      if (t >= mulaiSebelum) pesananSebelum += 1;
+      continue;
+    }
+    jumlahPesanan += 1;
+    perHari[indeks(t)].pesanan += 1;
+    for (const i of Array.isArray(p.item) ? p.item : []) {
+      const kunci = i.idMenu || 'lain:' + i.nama;
+      const x = favorit.get(kunci) || { nama: i.nama || 'Tanpa nama', jumlah: 0, omzet: 0 };
+      x.jumlah += Number(i.jumlah) || 0;
+      x.omzet += (Number(i.harga) || 0) * (Number(i.jumlah) || 0);
+      favorit.set(kunci, x);
+    }
+  }
+  const pemasukan = perHari.reduce((j, h) => j + h.pemasukan, 0);
+  const belum = db.semua('Pesanan', (p) => p.status !== 'batal' && (p.waktu || 0) >= mulai && !statusBayar(db, p.id).lunas);
+  return {
+    perHari,
+    pemasukan,
+    pemasukanSebelum,
+    jumlahPesanan,
+    pesananSebelum,
+    rataRata: jumlahPesanan ? Math.round(pemasukan / jumlahPesanan) : 0,
+    favorit: [...favorit.values()].sort((a, b) => b.jumlah - a.jumlah || b.omzet - a.omzet).slice(0, 5),
+    belumBayar: { jumlah: belum.length, nilai: belum.reduce((j, p) => j + (Number(p.total) || 0), 0) },
+  };
+}
+
+/**
+ * Pesanan yang perlu ditindaklanjuti kasir, dikelompokkan dan diurutkan (jadwal ambil terdekat dulu).
+ * konfirmasi: pembeli sudah kirim bukti bayar, belum ditandai lunas. tagih: belum bayar.
+ * baru: diterima, belum diproses. diproses. siap: siap diambil, belum selesai.
+ */
+export function pesananFollowUp(db) {
+  const grup = { konfirmasi: [], tagih: [], baru: [], diproses: [], siap: [] };
+  for (const p of db.semua('Pesanan', (x) => !['selesai', 'batal'].includes(x.status))) {
+    const lunas = statusBayar(db, p.id).lunas;
+    if (p.status === 'menunggu') grup[p.buktiPada && !lunas ? 'konfirmasi' : 'tagih'].push(p);
+    else if (grup[p.status]) grup[p.status].push(p);
+  }
+  const urut = (a, b) => (a.jadwal > 0 ? a.jadwal : Infinity) - (b.jadwal > 0 ? b.jadwal : Infinity) || (a.waktu || 0) - (b.waktu || 0);
+  for (const daftar of Object.values(grup)) daftar.sort(urut);
+  return grup;
+}
+
 // ---------- Toko online (link pemesanan) ----------
 
 export const ID_TOKO = 'stl_toko';
@@ -849,7 +937,7 @@ export function simpanBanner(db, data) {
   const foto = data.foto;
   const adaFoto = foto !== undefined ? !!foto : !!(lama && (lama.fotoLokal || lama.fotoUrl));
   if (!judul && teks) throw new Error('Isi judul banner, atau kosongkan teks untuk banner gambar saja.');
-  if (!judul && !adaFoto) throw new Error('Isi judul banner, atau pilih gambar (250 × 100 px) untuk banner gambar saja.');
+  if (!judul && !adaFoto) throw new Error('Isi judul banner, atau pilih gambar (900 × 360 px) untuk banner gambar saja.');
   return db.simpan('Banner', {
     ...(lama || { urutan: daftarBanner(db).length, aktif: true }),
     ...(data.id ? { id: data.id } : {}),
@@ -988,6 +1076,7 @@ export const pesanOnline = {
   info: (url, token, opsi) => panggilApi(url, { aksi: 'infoToko', token }, opsi),
   kirim: (url, token, isi, opsi) => panggilApi(url, { aksi: 'pesanOnline', token, ...isi }, opsi),
   status: (url, token, idPesanan, opsi) => panggilApi(url, { aksi: 'statusPesanan', token, idPesanan }, opsi),
+  bukti: (url, token, idPesanan, opsi) => panggilApi(url, { aksi: 'kirimBukti', token, idPesanan }, opsi),
 };
 
 // ---------- Testimoni pembeli ----------

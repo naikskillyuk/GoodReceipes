@@ -239,9 +239,12 @@ try {
   // Banner gambar saja: judul dan teks dikosongkan, cukup gambar.
   await page.getByRole('button', { name: 'Tambah banner' }).click();
   await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
-  await dlgBanner.getByText('pilih gambar (250 × 100 px)').waitFor();
+  await dlgBanner.getByText('pilih gambar (900 × 360 px)').waitFor();
   await dlgBanner.locator('input[type=file]').setInputFiles(path.join(AKAR, 'gambar/latar-masuk.jpg'));
   await dlgBanner.locator('.kartu-banner.gambar-saja img').waitFor();
+  await dlgBanner.getByText('Panduan gambar').waitFor();
+  await dlgBanner.getByText('Rasio gambar ini tidak 5:2').waitFor(); // foto latar-masuk tidak 5:2
+  await foto(page, '09a2-form-banner-gambar');
   await dlgBanner.getByLabel('Aksi tombol').selectOption('menu');
   await dlgBanner.getByLabel('Keterangan (dibaca pembaca layar)').fill('Lihat menu baru');
   await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
@@ -323,18 +326,39 @@ try {
   assert.match(await pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).getAttribute('href'), /wa\.me\/6281277778888/);
   assert.match(decodeURIComponent(await pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).getAttribute('href')), /Cara ambil: Ojek online \(dipesan pembeli\)/);
   await pembeli.getByText('Toko tidak memesankan ojek.').waitFor();
+  await pembeli.locator('.et-langkah.aktif', { hasText: 'Bukti bayar dikirim' }).waitFor();
   await foto(pembeli, '07d-bayar-transfer');
+  // Pembeli menekan "Kirim bukti bayar": WhatsApp terbuka di tab baru, timeline maju, toko melihatnya di kasir.
+  await pembeli.context().route('https://wa.me/**', (r) => r.fulfill({ contentType: 'text/html', body: 'WhatsApp' }));
+  const [tabWa] = await Promise.all([pembeli.waitForEvent('popup'), pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).click()]);
+  await tabWa.close();
+  await pembeli.locator('.et-langkah.selesai', { hasText: 'Bukti bayar dikirim' }).waitFor();
+  await pembeli.getByRole('heading', { name: 'Bukti bayar terkirim' }).waitFor();
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await page.goto(ADMIN + '#/pesanan?tab=menunggu');
   await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).getByText(/Ojol dipesan pembeli/).waitFor();
+  await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).getByText('Bukti bayar dikirim').waitFor();
   await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).click();
+  await page.getByText('Pembeli sudah mengirim bukti bayar').waitFor();
   await page.getByText('Ojek online (dipesan pembeli)').waitFor();
   await page.getByText('Jam driver datang').waitFor();
   await page.getByRole('button', { name: 'Cek & tandai lunas' }).click();
   await page.getByRole('button', { name: /^Tandai lunas transfer/ }).click();
   await page.getByText('Lunas · Transfer/QRIS').first().waitFor();
+  // Kendala dari dapur tampil di halaman pesanan pembeli.
+  await page.getByLabel('Pesan kendala untuk pembeli').fill('Maaf, brownies baru siap jam 4 sore karena oven bermasalah.');
+  await page.getByRole('button', { name: 'Simpan kendala' }).click();
+  await page.getByRole('button', { name: 'Kendala selesai' }).waitFor();
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
-  await pembeli.getByText('Pembayaran diterima').waitFor({ timeout: 15000 });
+  await pembeli.getByRole('heading', { name: 'Pesanan diterima' }).waitFor({ timeout: 15000 });
+  await pembeli.reload();
+  await pembeli.getByText('Info dari dapur').waitFor();
+  await pembeli.getByText('brownies baru siap jam 4 sore').waitFor();
+  await pembeli.locator('.et-langkah.selesai', { hasText: 'Pembayaran dikonfirmasi toko' }).waitFor();
+  await pembeli.locator('.et-langkah.aktif', { hasText: 'Pesanan diterima & disiapkan' }).waitFor();
+  await foto(pembeli, '08b-timeline-kendala');
+  await page.getByRole('button', { name: 'Kendala selesai' }).click();
+  await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await pembeli.getByRole('button', { name: '4 bintang' }).click();
   await pembeli.getByLabel('Testimoni').fill('Browniesnya lembut dan tidak terlalu manis!');
   await pembeli.getByRole('button', { name: 'Kirim testimoni' }).click();
@@ -351,13 +375,24 @@ try {
   await pembeli.getByRole('heading', { name: 'Kata pembeli' }).scrollIntoViewIfNeeded();
   await foto(pembeli, '07e-testimoni');
 
-  tahap('akun kasir: login di /admin langsung ke katalog, tidak bisa membuka resep; halaman depan = etalase');
+  tahap('akun kasir: login di /admin ke beranda (follow-up + tren), katalog, tidak bisa membuka resep; halaman depan = etalase');
   const kasir = await browser.newPage({ viewport: { width: 390, height: 844 } });
   pantau(kasir, 'toko');
   await masukUji(kasir, BASE, { login: 'toko.pagi' });
+  await kasir.getByRole('heading', { name: 'Beranda' }).waitFor();
+  await kasir.getByRole('heading', { name: 'Perlu ditindaklanjuti' }).waitFor();
+  await kasir.locator('.baris-follow', { hasText: 'Sari' }).waitFor({ timeout: 15000 });
+  await kasir.getByRole('heading', { name: 'Tren penjualan' }).waitFor();
+  await kasir.locator('.daftar-favorit li').first().waitFor();
+  assert.ok((await kasir.locator('.grafik-area .kolom-batang').count()) === 7, 'grafik 7 hari');
+  await kasir.getByRole('button', { name: '30 hari' }).click();
+  assert.ok((await kasir.locator('.grafik-area .kolom-batang').count()) === 30, 'grafik 30 hari');
+  assert.ok((await sisaLebar(kasir)) <= 0, 'beranda kasir tidak melebar');
+  await foto(kasir, '09-beranda-kasir');
+  await kasir.getByRole('link', { name: 'Buka katalog' }).click();
   await kasir.getByRole('heading', { name: 'Katalog' }).waitFor();
   await kasir.getByRole('button', { name: 'Tambah Brownies Fudgy ke keranjang' }).waitFor({ timeout: 15000 });
-  await foto(kasir, '09-katalog-toko');
+  await foto(kasir, '09a-katalog-toko');
   assert.equal(await kasir.evaluate(() => window.__app.db.semua('Bahan').length), 0, 'akun toko tidak menerima data bahan');
   await kasir.goto(BASE + '/#/resep');
   await kasir.getByText('Halaman tidak ditemukan').waitFor();
@@ -366,7 +401,7 @@ try {
   await kasir.getByRole('button', { name: 'Mulai pesan' }).click();
   await kasir.getByRole('heading', { name: 'Menu kami' }).waitFor();
   await kasir.goto(ADMIN);
-  await kasir.getByRole('heading', { name: 'Katalog' }).waitFor();
+  await kasir.getByRole('heading', { name: 'Beranda' }).waitFor();
   await kasir.goto(BASE + '/#/pesanan');
   await kasir.getByText('· Sari').waitFor({ timeout: 15000 });
   await kasir.locator('.kartu-pesanan').first().click();

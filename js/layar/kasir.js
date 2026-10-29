@@ -98,10 +98,10 @@ export function Kasir({ k }) {
     ${fotoHeader(db, 'kasir')
       ? html`<header class="kasir-header">
           <img src=${fotoHeader(db, 'kasir')} alt="" aria-hidden="true" />
-          ${!tampilanToko(db) && html`<a class="bulat" href=${tautan('/')} aria-label="Kembali"><${Ikon} nama="kembali" /></a>`}
+          <a class="bulat" href=${tautan('/')} aria-label="Kembali"><${Ikon} nama="kembali" /></a>
           <div><small>${ambilToko(db).namaToko || ambilMerek(db).nama}</small><h1>${tampilanToko(db) ? 'Katalog' : 'Kasir'}</h1></div>
         </header>`
-      : html`<${Hero} warna="var(--hijau)" label=${ambilMerek(db).nama} judul=${tampilanToko(db) ? 'Katalog' : 'Kasir'} kembali=${tampilanToko(db) ? undefined : '/'} />`}
+      : html`<${Hero} warna="var(--hijau)" label=${ambilMerek(db).nama} judul=${tampilanToko(db) ? 'Katalog' : 'Kasir'} kembali="/" />`}
     ${daftarBanner(db, { tampilDi: 'kasir', hanyaAktif: true }).length > 0 &&
     html`<div class="kasir-banner">
       ${daftarBanner(db, { tampilDi: 'kasir', hanyaAktif: true }).map(

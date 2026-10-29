@@ -146,6 +146,7 @@ return [
                 'id' => 't', 'nomor' => 't', 'sumber' => 't', 'idPelanggan' => 't', 'nama' => 't', 'hp' => 't', 'catatan' => 't', 'item' => 'j',
                 'subtotal' => 'n', 'diskon' => 'n', 'kodePromo' => 't', 'total' => 'n', 'status' => 't', 'oleh' => 't', 'waktu' => 'n',
                 'saluran' => 't', 'jadwal' => 'n', 'alamat' => 't', 'ongkir' => 'n', 'caraAmbil' => 't',
+                'buktiPada' => 'n', 'kendala' => 't', 'riwayat' => 'j',
             ],
         ],
         'Pembayaran' => [
@@ -194,7 +195,7 @@ return [
     'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'],
 
     // Kolom angka berisi waktu (ms): disimpan sebagai bilangan bulat besar.
-    'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal', 'diskonSampai'],
+    'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal', 'diskonSampai', 'buktiPada'],
 
     // Mayar (payment gateway). Kunci API milik tiap akun dapur disimpan terenkripsi di tabel users.
     'mayar' => [

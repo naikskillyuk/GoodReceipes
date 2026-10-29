@@ -1,6 +1,6 @@
 // Banner & header (akun admin): foto header etalase dan kasir, serta banner informasi yang tampil di etalase / kasir.
 
-import { html, useState } from '../../vendor/preact-htm.js';
+import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, FotoInput, LogoMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
@@ -54,6 +54,56 @@ function KartuHeader({ db, untuk, judul, bantu }) {
   </section>`;
 }
 
+// Ukuran gambar banner yang disarankan: rasio 5:2 (250 x 100), cukup besar agar tajam di layar HP.
+const SARAN_LEBAR = 900;
+const SARAN_TINGGI = 360;
+const MIN_LEBAR_TAJAM = 700;
+
+/** Ukuran asli gambar (px), atau null selama dimuat / bila gagal. */
+function useUkuranGambar(src) {
+  const [ukuran, setUkuran] = useState(null);
+  useEffect(() => {
+    setUkuran(null);
+    if (!src) return;
+    let hidup = true;
+    const img = new Image();
+    img.onload = () => hidup && setUkuran({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = src;
+    return () => {
+      hidup = false;
+    };
+  }, [src]);
+  return ukuran;
+}
+
+/** Panduan ukuran saat mengunggah gambar banner, plus pengecekan gambar yang dipilih. */
+function PanduanGambarBanner({ foto, gambarSaja }) {
+  const ukuran = useUkuranGambar(foto);
+  const cek = [];
+  if (ukuran) {
+    const rasio = ukuran.w / ukuran.h;
+    if (ukuran.w < MIN_LEBAR_TAJAM) cek.push({ baik: false, teks: `Gambar ini ${ukuran.w} × ${ukuran.h} px, terlalu kecil sehingga bisa terlihat pecah. Pakai ${SARAN_LEBAR} × ${SARAN_TINGGI} px.` });
+    if (gambarSaja && Math.abs(rasio - 2.5) > 0.12) cek.push({ baik: false, teks: `Rasio gambar ini tidak 5:2, jadi bagian ${rasio > 2.5 ? 'kiri dan kanan' : 'atas dan bawah'} akan terpotong. Lihat pratinjau di atas.` });
+    if (!cek.length) cek.push({ baik: true, teks: `Ukuran gambar pas (${ukuran.w} × ${ukuran.h} px).` });
+  }
+  return html`<div class="panduan-gambar">
+    <b>Panduan gambar</b>
+    ${gambarSaja
+      ? html`<ul>
+          <li>Ukuran <b>${SARAN_LEBAR} × ${SARAN_TINGGI} px</b> (rasio 5:2, sama dengan 250 × 100). Di Canva: <i>Custom size</i> ${SARAN_LEBAR} × ${SARAN_TINGGI}.</li>
+          <li><b>PNG</b> bila banyak tulisan atau logo, <b>JPG</b> kualitas tinggi bila berupa foto.</li>
+          <li>Sisakan ±30 px kosong di tiap pinggir; sudut banner dibuat membulat.</li>
+          <li>Jangan pakai gambar kecil (mis. 250 × 100 px) karena akan pecah di HP.</li>
+        </ul>`
+      : html`<ul>
+          <li>Gambar tampil di sisi kanan banner, di samping tulisan.</li>
+          <li>Paling bagus <b>PNG latar transparan</b> (mis. foto produk tanpa latar), sekitar <b>400 × 360 px</b>.</li>
+          <li>Ingin banner berupa gambar penuh? Kosongkan judul dan teks, lalu pakai gambar ${SARAN_LEBAR} × ${SARAN_TINGGI} px.</li>
+        </ul>`}
+    ${cek.map((c, i) => html`<p key=${i} class=${c.baik ? 'panduan-cek baik' : 'panduan-cek awas'} role=${c.baik ? 'status' : 'alert'}>${c.teks}</p>`)}
+  </div>`;
+}
+
 function FormBanner({ db, awal, onTutup }) {
   const [d, setD] = useState(() => ({
     judul: '', teks: '', warna: 'hijau', tombol: '', aksi: '', nilai: '', tampilDi: 'etalase', aktif: true,
@@ -79,12 +129,13 @@ function FormBanner({ db, awal, onTutup }) {
   return html`<${Modal} judul=${awal ? 'Ubah banner' : 'Banner baru'} onTutup=${onTutup}>
     <div class="kolom" style="gap:12px">
       <${KartuBanner} b=${d} foto=${d.foto} />
-      <p class="bantu">Ukuran banner 250 × 100 px. Kosongkan judul dan teks bila banner cukup gambar saja.</p>
+      <p class="bantu">Banner tampil dengan rasio 250 × 100. Kosongkan judul dan teks bila banner cukup gambar saja.</p>
       <label class="bidang"><span>Judul (opsional)</span><input class="input" maxlength="60" value=${d.judul} onInput=${(e) => atur({ judul: e.target.value })} placeholder="mis. Pre-order Lebaran dibuka" /></label>
       <label class="bidang"><span>Teks (opsional)</span><input class="input" maxlength="160" value=${d.teks} onInput=${(e) => atur({ teks: e.target.value })} placeholder="mis. Pesan kue kering sebelum 20 Maret" /></label>
       <div class="bidang"><span>Gambar${gambarSaja ? '' : ' (kanan, opsional)'}</span>
-        <${FotoInput} nilai=${d.foto} onUbah=${(f) => atur({ foto: f })} judul=${d.foto ? 'Ganti gambar' : 'Pilih gambar'} bantu=${gambarSaja ? 'Gambar 250 × 100 px (atau 750 × 300 px agar tajam). Tampil penuh tanpa tulisan.' : 'PNG / foto produk; tampil di sisi kanan banner. Tanpa judul dan teks, gambar tampil penuh 250 × 100 px.'} aksen="var(--hijau)" ikon="gambar" kompresFn=${kompresBanner} />
+        <${FotoInput} nilai=${d.foto} onUbah=${(f) => atur({ foto: f })} judul=${d.foto ? 'Ganti gambar' : 'Pilih gambar'} bantu=${gambarSaja ? `Ukuran ${SARAN_LEBAR} × ${SARAN_TINGGI} px, tampil penuh tanpa tulisan.` : 'PNG / foto produk, tampil di sisi kanan banner.'} aksen="var(--hijau)" ikon="gambar" kompresFn=${kompresBanner} />
         ${d.foto && html`<button type="button" class="btn kecil" style="align-self:flex-start" onClick=${() => atur({ foto: '' })}>Hapus gambar</button>`}
+        <${PanduanGambarBanner} foto=${d.foto} gambarSaja=${gambarSaja} />
       </div>
       ${!gambarSaja && html`<div class="bidang"><span>Warna</span>
         <div class="chips" role="group" aria-label="Warna banner">

@@ -8,7 +8,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { buatQR, salin } from './bagikan.js';
 import {
   daftarPesanan, statusBayar, ubahStatusPesanan, bayarTunai, bayarTransfer, saranUang, mintaBayarMayar, cekBayarMayar,
-  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, LABEL_AMBIL, caraAmbil, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
+  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, LABEL_AMBIL, caraAmbil, aturKendala, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah, angka, tanggal } from '../lib/util.js';
 
@@ -158,6 +158,28 @@ export function DialogBayar({ k, pesanan, onTutup }) {
 const LABEL_AMBIL_PENDEK = { ambil: 'Ambil', ojol: 'Ojol dipesan pembeli', antar: 'Antar' };
 const LABEL_JADWAL = { ambil: 'Jam ambil', ojol: 'Jam driver datang', antar: 'Jadwal antar' };
 
+/** Pesan kendala dari dapur: tampil di halaman pesanan pembeli, dan bisa dikirim lewat WhatsApp. */
+function KartuKendala({ db, p }) {
+  const [teks, setTeks] = useState(p.kendala || '');
+  const berubah = teks.trim() !== (p.kendala || '');
+  const simpan = (isi) => {
+    aturKendala(db, p.id, isi);
+    setTeks(isi);
+    tampilToast(isi ? 'Kendala disimpan dan tampil di halaman pesanan pembeli.' : 'Kendala ditandai selesai.');
+  };
+  const wa = p.hp && p.kendala ? `https://wa.me/${p.hp}?text=${encodeURIComponent(`Halo ${p.nama || ''}, mohon maaf ada kendala pada pesanan #${p.nomor}: ${p.kendala}`)}` : '';
+  return html`<section class=${'kartu kolom' + (p.kendala ? ' kartu-kendala' : '')} aria-labelledby=${'h-kendala-' + p.id}>
+    <h2 class="judul-kecil" id=${'h-kendala-' + p.id}>Kendala dari dapur</h2>
+    <p class="bantu">Mis. bahan habis, pesanan mundur, atau perlu ganti menu. ${p.sumber === 'online' ? 'Tampil sebagai pemberitahuan di halaman pesanan pembeli.' : 'Kabari pembeli lewat WhatsApp.'}</p>
+    <textarea class="input kecil" rows="3" maxlength="300" aria-label="Pesan kendala untuk pembeli" placeholder="mis. Maaf, brownies baru siap jam 4 sore karena oven bermasalah." value=${teks} onInput=${(e) => setTeks(e.target.value)}></textarea>
+    <div class="baris-btn">
+      ${berubah && teks.trim() && html`<button class="btn solid" onClick=${() => simpan(teks.trim())}>${p.kendala ? 'Perbarui kendala' : 'Simpan kendala'}</button>`}
+      ${p.kendala && html`<button class="btn" onClick=${() => simpan('')}><${Ikon} nama="centang" ukuran=${18} />Kendala selesai</button>`}
+      ${wa && html`<a class="btn" href=${wa} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Kabari via WhatsApp</a>`}
+    </div>
+  </section>`;
+}
+
 function KartuPesanan({ db, p }) {
   const item = Array.isArray(p.item) ? p.item : [];
   return html`<a class="kartu-pesanan" href=${tautan('/pesanan/' + p.id)}>
@@ -166,6 +188,11 @@ function KartuPesanan({ db, p }) {
       <span class=${'lencana-status s-' + p.status}>${STATUS_PESANAN[p.status] || p.status}</span>
     </div>
     <small class="teks-kecil">${item.map((i) => `${i.jumlah}× ${namaItem(i)}`).join(', ')}</small>
+    ${(p.kendala || (p.buktiPada > 0 && p.status === 'menunggu')) &&
+    html`<span class="tanda-pesanan">
+      ${p.buktiPada > 0 && p.status === 'menunggu' && !statusBayar(db, p.id).lunas && html`<span class="tanda bukti">Bukti bayar dikirim</span>`}
+      ${p.kendala && html`<span class="tanda kendala">Ada kendala</span>`}
+    </span>`}
     ${p.jadwal > 0 && html`<small class="jadwal-pesanan"><${Ikon} nama="jam" ukuran=${14} />${LABEL_AMBIL_PENDEK[caraAmbil(p)] || 'Ambil'} ${teksJadwal(p.jadwal)}</small>`}
     <div class="baris-pisah">
       <span class="teks-kecil">${tanggal(p.waktu)} ${jam(p.waktu)} · ${labelSumber(p)}</span>
@@ -249,6 +276,7 @@ export function DetailPesanan({ k, id }) {
             ${p.ongkir > 0 && html`<div class="hasil-baris"><span>Ongkir</span><b class="biasa">${rupiah(p.ongkir)}</b></div>`}
             <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(p.total)}</b></div>
             ${s.lunas && html`<p class="bantu">Dibayar ${s.bayar.metode === 'mayar' ? 'online (Mayar)' : (LABEL_METODE[s.bayar.metode] || 'Tunai').toLowerCase()}${s.bayar.metode === 'tunai' && s.bayar.diterima ? ` · diterima ${rupiah(s.bayar.diterima)}, kembalian ${rupiah(s.bayar.kembalian)}` : ''} · ${tanggal(s.bayar.lunasPada || s.bayar.waktu)} ${jam(s.bayar.lunasPada || s.bayar.waktu)}</p>`}
+            ${!s.lunas && p.buktiPada > 0 && p.status !== 'batal' && html`<div class="info" role="status">Pembeli sudah mengirim bukti bayar (${teksJadwal(p.buktiPada)}). Cek WhatsApp toko, lalu tandai lunas.</div>`}
             ${!s.lunas && p.status !== 'batal' && html`<button class="btn solid lebar" onClick=${() => setBayar(true)}><${Ikon} nama="dompet" ukuran=${18} />${s.menunggu ? 'Lihat QR pembayaran' : s.menungguTransfer ? 'Cek & tandai lunas' : 'Terima pembayaran'}</button>`}
           </section>
         </div>
@@ -271,6 +299,7 @@ export function DetailPesanan({ k, id }) {
               ${p.status !== 'batal' && p.status !== 'selesai' && html`<button class="btn bahaya" onClick=${() => ubah('batal')}>Batalkan</button>`}
             </div>
           </section>
+          ${p.status !== 'batal' && p.status !== 'selesai' && html`<${KartuKendala} key=${p.id + ':' + (p.kendala || '')} db=${db} p=${p} />`}
         </div>
       </div>
     </div>

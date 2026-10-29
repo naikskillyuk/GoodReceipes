@@ -28,6 +28,7 @@ import { Produksi } from './layar/produksi.js';
 import { StokMakanan } from './layar/stok-makanan.js';
 import { MenuJual } from './layar/menu-jual.js';
 import { Kasir } from './layar/kasir.js';
+import { BerandaKasir } from './layar/beranda-kasir.js';
 import { CatatPesanan } from './layar/catat-pesanan.js';
 import { BannerHeader } from './layar/banner.js';
 import { DaftarPesanan, DetailPesanan } from './layar/pesanan.js';
@@ -62,10 +63,10 @@ function Layar({ k }) {
   if (a === 'nilai' && b) return html`<${LayarPenilai} key=${b} k=${k} token=${b} />`;
   if (a === 'pesan' && b) return html`<${PesanOnline} key=${b} k=${k} token=${b} />`;
   if (a === 'tiruan-mayar' && b) return html`<${TiruanMayar} k=${k} id=${b} />`;
-  // Akun toko (kasir) hanya membuka halaman penjualan; beranda-nya langsung katalog kasir.
+  // Akun toko (kasir) hanya membuka halaman penjualan; beranda-nya daftar follow-up pesanan dan tren penjualan.
   if (peranAkun(k.db) === 'toko') {
     if (!RUTE_TOKO.includes(a || '')) return html`<${TidakAda} />`;
-    if (!a) return html`<${Kasir} k=${k} />`;
+    if (!a) return html`<${BerandaKasir} k=${k} />`;
   }
   if (!a) return html`<${Beranda} k=${k} />`;
   if (a === 'stok-bahan') return html`<${StokBahan} k=${k} />`;

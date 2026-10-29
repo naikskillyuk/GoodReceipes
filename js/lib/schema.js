@@ -122,6 +122,8 @@ export const TABEL = {
   // harga sudah termasuk pilihan tambahan). sumber 'kasir' | 'online' | 'manual'.
   // Pesanan manual: saluran (WhatsApp, Telepon, ...), jadwal ambil/antar (ms), alamat antar, ongkir.
   // Pesanan online: caraAmbil 'ambil' (diambil sendiri) | 'ojol' (ojek online dipesan pembeli sendiri) + jadwal jam ambil.
+  // Lacak pesanan: buktiPada = waktu pembeli menekan "Kirim bukti bayar" (ms), kendala = pesan dari dapur untuk pembeli
+  // ('' = tidak ada), riwayat = [{status, waktu}] perubahan status untuk timeline.
   // status: 'menunggu' (online, belum dibayar) | 'baru' | 'diproses' | 'siap' | 'selesai' | 'batal'.
   // Status bayar dibaca dari tabel Pembayaran (ada yang lunas = lunas).
   Pesanan: {
@@ -130,6 +132,7 @@ export const TABEL = {
       id: 't', nomor: 't', sumber: 't', idPelanggan: 't', nama: 't', hp: 't', catatan: 't', item: 'j',
       subtotal: 'n', diskon: 'n', kodePromo: 't', total: 'n', status: 't', oleh: 't', waktu: 'n',
       saluran: 't', jadwal: 'n', alamat: 't', ongkir: 'n', caraAmbil: 't',
+      buktiPada: 'n', kendala: 't', riwayat: 'j',
     },
   },
   // metode 'tunai' | 'transfer' (transfer/QRIS manual) | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.

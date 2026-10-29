@@ -62,12 +62,14 @@ class ApiController extends Controller
             if ($aksi === 'infoToko') {
                 return $this->keluar($jual->infoToko($req['token'] ?? null));
             }
-            if (in_array($aksi, ['pesanOnline', 'statusPesanan', 'kirimTestimoni'], true)) {
+            if (in_array($aksi, ['pesanOnline', 'statusPesanan', 'kirimTestimoni', 'kirimBukti'], true)) {
                 $k = 'toko:'.$aksi.':'.$request->ip();
                 $maks = match ($aksi) {
                     'pesanOnline' => (int) config('goodrecipes.pesanan_online_per_jam_per_ip'),
                     'kirimTestimoni' => 10,
-                    default => 120,
+                    'kirimBukti' => 30,
+                    // Halaman status pembeli mengecek tiap 5-30 detik selama terbuka.
+                    default => 900,
                 };
                 if (RateLimiter::tooManyAttempts($k, $maks)) {
                     return $this->keluar(['ok' => false, 'galat' => 'Terlalu banyak permintaan. Coba lagi beberapa saat lagi.']);
@@ -77,6 +79,7 @@ class ApiController extends Controller
                 return $this->keluar(match ($aksi) {
                     'pesanOnline' => $jual->pesanOnline($req),
                     'kirimTestimoni' => $jual->kirimTestimoni($req),
+                    'kirimBukti' => $jual->kirimBukti($req['token'] ?? null, $req['idPesanan'] ?? null),
                     default => $jual->statusPesanan($req['token'] ?? null, $req['idPesanan'] ?? null),
                 });
             }

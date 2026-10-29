@@ -201,7 +201,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     simpanBaris('Pembayaran', { ...b, status: 'lunas', lunasPada: Date.now() });
     const p = tabel('Pesanan')[b.idPesanan];
     if (p && !benar(p.dihapus, false) && p.sumber === 'online' && p.status === 'menunggu') {
-      simpanBaris('Pesanan', { ...p, status: 'baru' });
+      simpanBaris('Pesanan', { ...p, status: 'baru', riwayat: JSON.stringify([...bacaItem(p.riwayat), { status: 'baru', waktu: Date.now() }]) });
       potongStok(p);
     }
   }
@@ -412,7 +412,24 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       bayarManual: tungguTransfer ? bayarManual(s) : null,
       wa: String(s.waToko || ''),
       bisaTestimoni: lunas && kini.status !== 'batal' && !adaTesti,
+      waktu: angka(kini.waktu),
+      buktiPada: angka(kini.buktiPada),
+      lunasPada: bayar().filter((b) => b.status === 'lunas').reduce((m, b) => Math.max(m, angka(b.lunasPada) || angka(b.waktu)), 0),
+      metodeBayar: bayar().some((b) => b.metode === 'mayar') ? 'mayar' : 'transfer',
+      riwayat: bacaItem(kini.riwayat).filter((r) => r && r.status && r.waktu),
+      kendala: ['batal', 'selesai'].includes(kini.status) ? '' : String(kini.kendala || '').slice(0, 300),
     };
+  }
+  function kirimBukti(req) {
+    const s = tokoDariToken(req.token);
+    const p = s && tabel('Pesanan')[req.idPesanan];
+    if (!p || benar(p.dihapus, false) || p.sumber !== 'online') return { ok: false, galat: 'Pesanan tidak ditemukan.' };
+    if (p.status === 'batal') return { ok: false, galat: 'Pesanan ini sudah dibatalkan.' };
+    if (!angka(p.buktiPada)) {
+      simpanBaris('Pesanan', { ...p, buktiPada: Date.now() });
+      kabari();
+    }
+    return { ok: true };
   }
 
   function jawab(req) {
@@ -429,6 +446,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         return statusPesanan(req);
       case 'kirimTestimoni':
         return kirimTestimoni(req);
+      case 'kirimBukti':
+        return kirimBukti(req);
       case 'infoSitus':
         return { ok: true, logoUrl: (keadaan.situs && keadaan.situs.logoUrl) || '', latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '' };
       case 'tiruanLunas': {

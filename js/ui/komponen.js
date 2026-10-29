@@ -58,10 +58,11 @@ const MENU_ADMIN = [
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
   { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Lihat Etalase Toko', ikon: 'toko', luar: true },
 ];
-// Akun toko (kasir): POS.
+// Akun toko (kasir): beranda follow-up & tren, katalog (POS), pesanan, stok.
 const MENU_TOKO = [
-  { kunci: 'kasir', jalur: '/', label: 'Katalog', ikon: 'struk', pil: true },
-  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah', pil: true },
+  { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
+  { kunci: 'kasir', jalur: '/kasir', label: 'Katalog', ikon: 'struk', pil: true },
+  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
   { kunci: 'pesanan', jalur: '/pesanan', label: 'Status Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue', pil: true },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan' },
