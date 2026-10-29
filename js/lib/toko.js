@@ -542,6 +542,16 @@ export const STATUS_PESANAN = {
 };
 export const ALUR_STATUS = ['baru', 'diproses', 'siap', 'selesai'];
 
+/** Cara pesanan sampai ke pembeli. 'ojol' = ojek online (Gojek/Grab) yang dipesan pembeli sendiri, bukan oleh toko. */
+export const LABEL_AMBIL = { ambil: 'Ambil sendiri', ojol: 'Ojek online (dipesan pembeli)', antar: 'Diantar toko' };
+
+/** Cara ambil satu pesanan; pesanan manual lama ditebak dari alamat/ongkir. '' = tidak diketahui. */
+export function caraAmbil(p) {
+  if (p.caraAmbil && LABEL_AMBIL[p.caraAmbil]) return p.caraAmbil;
+  if (p.alamat || p.ongkir) return 'antar';
+  return p.jadwal > 0 ? 'ambil' : '';
+}
+
 /** Nomor pendek, mis. "2810-K7Q" (tanggal-bulan + 3 huruf acak). Sama dengan Penjualan::nomorPesanan. */
 export function nomorPesanan(sekarang = Date.now()) {
   const d = new Date(sekarang);
@@ -828,11 +838,18 @@ export function daftarBanner(db, { tampilDi = '', hanyaAktif = false } = {}) {
     .sort((a, b) => (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || String(a.judul || '').localeCompare(String(b.judul || '')));
 }
 
+/** Banner tanpa judul dan teks = gambar saja (gambar penuh, tanpa tulisan). */
+export const bannerGambarSaja = (b) => !String(b.judul || '').trim() && !String(b.teks || '').trim();
+
+/** Simpan banner: berjudul, atau tanpa judul dan teks sama sekali tetapi ada gambarnya (gambar saja). */
 export function simpanBanner(db, data) {
   const judul = String(data.judul || '').trim().slice(0, 60);
-  if (!judul) throw new Error('Isi judul banner.');
+  const teks = String(data.teks || '').trim();
   const lama = data.id ? db.ambil('Banner', data.id) : null;
   const foto = data.foto;
+  const adaFoto = foto !== undefined ? !!foto : !!(lama && (lama.fotoLokal || lama.fotoUrl));
+  if (!judul && teks) throw new Error('Isi judul banner, atau kosongkan teks untuk banner gambar saja.');
+  if (!judul && !adaFoto) throw new Error('Isi judul banner, atau pilih gambar (250 × 100 px) untuk banner gambar saja.');
   return db.simpan('Banner', {
     ...(lama || { urutan: daftarBanner(db).length, aktif: true }),
     ...(data.id ? { id: data.id } : {}),

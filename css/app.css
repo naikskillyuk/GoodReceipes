@@ -5284,7 +5284,7 @@ details.pembeli summary {
   position: relative;
   width: calc(100vw - 48px);
   max-width: 640px;
-  min-height: 168px;
+  aspect-ratio: 5 / 2;
   border-radius: 24px;
   overflow: hidden;
   background: linear-gradient(120deg, #2f7a1c 0%, #5fae3a 55%, #f5c02f 130%);
@@ -5308,8 +5308,8 @@ details.pembeli summary {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 18px;
+  gap: 3px;
+  padding: 12px 16px;
   max-width: 64%;
 }
 .et-banner-isi small {
@@ -5321,15 +5321,15 @@ details.pembeli summary {
 }
 .et-banner-isi b {
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 24px;
+  font-size: 21px;
   line-height: 1.1;
 }
 .et-banner-isi span {
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
   opacity: 0.95;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -5411,7 +5411,6 @@ details.pembeli summary {
 @media (min-width: 720px) {
   .et-banner {
     width: 560px;
-    min-height: 200px;
   }
   .et-pintas {
     max-width: 560px;
@@ -5572,6 +5571,34 @@ details.opsi-menu[open] {
 }
 .et-opsi-item b {
   color: var(--e-utama-2);
+}
+/* Cara ambil pesanan di keranjang etalase */
+.et-cara-ambil {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.et-cara-ambil legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.et-cara-ambil .et-opsi-item {
+  padding: 10px 14px;
+}
+.et-cara-ambil .et-opsi-item span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.et-cara-ambil .et-opsi-item small {
+  color: var(--e-muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
 .et-ada-pilihan {
   font-size: 11.5px;
@@ -5780,16 +5807,34 @@ details.opsi-menu[open] {
   position: relative;
   display: flex;
   align-items: stretch;
-  min-height: 132px;
-  border-radius: 24px;
+  /* Ukuran banner 250 x 100 px: rasio tetap 5:2 di semua lebar layar. */
+  aspect-ratio: 5 / 2;
+  border-radius: 20px;
   overflow: hidden;
   background: var(--b-latar);
   color: var(--b-tinta);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 .kartu-banner.kecil {
-  min-height: 104px;
-  border-radius: 20px;
+  border-radius: 16px;
+}
+.kartu-banner.gambar-saja {
+  background: var(--kartu-2);
+}
+.kb-gambar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.kb-penuh {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 .kb-isi {
   position: relative;
@@ -5797,8 +5842,8 @@ details.opsi-menu[open] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 16px 18px;
+  gap: 3px;
+  padding: 12px 16px;
   flex: 1;
   min-width: 0;
 }
@@ -5815,10 +5860,10 @@ details.opsi-menu[open] {
 }
 .kb-teks {
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.35;
   opacity: 0.85;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -5827,8 +5872,8 @@ details.opsi-menu[open] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 0 16px;
+  min-height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 0;
   background: var(--b-tinta);
@@ -5852,8 +5897,7 @@ details.opsi-menu[open] {
   max-width: 640px;
 }
 .et-banner-admin .kartu-banner {
-  height: 100%;
-  min-height: 168px;
+  width: 100%;
 }
 @media (min-width: 720px) {
   .et-banner-admin {
@@ -6108,6 +6152,9 @@ details.opsi-menu[open] {
   gap: 6px;
   padding-top: 10px;
   border-top: 1px solid var(--garis);
+}
+.baris-banner > .kartu-banner {
+  max-width: 360px;
 }
 .baris-banner .baris-pisah {
   flex-wrap: wrap;

@@ -121,6 +121,7 @@ export const TABEL = {
   // Pesanan. item = [{idMenu, nama, harga, jumlah, opsi?}] (idMenu kosong = item di luar menu; opsi = nama pilihan tambahan,
   // harga sudah termasuk pilihan tambahan). sumber 'kasir' | 'online' | 'manual'.
   // Pesanan manual: saluran (WhatsApp, Telepon, ...), jadwal ambil/antar (ms), alamat antar, ongkir.
+  // Pesanan online: caraAmbil 'ambil' (diambil sendiri) | 'ojol' (ojek online dipesan pembeli sendiri) + jadwal jam ambil.
   // status: 'menunggu' (online, belum dibayar) | 'baru' | 'diproses' | 'siap' | 'selesai' | 'batal'.
   // Status bayar dibaca dari tabel Pembayaran (ada yang lunas = lunas).
   Pesanan: {
@@ -128,7 +129,7 @@ export const TABEL = {
     kolom: {
       id: 't', nomor: 't', sumber: 't', idPelanggan: 't', nama: 't', hp: 't', catatan: 't', item: 'j',
       subtotal: 'n', diskon: 'n', kodePromo: 't', total: 'n', status: 't', oleh: 't', waktu: 'n',
-      saluran: 't', jadwal: 'n', alamat: 't', ongkir: 'n',
+      saluran: 't', jadwal: 'n', alamat: 't', ongkir: 'n', caraAmbil: 't',
     },
   },
   // metode 'tunai' | 'transfer' (transfer/QRIS manual) | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.
@@ -155,7 +156,8 @@ export const TABEL = {
   // Satu baris saja (id tetap 'stl_merek'): nama dan logo aplikasi, ikut tersinkron dan tampil di halaman penilai.
   // Banner informasi di etalase / kasir (diatur admin): judul, teks, gambar, warna, dan tombol.
   // aksi: '' | 'menu' | 'kategori' | 'promo' | 'wa' | 'link'; nilai = nama kategori / kode promo / alamat link.
-  // tampilDi: 'etalase' | 'kasir' | 'semua'.
+  // tampilDi: 'etalase' | 'kasir' | 'semua'. Ukuran tampil 250 x 100 (rasio 5:2).
+  // Judul dan teks kosong + ada gambar = banner gambar saja (gambar penuh, tanpa tulisan).
   Banner: {
     awalan: 'bnr',
     kolom: {

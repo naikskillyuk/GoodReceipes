@@ -306,7 +306,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         .slice(0, 6)
         .map((p) => ({ kode: String(p.kode).trim().toUpperCase(), nama: String(p.nama || ''), jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), minBelanja: angka(p.minBelanja), maksDiskon: angka(p.maksDiskon), untuk: p.untuk || 'semua', sampai: angka(p.sampai) })),
       latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '',
-      banner: hidup('Banner', (b) => benar(b.aktif, false) && ['etalase', 'semua'].includes(b.tampilDi || 'etalase') && String(b.judul || '').trim())
+      banner: hidup('Banner', (b) => benar(b.aktif, false) && ['etalase', 'semua'].includes(b.tampilDi || 'etalase') && (String(b.judul || '').trim() || /^(https?:|\/foto\/)/.test(String(b.fotoUrl || ''))))
         .sort((a, b) => angka(a.urutan) - angka(b.urutan))
         .slice(0, 8)
         .map((b) => ({ judul: String(b.judul), teks: String(b.teks || ''), fotoUrl: /^(https?:|\/foto\/)/.test(String(b.fotoUrl || '')) ? String(b.fotoUrl) : '', warna: b.warna || 'hijau', tombol: String(b.tombol || ''), aksi: String(b.aksi || ''), nilai: String(b.nilai || '') })),
@@ -348,6 +348,13 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     else if (hp.startsWith('8')) hp = '62' + hp;
     if (nama.length < 2) return { ok: false, galat: 'Isi nama Anda.' };
     if (!/^62\d{8,13}$/.test(hp)) return { ok: false, galat: 'Isi nomor WhatsApp yang benar, mis. 0812xxxxxxx.' };
+    // Sama dengan Penjualan::pesanOnline: cara ambil + jam ambil (boleh kosong untuk halaman lama).
+    const caraAmbil = ['ambil', 'ojol'].includes(req.caraAmbil) ? req.caraAmbil : '';
+    let jadwal = Math.floor(Number(req.jadwal)) || 0;
+    if (caraAmbil) {
+      if (jadwal < Date.now() - 15 * 60 * 1000) return { ok: false, galat: 'Pilih jam ambil yang belum lewat.' };
+      if (jadwal > Date.now() + 60 * 24 * 60 * 60 * 1000) return { ok: false, galat: 'Jam ambil paling lambat 60 hari dari sekarang.' };
+    } else jadwal = 0;
     const menu = Object.fromEntries(hidup('Menu', (m) => benar(m.aktif, false) && benar(m.online, false)).map((m) => [m.id, m]));
     const masuk = Array.isArray(req.item) ? req.item : [];
     if (!masuk.length) return { ok: false, galat: 'Pilih menu yang ingin dipesan.' };
@@ -376,7 +383,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     if (!tabel('Pelanggan')[idPelanggan]) simpanBaris('Pelanggan', { id: idPelanggan, nama, hp, catatan: '', dibuat: sekarang });
     const idPesanan = idAcak('psn');
     const nomor = nomorPesanan();
-    simpanBaris('Pesanan', { id: idPesanan, nomor, sumber: 'online', idPelanggan, nama, hp, catatan: bersihkan(req.catatan, 300), item: JSON.stringify(item), subtotal, diskon: promo.diskon, kodePromo: promo.kode, total, status: 'menunggu', oleh: 'Link pemesanan', waktu: sekarang });
+    simpanBaris('Pesanan', { id: idPesanan, nomor, sumber: 'online', idPelanggan, nama, hp, catatan: bersihkan(req.catatan, 300), item: JSON.stringify(item), subtotal, diskon: promo.diskon, kodePromo: promo.kode, total, status: 'menunggu', oleh: 'Link pemesanan', waktu: sekarang, caraAmbil, jadwal });
     const link = mayar ? buatLinkMayar(total) : { id: '', link: '' };
     simpanBaris('Pembayaran', { id: idAcak('byr'), idPesanan, metode: mayar ? 'mayar' : 'transfer', jumlah: total, status: 'menunggu', idMayar: link.id, linkMayar: link.link, waktu: sekarang });
     kabari();
@@ -401,6 +408,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     return {
       ok: true, nomor: kini.nomor, status: kini.status, lunas, total: angka(kini.total), item: bacaItem(kini.item), nama: kini.nama,
       link: lunas || !menunggu ? '' : menunggu.linkMayar,
+      caraAmbil: String(kini.caraAmbil || ''), jadwal: angka(kini.jadwal), alamatToko: String(s.alamatToko || ''),
       bayarManual: tungguTransfer ? bayarManual(s) : null,
       wa: String(s.waToko || ''),
       bisaTestimoni: lunas && kini.status !== 'batal' && !adaTesti,

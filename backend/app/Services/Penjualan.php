@@ -250,7 +250,9 @@ class Penjualan
     /** Banner informasi aktif untuk etalase, urut tampil. */
     private function bannerEtalase(int $id): array
     {
-        $daftar = $this->semua($id, 'Banner', fn ($b) => $b['aktif'] && in_array($b['tampilDi'] ?: 'etalase', ['etalase', 'semua'], true) && trim((string) $b['judul']) !== '');
+        // Banner berjudul, atau banner gambar saja (tanpa judul) yang gambarnya sudah terunggah.
+        $daftar = $this->semua($id, 'Banner', fn ($b) => $b['aktif'] && in_array($b['tampilDi'] ?: 'etalase', ['etalase', 'semua'], true)
+            && (trim((string) $b['judul']) !== '' || str_starts_with((string) $b['fotoUrl'], 'http')));
         usort($daftar, fn ($a, $b) => ((float) $a['urutan']) <=> ((float) $b['urutan']));
 
         return array_map(fn ($b) => [
@@ -444,6 +446,21 @@ class Penjualan
         if ($hp === '') {
             return ['ok' => false, 'galat' => 'Isi nomor WhatsApp yang benar, mis. 0812xxxxxxx.'];
         }
+        // Cara ambil: diambil sendiri atau ojek online yang dipesan pembeli sendiri, beserta jam ambilnya.
+        // Boleh kosong untuk halaman lama yang belum punya pilihan ini.
+        $caraAmbil = in_array($req['caraAmbil'] ?? '', ['ambil', 'ojol'], true) ? $req['caraAmbil'] : '';
+        $jadwal = is_numeric($req['jadwal'] ?? null) ? (int) $req['jadwal'] : 0;
+        if ($caraAmbil !== '') {
+            $kini = self::sekarang();
+            if ($jadwal < $kini - 15 * 60 * 1000) {
+                return ['ok' => false, 'galat' => 'Pilih jam ambil yang belum lewat.'];
+            }
+            if ($jadwal > $kini + 60 * 24 * 60 * 60 * 1000) {
+                return ['ok' => false, 'galat' => 'Jam ambil paling lambat 60 hari dari sekarang.'];
+            }
+        } else {
+            $jadwal = 0;
+        }
 
         // Item: harga selalu dari menu di server, bukan dari pembeli.
         $menu = [];
@@ -505,7 +522,7 @@ class Penjualan
             'kembaliKe' => $kembaliKe ? $kembaliKe.'/#/pesan/'.$s['tokenToko'].'?pesanan='.$idPesanan : '',
         ]) : ['id' => '', 'link' => ''];
 
-        return Sinkron::denganKunci($id, fn () => DB::transaction(function () use ($id, $idPesanan, $nomor, $nama, $hp, $idPelanggan, $item, $subtotal, $diskon, $promo, $total, $sekarang, $req, $link) {
+        return Sinkron::denganKunci($id, fn () => DB::transaction(function () use ($id, $idPesanan, $nomor, $nama, $hp, $idPelanggan, $item, $subtotal, $diskon, $promo, $total, $sekarang, $req, $link, $caraAmbil, $jadwal) {
             if (! $this->ambil($id, 'Pelanggan', $idPelanggan)) {
                 $this->simpan($id, 'Pelanggan', ['id' => $idPelanggan, 'nama' => $nama, 'hp' => $hp, 'catatan' => '', 'dibuat' => $sekarang]);
             }
@@ -514,6 +531,7 @@ class Penjualan
                 'catatan' => $this->teks($req['catatan'] ?? '', 300), 'item' => json_encode($item), 'subtotal' => $subtotal,
                 'diskon' => $diskon, 'kodePromo' => $promo ? Str::upper(trim((string) $promo['kode'])) : '', 'total' => $total,
                 'status' => 'menunggu', 'oleh' => 'Link pemesanan', 'waktu' => $sekarang,
+                'caraAmbil' => $caraAmbil, 'jadwal' => $jadwal,
             ]);
             $this->simpan($id, 'Pembayaran', [
                 'id' => 'byr_'.base_convert((string) $sekarang, 10, 36).Str::lower(Str::random(8)), 'idPesanan' => $idPesanan,
@@ -611,6 +629,8 @@ class Penjualan
         return [
             'ok' => true, 'nomor' => $p['nomor'], 'status' => $p['status'], 'lunas' => $lunas, 'total' => (float) $p['total'],
             'item' => $p['item'] ?: [], 'nama' => $p['nama'], 'link' => $lunas ? '' : $link,
+            'caraAmbil' => (string) $p['caraAmbil'], 'jadwal' => (int) $p['jadwal'],
+            'alamatToko' => (string) $toko['setelan']['alamatToko'],
             'bayarManual' => $tungguTransfer ? $this->bayarManual($toko['setelan']) : null,
             'wa' => (string) $toko['setelan']['waToko'],
             'bisaTestimoni' => $lunas && $p['status'] !== 'batal' && ! $testimoni,

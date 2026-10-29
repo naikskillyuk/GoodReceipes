@@ -8,13 +8,15 @@ import { kompres } from '../ui/gambar.js';
 import { KartuBanner } from '../ui/banner.js';
 import { ambilMerek } from '../lib/repo.js';
 import {
-  daftarBanner, simpanBanner, geserBanner, fotoHeader, simpanFotoHeader, WARNA_BANNER, AKSI_BANNER, daftarPromo, ambilToko,
+  daftarBanner, simpanBanner, geserBanner, bannerGambarSaja, fotoHeader, simpanFotoHeader, WARNA_BANNER, AKSI_BANNER, daftarPromo, ambilToko,
 } from '../lib/toko.js';
 
 const kompresHeader = (file) => kompres(file, 1600, 0.82);
 const kompresBanner = (file) => kompres(file, 900, 0.85);
 const TAMPIL = { etalase: 'Etalase pembeli', kasir: 'Kasir', semua: 'Etalase & kasir' };
 const fotoBanner = (b) => b.fotoLokal || b.fotoUrl || '';
+/** Nama banner di daftar admin (banner gambar saja tidak punya judul). */
+const namaBanner = (b) => String(b.judul || '').trim() || 'gambar' + (b.tombol ? ' ' + b.tombol : '');
 
 /** Pratinjau header etalase seperti yang dilihat pembeli. */
 function PratinjauHeader({ db, foto }) {
@@ -60,11 +62,12 @@ function FormBanner({ db, awal, onTutup }) {
   }));
   const [galat, setGalat] = useState('');
   const atur = (patch) => (setGalat(''), setD((x) => ({ ...x, ...patch })));
+  const gambarSaja = bannerGambarSaja(d);
   const promo = daftarPromo(db).filter((p) => p.promo.aktif).map((p) => p.promo.kode);
   const kategori = [...new Set(db.semua('Kategori').map((k) => k.nama)), 'Paket'];
   const simpan = () => {
     try {
-      if (d.aksi && !d.tombol.trim()) return setGalat('Isi tulisan tombol, atau pilih "Tanpa tombol".');
+      if (d.aksi && !d.tombol.trim()) return setGalat(gambarSaja ? 'Isi keterangan banner (mis. Lihat menu), atau pilih "Tanpa tombol".' : 'Isi tulisan tombol, atau pilih "Tanpa tombol".');
       if (['kategori', 'promo', 'link'].includes(d.aksi) && !String(d.nilai || '').trim()) return setGalat('Lengkapi tujuan tombol.');
       simpanBanner(db, { ...d, id: awal && awal.id });
       tampilToast(awal ? 'Banner disimpan.' : 'Banner ditambahkan.');
@@ -76,24 +79,25 @@ function FormBanner({ db, awal, onTutup }) {
   return html`<${Modal} judul=${awal ? 'Ubah banner' : 'Banner baru'} onTutup=${onTutup}>
     <div class="kolom" style="gap:12px">
       <${KartuBanner} b=${d} foto=${d.foto} />
-      <label class="bidang"><span>Judul</span><input class="input" maxlength="60" value=${d.judul} onInput=${(e) => atur({ judul: e.target.value })} placeholder="mis. Pre-order Lebaran dibuka" /></label>
-      <label class="bidang"><span>Teks</span><input class="input" maxlength="160" value=${d.teks} onInput=${(e) => atur({ teks: e.target.value })} placeholder="mis. Pesan kue kering sebelum 20 Maret" /></label>
-      <div class="bidang"><span>Gambar (kanan, opsional)</span>
-        <${FotoInput} nilai=${d.foto} onUbah=${(f) => atur({ foto: f })} judul=${d.foto ? 'Ganti gambar' : 'Pilih gambar'} bantu="PNG / foto produk; tampil di sisi kanan banner." aksen="var(--hijau)" ikon="gambar" kompresFn=${kompresBanner} />
+      <p class="bantu">Ukuran banner 250 × 100 px. Kosongkan judul dan teks bila banner cukup gambar saja.</p>
+      <label class="bidang"><span>Judul (opsional)</span><input class="input" maxlength="60" value=${d.judul} onInput=${(e) => atur({ judul: e.target.value })} placeholder="mis. Pre-order Lebaran dibuka" /></label>
+      <label class="bidang"><span>Teks (opsional)</span><input class="input" maxlength="160" value=${d.teks} onInput=${(e) => atur({ teks: e.target.value })} placeholder="mis. Pesan kue kering sebelum 20 Maret" /></label>
+      <div class="bidang"><span>Gambar${gambarSaja ? '' : ' (kanan, opsional)'}</span>
+        <${FotoInput} nilai=${d.foto} onUbah=${(f) => atur({ foto: f })} judul=${d.foto ? 'Ganti gambar' : 'Pilih gambar'} bantu=${gambarSaja ? 'Gambar 250 × 100 px (atau 750 × 300 px agar tajam). Tampil penuh tanpa tulisan.' : 'PNG / foto produk; tampil di sisi kanan banner. Tanpa judul dan teks, gambar tampil penuh 250 × 100 px.'} aksen="var(--hijau)" ikon="gambar" kompresFn=${kompresBanner} />
         ${d.foto && html`<button type="button" class="btn kecil" style="align-self:flex-start" onClick=${() => atur({ foto: '' })}>Hapus gambar</button>`}
       </div>
-      <div class="bidang"><span>Warna</span>
+      ${!gambarSaja && html`<div class="bidang"><span>Warna</span>
         <div class="chips" role="group" aria-label="Warna banner">
           ${Object.entries(WARNA_BANNER).map(([k, w]) => html`<button type="button" class=${'chip chip-warna' + (d.warna === k ? ' aktif' : '')} aria-pressed=${d.warna === k} style=${`--warna-chip:${w.latar};--tinta-chip:${w.tinta}`} onClick=${() => atur({ warna: k })}>${k}</button>`)}
         </div>
-      </div>
+      </div>`}
       <div class="dua-kolom">
         <label class="bidang"><span>Tombol</span>
           <select class="pilih" aria-label="Aksi tombol" value=${d.aksi} onChange=${(e) => atur({ aksi: e.target.value, nilai: '', tombol: d.tombol || (e.target.value ? { menu: 'Lihat menu', kategori: 'Lihat', promo: 'Pakai kode', wa: 'Chat kami', link: 'Buka' }[e.target.value] : '') })}>
             ${Object.entries(AKSI_BANNER).map(([k, l]) => html`<option value=${k} selected=${d.aksi === k}>${l}</option>`)}
           </select>
         </label>
-        ${d.aksi && html`<label class="bidang"><span>Tulisan tombol</span><input class="input" maxlength="30" aria-label="Tulisan tombol" value=${d.tombol} onInput=${(e) => atur({ tombol: e.target.value })} /></label>`}
+        ${d.aksi && html`<label class="bidang"><span>${gambarSaja ? 'Keterangan (dibaca pembaca layar)' : 'Tulisan tombol'}</span><input class="input" maxlength="30" aria-label=${gambarSaja ? 'Keterangan (dibaca pembaca layar)' : 'Tulisan tombol'} value=${d.tombol} onInput=${(e) => atur({ tombol: e.target.value })} /></label>`}
       </div>
       ${d.aksi === 'kategori' &&
       html`<label class="bidang"><span>Kategori</span><select class="pilih" aria-label="Kategori tujuan" value=${d.nilai} onChange=${(e) => atur({ nilai: e.target.value })}>
@@ -124,7 +128,7 @@ export function BannerHeader({ k }) {
   const daftar = daftarBanner(db);
   const [form, setForm] = useState(null); // null | 'baru' | banner
   const hapus = async (b) => {
-    if (await tanya({ judul: `Hapus banner “${b.judul}”?`, ya: 'Hapus', bahaya: true })) db.hapus('Banner', b.id);
+    if (await tanya({ judul: `Hapus banner “${namaBanner(b)}”?`, ya: 'Hapus', bahaya: true })) db.hapus('Banner', b.id);
   };
   return html`<${Kerangka} k=${k} aktif="banner">
     <${Hero} warna="var(--kuning)" label="Tampilan" judul="Banner & header" kembali="/" stat=${html`<${Stat} nilai=${daftar.filter((b) => b.aktif).length} label="banner aktif" />`}>
@@ -147,11 +151,11 @@ export function BannerHeader({ k }) {
                 <div class="baris-pisah">
                   <small class="teks-kecil">${TAMPIL[b.tampilDi] || TAMPIL.etalase}${b.aktif ? '' : ' · disembunyikan'}${b.aksi ? ' · ' + AKSI_BANNER[b.aksi] + (b.nilai ? ': ' + b.nilai : '') : ''}</small>
                   <span class="baris-aksi">
-                    <button class="ikon-btn kecil" aria-label=${'Naikkan ' + b.judul} disabled=${i === 0} onClick=${() => geserBanner(db, b.id, -1)}><span style="display:inline-flex;transform:rotate(180deg)"><${Ikon} nama="bawah" ukuran=${16} /></span></button>
-                    <button class="ikon-btn kecil" aria-label=${'Turunkan ' + b.judul} disabled=${i === daftar.length - 1} onClick=${() => geserBanner(db, b.id, 1)}><${Ikon} nama="bawah" ukuran=${16} /></button>
+                    <button class="ikon-btn kecil" aria-label=${'Naikkan ' + namaBanner(b)} disabled=${i === 0} onClick=${() => geserBanner(db, b.id, -1)}><span style="display:inline-flex;transform:rotate(180deg)"><${Ikon} nama="bawah" ukuran=${16} /></span></button>
+                    <button class="ikon-btn kecil" aria-label=${'Turunkan ' + namaBanner(b)} disabled=${i === daftar.length - 1} onClick=${() => geserBanner(db, b.id, 1)}><${Ikon} nama="bawah" ukuran=${16} /></button>
                     <button class="btn kecil" onClick=${() => db.simpan('Banner', { ...b, aktif: !b.aktif })}>${b.aktif ? 'Sembunyikan' : 'Tampilkan'}</button>
-                    <button class="btn kecil" aria-label=${'Ubah banner ' + b.judul} onClick=${() => setForm(b)}>Ubah</button>
-                    <button class="ikon-btn kecil" aria-label=${'Hapus banner ' + b.judul} onClick=${() => hapus(b)}><${Ikon} nama="sampah" ukuran=${16} /></button>
+                    <button class="btn kecil" aria-label=${'Ubah banner ' + namaBanner(b)} onClick=${() => setForm(b)}>Ubah</button>
+                    <button class="ikon-btn kecil" aria-label=${'Hapus banner ' + namaBanner(b)} onClick=${() => hapus(b)}><${Ikon} nama="sampah" ukuran=${16} /></button>
                   </span>
                 </div>
               </div>`,

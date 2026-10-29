@@ -8,7 +8,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { buatQR, salin } from './bagikan.js';
 import {
   daftarPesanan, statusBayar, ubahStatusPesanan, bayarTunai, bayarTransfer, saranUang, mintaBayarMayar, cekBayarMayar,
-  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
+  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, LABEL_AMBIL, caraAmbil, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah, angka, tanggal } from '../lib/util.js';
 
@@ -155,6 +155,9 @@ export function DialogBayar({ k, pesanan, onTutup }) {
   <//>`;
 }
 
+const LABEL_AMBIL_PENDEK = { ambil: 'Ambil', ojol: 'Ojol dipesan pembeli', antar: 'Antar' };
+const LABEL_JADWAL = { ambil: 'Jam ambil', ojol: 'Jam driver datang', antar: 'Jadwal antar' };
+
 function KartuPesanan({ db, p }) {
   const item = Array.isArray(p.item) ? p.item : [];
   return html`<a class="kartu-pesanan" href=${tautan('/pesanan/' + p.id)}>
@@ -163,7 +166,7 @@ function KartuPesanan({ db, p }) {
       <span class=${'lencana-status s-' + p.status}>${STATUS_PESANAN[p.status] || p.status}</span>
     </div>
     <small class="teks-kecil">${item.map((i) => `${i.jumlah}× ${namaItem(i)}`).join(', ')}</small>
-    ${p.jadwal > 0 && html`<small class="jadwal-pesanan"><${Ikon} nama="jam" ukuran=${14} />${p.alamat || p.ongkir ? 'Antar' : 'Ambil'} ${teksJadwal(p.jadwal)}</small>`}
+    ${p.jadwal > 0 && html`<small class="jadwal-pesanan"><${Ikon} nama="jam" ukuran=${14} />${LABEL_AMBIL_PENDEK[caraAmbil(p)] || 'Ambil'} ${teksJadwal(p.jadwal)}</small>`}
     <div class="baris-pisah">
       <span class="teks-kecil">${tanggal(p.waktu)} ${jam(p.waktu)} · ${labelSumber(p)}</span>
       <span class="baris-aksi"><${LencanaBayar} db=${db} p=${p} /><b>${rupiah(p.total)}</b></span>
@@ -230,7 +233,9 @@ export function DetailPesanan({ k, id }) {
     }
     ubahStatusPesanan(db, p.id, status);
   };
-  const waPembeli = p.hp ? `https://wa.me/${p.hp}?text=${encodeURIComponent(`Halo ${p.nama || ''}, pesanan #${p.nomor} ${p.status === 'siap' ? 'sudah siap diambil' : 'sedang kami proses'}. Terima kasih!`)}` : '';
+  const cara = caraAmbil(p);
+  const kabarSiap = cara === 'ojol' ? 'sudah siap. Silakan pesan Gojek / Grab ke toko sekarang' : 'sudah siap diambil';
+  const waPembeli = p.hp ? `https://wa.me/${p.hp}?text=${encodeURIComponent(`Halo ${p.nama || ''}, pesanan #${p.nomor} ${p.status === 'siap' ? kabarSiap : 'sedang kami proses'}. Terima kasih!`)}` : '';
 
   return html`<${Kerangka} k=${k} aktif="pesanan">
     <${Hero} warna="var(--tomat)" label=${STATUS_PESANAN[p.status] || p.status} judul=${'#' + p.nomor} kembali="/pesanan" stat=${html`<${LencanaBayar} db=${db} p=${p} />`} />
@@ -253,7 +258,9 @@ export function DetailPesanan({ k, id }) {
             ${p.hp && html`<div class="hasil-baris"><span>WhatsApp</span><b class="biasa">${tampilHp(p.hp)}</b></div>`}
             <div class="hasil-baris"><span>Dari</span><b class="biasa">${labelSumber(p)}${p.oleh && p.sumber !== 'online' ? ' · ' + p.oleh : ''}</b></div>
             <div class="hasil-baris"><span>Dicatat</span><b class="biasa">${tanggal(p.waktu)} ${jam(p.waktu)}</b></div>
-            ${p.jadwal > 0 && html`<div class="hasil-baris"><span>${p.alamat || p.ongkir ? 'Jadwal antar' : 'Jadwal ambil'}</span><b class="biasa">${teksJadwal(p.jadwal)}</b></div>`}
+            ${p.caraAmbil && LABEL_AMBIL[p.caraAmbil] && html`<div class="hasil-baris"><span>Cara ambil</span><b class="biasa">${LABEL_AMBIL[p.caraAmbil]}</b></div>`}
+            ${p.jadwal > 0 && html`<div class="hasil-baris"><span>${LABEL_JADWAL[cara] || 'Jadwal ambil'}</span><b class="biasa">${teksJadwal(p.jadwal)}</b></div>`}
+            ${cara === 'ojol' && html`<p class="bantu">Ojek dipesan sendiri oleh pembeli. Siapkan pesanan sebelum driver datang.</p>`}
             ${p.alamat && html`<div class="hasil-baris"><span>Alamat</span><b class="biasa">${p.alamat}</b></div>`}
             ${p.catatan && html`<div class="hasil-baris"><span>Catatan</span><b class="biasa">${p.catatan}</b></div>`}
             <div class="baris-btn">

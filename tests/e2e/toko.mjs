@@ -46,6 +46,12 @@ function pantau(page, nama) {
   });
 }
 
+// Nilai input datetime-local untuk N jam dari sekarang (waktu setempat).
+const jamNanti = (n) => {
+  const d = new Date(Date.now() + n * 3600 * 1000);
+  const dua = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}T${dua(d.getHours())}:${dua(d.getMinutes())}`;
+};
 const sisaLebar = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const evalDb = (page, fn, arg) => page.evaluate(async ([kode, a]) => {
   const toko = await import('/js/lib/toko.js');
@@ -230,6 +236,18 @@ try {
   await foto(page, '09a-form-banner');
   await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
   await page.getByText('Banner ditambahkan.').waitFor();
+  // Banner gambar saja: judul dan teks dikosongkan, cukup gambar.
+  await page.getByRole('button', { name: 'Tambah banner' }).click();
+  await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
+  await dlgBanner.getByText('pilih gambar (250 × 100 px)').waitFor();
+  await dlgBanner.locator('input[type=file]').setInputFiles(path.join(AKAR, 'gambar/latar-masuk.jpg'));
+  await dlgBanner.locator('.kartu-banner.gambar-saja img').waitFor();
+  await dlgBanner.getByLabel('Aksi tombol').selectOption('menu');
+  await dlgBanner.getByLabel('Keterangan (dibaca pembaca layar)').fill('Lihat menu baru');
+  await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
+  await page.getByText('Banner ditambahkan.').waitFor();
+  const ukuran = await page.locator('.baris-banner .kartu-banner.gambar-saja').boundingBox();
+  assert.ok(Math.abs(ukuran.width / ukuran.height - 2.5) < 0.05, 'banner berukuran 250 x 100 (5:2)');
   await foto(page, '09b-banner-admin');
 
   tahap('pembeli memesan lewat link, membayar, pesanan masuk dan stok terpotong');
@@ -247,6 +265,7 @@ try {
   await pembeli.getByText('Halo, selamat datang di').waitFor();
   await pembeli.locator('.et-header-foto[src*="/foto/"]').waitFor();
   await pembeli.getByText('Pre-order Lebaran').first().waitFor();
+  await pembeli.getByRole('button', { name: 'Lihat menu baru' }).waitFor();
   await pembeli.locator('.et-diskon', { hasText: '-50%' }).first().waitFor();
   await foto(pembeli, '07a-etalase-beranda');
   assert.ok((await sisaLebar(pembeli)) <= 0, 'etalase tidak melebar');
@@ -261,6 +280,11 @@ try {
   await pembeli.getByRole('button', { name: 'Keranjang (2)' }).click();
   await pembeli.getByLabel('Nama').fill('Sari');
   await pembeli.getByLabel('Nomor WhatsApp').fill('081299998888');
+  // Cara ambil wajib dipilih, lengkap dengan jamnya.
+  await pembeli.getByRole('button', { name: 'Pesan & bayar' }).click();
+  await pembeli.getByText('Pilih cara ambil pesanan').waitFor();
+  await pembeli.getByRole('radio', { name: /Ambil sendiri/ }).check();
+  await pembeli.getByLabel('Jam Anda datang mengambil').fill(jamNanti(2));
   await foto(pembeli, '07c-etalase-keranjang');
   assert.ok((await sisaLebar(pembeli)) <= 0, 'halaman pembeli tidak melebar');
   await pembeli.getByRole('button', { name: 'Pesan & bayar' }).click();
@@ -288,15 +312,24 @@ try {
   await pembeli.getByRole('button', { name: 'Keranjang (1)' }).click();
   await pembeli.getByLabel('Nama').fill('Rudi');
   await pembeli.getByLabel('Nomor WhatsApp').fill('081355556666');
+  await pembeli.getByRole('radio', { name: /Ojek online/ }).check();
+  await pembeli.getByText('Pesan ojeknya sendiri lewat aplikasi Gojek / Grab').waitFor();
+  await pembeli.getByLabel('Jam driver ojek datang ke toko').fill(jamNanti(3));
+  await foto(pembeli, '07c2-etalase-ojol');
   await pembeli.getByRole('button', { name: 'Pesan sekarang' }).click();
   await pembeli.getByRole('heading', { name: 'Cara bayar' }).waitFor();
   await pembeli.getByText('1234567890').waitFor();
   await pembeli.getByRole('img', { name: 'Kode QRIS toko' }).waitFor();
   assert.match(await pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).getAttribute('href'), /wa\.me\/6281277778888/);
+  assert.match(decodeURIComponent(await pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).getAttribute('href')), /Cara ambil: Ojek online \(dipesan pembeli\)/);
+  await pembeli.getByText('Toko tidak memesankan ojek.').waitFor();
   await foto(pembeli, '07d-bayar-transfer');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await page.goto(ADMIN + '#/pesanan?tab=menunggu');
+  await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).getByText(/Ojol dipesan pembeli/).waitFor();
   await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).click();
+  await page.getByText('Ojek online (dipesan pembeli)').waitFor();
+  await page.getByText('Jam driver datang').waitFor();
   await page.getByRole('button', { name: 'Cek & tandai lunas' }).click();
   await page.getByRole('button', { name: /^Tandai lunas transfer/ }).click();
   await page.getByText('Lunas · Transfer/QRIS').first().waitFor();

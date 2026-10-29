@@ -145,7 +145,7 @@ return [
             'kolom' => [
                 'id' => 't', 'nomor' => 't', 'sumber' => 't', 'idPelanggan' => 't', 'nama' => 't', 'hp' => 't', 'catatan' => 't', 'item' => 'j',
                 'subtotal' => 'n', 'diskon' => 'n', 'kodePromo' => 't', 'total' => 'n', 'status' => 't', 'oleh' => 't', 'waktu' => 'n',
-                'saluran' => 't', 'jadwal' => 'n', 'alamat' => 't', 'ongkir' => 'n',
+                'saluran' => 't', 'jadwal' => 'n', 'alamat' => 't', 'ongkir' => 'n', 'caraAmbil' => 't',
             ],
         ],
         'Pembayaran' => [

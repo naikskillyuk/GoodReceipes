@@ -10,10 +10,11 @@ import { tampilToast } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
 import { terapkanMerekDokumen } from '../ui/merek.js';
 import { scriptUrlAman } from './penilai.js';
-import { InfoTransfer } from './pesanan.js';
+import { InfoTransfer, teksJadwal } from './pesanan.js';
+import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
 import { KartuBanner } from '../ui/banner.js';
 import { Bintang } from './pelanggan.js';
-import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris } from '../lib/toko.js';
+import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris, LABEL_AMBIL } from '../lib/toko.js';
 import { panggilApi } from '../lib/sync.js';
 import { LOGO_BAWAAN, ambilMerek } from '../lib/repo.js';
 import { rupiah, tanggal } from '../lib/util.js';
@@ -396,6 +397,8 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
   const [nama, setNama] = useState('');
   const [hp, setHp] = useState('');
   const [catatan, setCatatan] = useState('');
+  const [cara, setCara] = useState('');
+  const [jam, setJam] = useState('');
   const [kode, setKode] = useState(() => baca(kunciKode(token), '') || '');
   const [galat, setGalat] = useState('');
   const [mengirim, setMengirim] = useState(false);
@@ -408,10 +411,14 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
     if (!item.length) return setGalat('Keranjang masih kosong.');
     if (nama.trim().length < 2) return setGalat('Isi nama Anda.');
     if (!hp.trim()) return setGalat('Isi nomor WhatsApp untuk kabar pesanan.');
+    if (!cara) return setGalat('Pilih cara ambil pesanan: ambil sendiri atau ojek online.');
+    const jadwal = dariInputWaktu(jam);
+    if (!jadwal) return setGalat('Isi jam pesanan akan diambil.');
+    if (jadwal < Date.now() - 5 * 60 * 1000) return setGalat('Jam ambil sudah lewat. Pilih jam lain.');
     setMengirim(true);
     setGalat('');
     try {
-      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
+      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, caraAmbil: cara, jadwal, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
       tulis(kunciPesanan(token), j.idPesanan);
       tulis(kunciKode(token), '');
       kosongkan();
@@ -443,7 +450,23 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
       <h2 class="et-h2" id="h-data-pembeli">Data pemesan</h2>
       <label class="bidang"><span>Nama</span><input class="input" maxlength="60" autocomplete="name" value=${nama} onInput=${(e) => setNama(e.target.value)} /></label>
       <label class="bidang"><span>Nomor WhatsApp</span><input class="input" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="0812…" value=${hp} onInput=${(e) => setHp(e.target.value)} /><span class="bantu">Untuk kabar pesanan dan promo dari toko.</span></label>
-      <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="300" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. diambil jam 4 sore / alamat antar" /></label>
+      <fieldset class="bidang et-cara-ambil">
+        <legend>Cara ambil pesanan</legend>
+        <div class="et-opsi">
+          ${[
+            { kunci: 'ambil', teks: 'Datang ke toko dan ambil sendiri.' },
+            { kunci: 'ojol', teks: 'Anda yang memesan Gojek / Grab ke toko. Toko tidak memesankan ojek.' },
+          ].map(
+            (o) => html`<label class=${'et-opsi-item' + (cara === o.kunci ? ' aktif' : '')} key=${o.kunci}>
+              <input type="radio" name="cara-ambil" value=${o.kunci} checked=${cara === o.kunci} onChange=${() => (setCara(o.kunci), setGalat(''))} />
+              <span><strong>${LABEL_AMBIL[o.kunci]}</strong><small>${o.teks}</small></span>
+            </label>`,
+          )}
+        </div>
+      </fieldset>
+      ${cara && html`<label class="bidang"><span>${cara === 'ojol' ? 'Jam driver ojek datang ke toko' : 'Jam Anda datang mengambil'}</span><input class="input" type="datetime-local" min=${keInputWaktu(Date.now())} value=${jam} onInput=${(e) => (setJam(e.target.value), setGalat(''))} /></label>`}
+      ${cara === 'ojol' && html`<div class="info">Pesan ojeknya sendiri lewat aplikasi Gojek / Grab sesuai jam di atas${info.alamat ? html`, dengan titik jemput <b>${info.alamat}</b>` : ' ke alamat toko'}. Ongkir dibayar langsung ke driver dan tidak termasuk total di bawah.</div>`}
+      <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="300" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. tanpa kacang" /></label>
       <label class="bidang"><span>Kode promo (opsional)</span><input class="input" maxlength="30" style="text-transform:uppercase" value=${kode} onInput=${(e) => setKode(e.target.value)} /></label>
       <div class="hasil-baris"><span><b class="biasa">Total</b>${kode.trim() ? html`<br /><small class="teks-kecil">Diskon promo dihitung saat dipesan</small>` : ''}</span><b class="et-total">${rupiah(total)}</b></div>
       ${!info.buka && html`<div class="info">Toko sedang tutup. ${info.catatan || 'Silakan kembali lagi nanti.'}</div>`}
@@ -514,7 +537,8 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
   if (!s) return html`<p role="status">Memeriksa pesanan…</p>`;
   const LABEL = { baru: 'Pesanan diterima toko', diproses: 'Sedang disiapkan', siap: 'Siap diambil / dikirim', selesai: 'Selesai', batal: 'Pesanan dibatalkan', menunggu: 'Menunggu pembayaran' };
   const manual = !s.lunas && s.bayarManual;
-  const waBukti = manual ? waTautan(s.wa, `Halo, saya sudah bayar pesanan #${s.nomor} sebesar ${rupiah(s.total)} atas nama ${s.nama}. Berikut bukti transfernya.`) : '';
+  const ambil = s.caraAmbil && LABEL_AMBIL[s.caraAmbil] ? `${LABEL_AMBIL[s.caraAmbil]}${s.jadwal > 0 ? ', ' + teksJadwal(s.jadwal) : ''}` : '';
+  const waBukti = manual ? waTautan(s.wa, `Halo, saya sudah bayar pesanan #${s.nomor} sebesar ${rupiah(s.total)} atas nama ${s.nama}.${ambil ? ` Cara ambil: ${ambil}.` : ''} Berikut bukti transfernya.`) : '';
   return html`<div class="kolom" style="gap:16px">
     <h1 class="et-judul-layar">Pesanan Anda</h1>
     <div class="kosong et-status" role="status">
@@ -533,6 +557,8 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
     <section class="et-panel kolom">
       ${(s.item || []).map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${namaItem(i)}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
       <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(s.total)}</b></div>
+      ${ambil && html`<div class="hasil-baris"><span>Cara ambil</span><b class="biasa">${ambil}</b></div>`}
+      ${s.caraAmbil === 'ojol' && s.status !== 'batal' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} sesuai jam di atas. Toko tidak memesankan ojek.</p>`}
     </section>
     ${s.link && html`<a class="et-tombol lebar" href=${s.link}>Bayar sekarang</a>`}
     ${s.bisaTestimoni && html`<${FormTestimoni} url=${url} token=${token} idPesanan=${idPesanan} nama=${s.nama} />`}
