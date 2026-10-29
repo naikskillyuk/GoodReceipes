@@ -5,7 +5,7 @@ import { Kerangka, Hero, Stat, Kosong, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
-import { daftarStokMakanan, ubahStokMakanan, riwayatMakanan, peranAkun } from '../lib/toko.js';
+import { daftarStokMakanan, ubahStokMakanan, riwayatMakanan, tampilanToko } from '../lib/toko.js';
 import { tampilJumlah, tanggal } from '../lib/util.js';
 
 const JENIS = { produksi: 'Produksi', jual: 'Terjual', koreksi: 'Hitung ulang', rusak: 'Rusak / basi' };
@@ -45,12 +45,12 @@ function Detail({ k, s, onTutup }) {
 
 export function StokMakanan({ k }) {
   const { db } = k;
-  const dapur = peranAkun(db) === 'dapur';
+  const dapur = !tampilanToko(db); // produksi dicatat di halaman admin
   const [buka, setBuka] = useState('');
   const semua = daftarStokMakanan(db);
   const habis = semua.filter((s) => s.stok <= 0).length;
   return html`<${Kerangka} k=${k} aktif="stok-makanan" plus=${dapur ? { href: '/produksi', label: 'Catat produksi' } : null}>
-    <${Hero} warna="var(--kuning)" label="Siap jual" judul="Stok makanan" kembali="/" stat=${html`<${Stat} nilai=${habis} label="habis" />`}>
+    <${Hero} warna="var(--kuning)" label="Siap jual" judul="Stok produk" kembali="/" stat=${html`<${Stat} nilai=${habis} label="habis" />`}>
       <p class="hero-sub">Bertambah saat dapur mencatat produksi, berkurang otomatis saat ada pesanan (paket ikut memotong isinya).</p>
     <//>
     <div class="isi">

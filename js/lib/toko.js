@@ -21,8 +21,22 @@ export function peranAkun(db) {
   return db.pengaturan.akun && db.pengaturan.akun.peran === 'toko' ? 'toko' : 'dapur';
 }
 
-/** Halaman yang boleh dibuka akun toko (bagian pertama alamat). */
-export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'stok-makanan', 'menu', 'pelanggan', 'pengaturan'];
+/** Halaman toko / POS (bagian pertama alamat). Semua halaman lain hanya ada di /admin. */
+export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'stok-makanan', 'pelanggan', 'pengaturan'];
+
+// Situs punya dua pintu: "/" = halaman toko (POS), "/admin" = halaman admin resep, HPP, harga, dan stok.
+export const ALAMAT_TOKO = '/';
+export const ALAMAT_ADMIN = '/admin';
+
+/** Sedang dibuka di /admin? */
+export function halamanAdmin(jalur = globalThis.location?.pathname || '/') {
+  return /^\/admin\/?$/.test(jalur);
+}
+
+/** Tampilan toko dipakai di halaman utama, dan selalu untuk akun toko. */
+export function tampilanToko(db) {
+  return !halamanAdmin() || peranAkun(db) === 'toko';
+}
 
 const jumlahkan = (daftar, kunci) => {
   const peta = new Map();
@@ -675,7 +689,7 @@ export function aturTokenToko(db, { ganti = false } = {}) {
 /** Tautan pemesanan untuk pembeli. Alamat server ikut hanya saat uji (config.js menetapkannya di versi jual). */
 export function tautanToko(token, scriptUrl = '') {
   const tetap = (globalThis.window && window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
-  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '');
+  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '').replace(/admin\/?$/, ''); // link publik selalu ke halaman utama
   return `${dasar}#/pesan/${token}` + (tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`);
 }
 

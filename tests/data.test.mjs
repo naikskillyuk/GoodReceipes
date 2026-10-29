@@ -219,7 +219,7 @@ test('serialisasi baris untuk server: JSON, boolean, dan kolom lokal', async () 
 
 test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async () => {
   const db = await dbBaru();
-  assert.deepEqual(repo.ambilMerek(db), { nama: 'Good Receipes', logo: 'icons/icon-192.png', logoSendiri: '', namaSendiri: '' });
+  assert.deepEqual(repo.ambilMerek(db), { nama: 'rasa.terasrumah', logo: 'icons/icon-192.png', logoSendiri: '', namaSendiri: '' });
 
   repo.simpanMerek(db, { nama: '  Dapur Agam  ' });
   let m = repo.ambilMerek(db);
@@ -238,7 +238,7 @@ test('merek: bawaan, nama sendiri, logo sendiri, dan kembali ke bawaan', async (
   assert.equal(repo.ambilMerek(db).logo, 'icons/icon-192.png');
 
   repo.simpanMerek(db, { nama: '   ' }); // nama kosong -> bawaan
-  assert.equal(repo.ambilMerek(db).nama, 'Good Receipes');
+  assert.equal(repo.ambilMerek(db).nama, 'rasa.terasrumah');
 
   repo.simpanMerek(db, { nama: 'x'.repeat(100) });
   assert.equal(repo.ambilMerek(db).nama.length, 40);

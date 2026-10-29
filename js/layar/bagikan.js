@@ -12,7 +12,7 @@ import { ASPEK, CONTOH_PANDUAN, BATAS_PANDUAN } from '../lib/skor.js';
 /** Tautan yang dibuka penilai. Alamat server ikut di tautan kecuali sudah ditetapkan di config.js. */
 export function buatTautanNilai(token, scriptUrl) {
   const tetap = (window.APP_CONFIG && window.APP_CONFIG.scriptUrl) || '';
-  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '');
+  const dasar = (location.origin + location.pathname).replace(/index\.html$/, '').replace(/admin\/?$/, ''); // link publik selalu ke halaman utama
   return `${dasar}#/nilai/${token}` + (tetap || !scriptUrl ? '' : `?u=${encodeURIComponent(scriptUrl)}`);
 }
 

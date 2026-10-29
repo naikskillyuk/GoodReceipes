@@ -1,6 +1,17 @@
-# Good Receipes
+# rasa.terasrumah
 
-Aplikasi web untuk mencatat eksperimen resep masakan sampai ketemu resep juara, lalu menghitung HPP, harga jual, titik impas, dan menyusun ide pemasaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Semua data tersimpan di **akun pengguna** di server (setiap perubahan langsung dikirim, tanpa tombol sinkron): backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**. Aplikasi siap dijual: akun pembeli dibuat lewat halaman admin setelah membayar, dan data setiap pembeli terpisah.
+Aplikasi toko dan dapur untuk brand **rasa.terasrumah**: dari eksperimen resep, resep juara, HPP, harga jual, belanja dan stok bahan, produksi, stok produk, sampai kasir, pesanan, dan pembayaran. Dibuat untuk dipakai terutama di HP, dan tampil memenuhi layar di laptop. Semua data tersimpan di server (setiap perubahan langsung dikirim, tanpa tombol sinkron): backend **Laravel** dengan database **PostgreSQL Supabase** (atau MySQL di Laragon untuk uji lokal) dan foto di **Supabase Storage**.
+
+## Dua halaman, satu data
+
+| Alamat | Untuk | Isi |
+| --- | --- | --- |
+| `https://rasaterasrumah.vercel.app/` | **Halaman toko (POS)**: akun toko (kasir) dan pemilik | Katalog + keranjang, catat pesanan manual, status pesanan, stok produk, pelanggan, akun |
+| `https://rasaterasrumah.vercel.app/admin` | **Halaman admin**: hanya akun pemilik (dapur) | Resep & eksperimen, HPP, harga jual (menu), paket produk, bahan, stok bahan & belanja, produksi, stok produk, laporan pesanan, pelanggan & promo, pengaturan (akun toko, Mayar, link pemesanan) |
+
+Keduanya memakai data yang sama: harga dan menu yang diatur di admin langsung tampil di katalog toko, dan pesanan dari toko langsung memotong stok produk yang terlihat di admin. Akun toko yang membuka `/admin` diarahkan kembali ke halaman toko. `/admin` dilayani oleh `index.html` yang sama lewat `rewrites` di `vercel.json`.
+
+**Mengganti domain** ke `rasaterasrumah.vercel.app`: di Vercel buka proyek frontend → *Settings → Domains* → tambahkan `rasaterasrumah.vercel.app` (atau ganti nama proyek menjadi `rasaterasrumah`). Lalu di proyek backend ubah `FRONTEND_URL=https://rasaterasrumah.vercel.app`, dan bila `CORS_ORIGINS` diisi, tambahkan domain baru itu. Pengguna yang sudah masuk di domain lama perlu masuk sekali lagi di domain baru (data ada di server, tidak hilang).
 
 ## Yang bisa dilakukan
 

@@ -79,7 +79,9 @@ const http_ = http.createServer(async (req, res) => {
     return kirim(res, 200, f.mime, Buffer.from(f.base64, 'base64'));
   }
 
-  let jalur = decodeURIComponent(url.pathname);
+  // Halaman admin memakai index.html yang sama (sama seperti rewrite di vercel.json).
+  if (url.pathname === '/admin/') return kirim(res, 308, 'text/plain', '', { Location: '/admin' + url.search });
+  let jalur = url.pathname === '/admin' ? '/index.html' : decodeURIComponent(url.pathname);
   if (jalur.endsWith('/')) jalur += 'index.html';
   const berkas = path.normalize(path.join(AKAR, jalur));
   const bagian = path.relative(AKAR, berkas).split(path.sep);

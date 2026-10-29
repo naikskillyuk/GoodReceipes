@@ -549,7 +549,7 @@ export function tambahIsiPaket(db, idPaket, idResep) {
 
 // ---------- Merek (nama dan logo aplikasi) ----------
 
-export const NAMA_APLIKASI_BAWAAN = 'Good Receipes';
+export const NAMA_APLIKASI_BAWAAN = 'rasa.terasrumah';
 export const LOGO_BAWAAN = 'icons/icon-192.png';
 export const ID_MEREK = 'stl_merek';
 

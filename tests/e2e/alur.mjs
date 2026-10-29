@@ -18,6 +18,7 @@ const { masukUji, cariBrowser } = await import('./bantu.mjs');
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = 8300 + Math.floor(Math.random() * 500);
 const BASE = `http://localhost:${PORT}`;
+const ADMIN = BASE + '/admin'; // halaman admin (resep, HPP, harga, stok)
 const DATA = path.join(os.tmpdir(), `e2e-resep-${PORT}.json`);
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -61,8 +62,8 @@ try {
   console.log('Alur pemilik:');
 
   tahap('tanpa akun: layar sambutan dengan tombol Login; formulir muncul setelah ditekan; kata sandi salah ditolak');
-  await page.goto(BASE + '/');
-  await page.getByRole('heading', { name: 'Good Receipes', level: 1 }).waitFor();
+  await page.goto(ADMIN + '');
+  await page.getByRole('heading', { name: 'rasa.terasrumah', level: 1 }).waitFor();
   assert.equal(await page.locator('#login-akun').count(), 0, 'formulir belum tampil sebelum Login ditekan');
   assert.equal(await page.locator('.sisi').count(), 0, 'menu aplikasi belum tampil sebelum masuk');
   assert.equal(await page.getByText(/Daftar/).count(), 0, 'tidak ada pendaftaran sendiri');
@@ -86,14 +87,14 @@ try {
   await page.getByRole('button', { name: 'Login', exact: true }).waitFor();
 
   tahap('masuk dengan akun uji');
-  await masukUji(page, BASE);
+  await masukUji(page, BASE, { jalur: '/admin' });
 
   tahap('data kosong menampilkan ajakan membuat resep');
-  await page.goto(BASE + '/');
+  await page.goto(ADMIN + '');
   await page.getByText('Belum ada resep').first().waitFor();
 
   tahap('tambah tiga bahan dengan konversi satuan');
-  await page.goto(BASE + '/#/bahan?baru=1');
+  await page.goto(ADMIN + '#/bahan?baru=1');
   const tambahBahan = async (nama, merek, harga, isi, satuan, konversi) => {
     await page.getByPlaceholder('mis. Dark chocolate').fill(nama);
     await page.locator('input.input').nth(2).fill(merek); // setelah pencarian dan nama: merek
@@ -124,7 +125,7 @@ try {
   assert.equal(Math.round(harga), 1650, '1 butir telur = 55 g x Rp 30/g');
 
   tahap('buat resep dengan gambar acuan, kategori, dan target');
-  await page.goto(BASE + '/#/resep/baru');
+  await page.goto(ADMIN + '#/resep/baru');
   await page.locator('#nama-resep').fill('Kue Uji');
   await page.getByRole('button', { name: 'Kue', exact: true }).click();
   await page.locator('#target-resep').fill('Lembut dan harga di bawah Rp 5.000.');
@@ -137,12 +138,12 @@ try {
   await page.getByText('Lembut dan harga di bawah').waitFor();
 
   tahap('validasi: nama resep wajib');
-  await page.goto(BASE + '/#/resep/baru');
+  await page.goto(ADMIN + '#/resep/baru');
   await page.getByRole('button', { name: /Simpan resep/ }).click();
   await page.getByText('Nama resep wajib diisi.').waitFor();
 
   tahap('catat eksperimen 1: bahan, takaran, langkah, foto');
-  await page.goto(BASE + `/#/resep/${idResep}/eksperimen/baru`);
+  await page.goto(ADMIN + `#/resep/${idResep}/eksperimen/baru`);
   await page.getByLabel('Jumlah hasil jadi').fill('10');
   await page.locator('input[list=daftar-satuan-porsi]').fill('potong');
   const pilih = async (nama, jumlah, satuan) => {
@@ -162,14 +163,14 @@ try {
   const idEks1 = await page.evaluate(() => window.__app.db.semua('Eksperimen')[0].id);
 
   tahap('validasi: jumlah bahan wajib diisi');
-  await page.goto(BASE + `/#/resep/${idResep}/eksperimen/baru`);
+  await page.goto(ADMIN + `#/resep/${idResep}/eksperimen/baru`);
   await page.getByRole('button', { name: 'Tambah bahan' }).first().click();
   await page.locator('.pilih-item', { hasText: 'Cokelat bubuk' }).click();
   await page.getByRole('button', { name: /Simpan eksperimen/ }).click();
   await page.getByText('Jumlah Cokelat bubuk belum diisi.').waitFor();
 
   tahap('duplikat eksperimen 1, ubah takaran, selisih biaya tampil');
-  await page.goto(BASE + `/#/resep/${idResep}/eksperimen/baru?dari=${idEks1}`);
+  await page.goto(ADMIN + `#/resep/${idResep}/eksperimen/baru?dari=${idEks1}`);
   await page.getByText('Salinan dari Eksperimen 1').waitFor();
   await page.getByLabel('Jumlah Tepung terigu').fill('150');
   await page.locator('.bahan-form.berubah').waitFor();
@@ -181,7 +182,7 @@ try {
 
   tahap('sebelum ada juara, resep tampil di banner "Sedang dikembangkan" beranda');
   const urlEks2 = page.url();
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).waitFor();
   assert.equal(await page.locator('.kartu-juara').count(), 0);
 
@@ -189,13 +190,13 @@ try {
   await page.goto(urlEks2);
   await page.getByRole('button', { name: 'Tandai' }).click();
   await page.getByText('Eksperimen juara').first().waitFor();
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await page.locator('.kartu-juara', { hasText: 'Kue Uji' }).waitFor();
   assert.match(await teks(page, '.kartu-juara'), /Eksperimen 2/);
   assert.equal(await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).count(), 0, 'tidak lagi di banner dikembangkan');
 
   tahap('HPP Resep: packing per porsi, lalu Simpan HPP');
-  await page.goto(BASE + `/#/resep/${idResep}/hpp`);
+  await page.goto(ADMIN + `#/resep/${idResep}/hpp`);
   await page.getByRole('button', { name: /^Packing$/ }).click();
   await page.getByLabel('Nilai Packing').fill('500');
   // bahan eks. 2 = 150 g x 13 + 2 x 1.650 + 1.080 = 1.950 + 3.300 + 1.080 = 6.330; + packing 500 x 10
@@ -228,7 +229,7 @@ try {
     repo.simpanHPPResep(db, saus.id);
     return saus.id;
   }, idResep);
-  await page.goto(BASE + `/#/resep/${idResep}/jual`);
+  await page.goto(ADMIN + `#/resep/${idResep}/jual`);
   await page.getByLabel('Tambah resep lain').selectOption(idSaus);
   await page.getByRole('link', { name: 'Saus Uji' }).waitFor();
   await page.getByLabel('Jumlah Saus Uji').fill('50');
@@ -249,7 +250,7 @@ try {
   await page.getByText(marginUji.toFixed(1).replace('.', ',') + '%').first().waitFor();
 
   tahap('HPP paket: biaya kemasan paket dihitung sekali');
-  await page.goto(BASE + '/#/resep?tujuan=hpp');
+  await page.goto(ADMIN + '#/resep?tujuan=hpp');
   await page.getByRole('link', { name: /Hitung HPP paket/ }).click();
   await page.getByLabel('Nama paket').fill('Paket Uji');
   await page.getByRole('button', { name: 'Buat' }).click();
@@ -268,7 +269,7 @@ try {
   rutePaket = `/paket/${paketUji.d.paket.id}`;
 
   tahap('semua perubahan tersimpan ke server sendiri (tanpa tombol), foto ikut terunggah');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByRole('heading', { name: 'Akun', exact: true }).waitFor();
   assert.equal(await page.getByText('chefuji').count(), 1, 'username tampil');
   assert.equal(await page.getByRole('button', { name: /Sinkron/ }).count(), 0, 'tidak ada tombol sinkron');
@@ -277,7 +278,7 @@ try {
   assert.match(fotoUrl, /^\/foto\//);
 
   tahap('halaman bagikan QR aktif, petunjuk penilaian dan catatan chef diisi');
-  await page.goto(BASE + `/#/eksperimen/${idEks2}/bagikan`);
+  await page.goto(ADMIN + `#/eksperimen/${idEks2}/bagikan`);
   await page.locator('.qr-kotak svg').waitFor();
   await page.getByLabel(/^Catatan chef/).fill('Gula saya kurangi 20 g dari eksperimen 1.');
   await page.getByLabel('Tekstur', { exact: true }).fill('Harus kriuk dan kering');
@@ -319,21 +320,21 @@ try {
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   const nilaiMasuk = await page.evaluate((id) => window.__app.db.semua('Penilaian', (p) => p.idEksperimen === id && !p.dariPemilik).map((p) => ({ n: p.namaPenilai, r: p.rasa, a: p.aroma, k: p.komentar })), idEks2);
   assert.deepEqual(nilaiMasuk, [{ n: 'Tamu Uji', r: 9, a: 10, k: 'Enak sekali, tidak terlalu manis.' }]);
-  await page.goto(BASE + `/#/eksperimen/${idEks2}`);
+  await page.goto(ADMIN + `#/eksperimen/${idEks2}`);
   await page.getByText('Enak sekali, tidak terlalu manis.').waitFor();
   assert.match(await teks(page, '.bulat-skor'), /9,0/); // rasa 9
-  await page.goto(BASE + '/#/ulasan');
+  await page.goto(ADMIN + '#/ulasan');
   await page.getByText('Tamu Uji').waitFor();
 
   tahap('pemilik menutup penilaian, penilai melihat pesan ditutup');
-  await page.goto(BASE + `/#/eksperimen/${idEks2}/bagikan`);
+  await page.goto(ADMIN + `#/eksperimen/${idEks2}/bagikan`);
   await page.getByText('Terima penilaian').click(); // matikan
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await rater.reload();
   await rater.getByText('Penilaian sudah ditutup').waitFor();
 
   tahap('pemilik menghapus ulasan dengan konfirmasi');
-  await page.goto(BASE + '/#/ulasan');
+  await page.goto(ADMIN + '#/ulasan');
   await page.getByRole('button', { name: 'Hapus ulasan' }).first().click();
   await page.getByRole('button', { name: 'Hapus', exact: true }).click();
   await page.getByText('Belum ada ulasan').waitFor();
@@ -343,7 +344,7 @@ try {
   for (const [lebar, tinggi] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
     await page.setViewportSize({ width: lebar, height: tinggi });
     for (const r of rute) {
-      await page.goto(BASE + '/#' + r);
+      await page.goto(ADMIN + '#' + r);
       await page.waitForTimeout(120);
       const lebarIsi = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       assert.ok(lebarIsi <= 1, `${r} melebar ${lebarIsi}px pada lebar ${lebar}`);
@@ -352,7 +353,7 @@ try {
 
   tahap('offline: aplikasi tetap terbuka dari cache dan data lokal');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(BASE + '/#/resep');
+  await page.goto(ADMIN + '#/resep');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.waitForFunction(async () => {
     const nama = await caches.keys();
@@ -361,7 +362,7 @@ try {
   await ctx.setOffline(true);
   await page.reload();
   await page.getByText('Kue Uji').first().waitFor();
-  await page.goto(BASE + `/#/resep/${idResep}`);
+  await page.goto(ADMIN + `#/resep/${idResep}`);
   await page.getByRole('heading', { name: 'Kue Uji' }).waitFor();
   await ctx.setOffline(false);
   await browser.close();

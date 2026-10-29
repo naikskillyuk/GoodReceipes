@@ -1,7 +1,7 @@
 {
-  "name": "Good Receipes",
-  "short_name": "Good Receipes",
-  "description": "Catat eksperimen resep, nilai hasilnya, hitung HPP, dan rencanakan penjualan.",
+  "name": "rasa.terasrumah",
+  "short_name": "rasa.terasrumah",
+  "description": "Katalog, kasir, dan pesanan toko rasa.terasrumah.",
   "lang": "id",
   "start_url": "./",
   "scope": "./",

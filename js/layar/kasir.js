@@ -5,8 +5,9 @@ import { Kerangka, Hero, Kosong, Foto } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
-import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun } from '../lib/toko.js';
+import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, ALAMAT_ADMIN } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
+import { ambilMerek } from '../lib/repo.js';
 
 export function Kasir({ k }) {
   const { db } = k;
@@ -53,11 +54,11 @@ export function Kasir({ k }) {
 
   const kosong = daftarMenu(db).length === 0;
   return html`<${Kerangka} k=${k} aktif="kasir">
-    <${Hero} warna="var(--hijau)" label="Toko" judul="Kasir" kembali="/" />
+    <${Hero} warna="var(--hijau)" label=${ambilMerek(db).nama} judul=${tampilanToko(db) ? 'Katalog' : 'Kasir'} kembali=${tampilanToko(db) ? undefined : '/'} />
     <div class="isi">
       ${kosong
-        ? html`<${Kosong} judul="Menu masih kosong" teks=${peranAkun(db) === 'dapur' ? 'Masukkan resep atau paket ke menu jual dulu.' : 'Minta akun dapur memasukkan menu jual.'}>
-            ${peranAkun(db) === 'dapur' && html`<a class="btn solid" href=${tautan('/menu')}>Atur menu jual</a>`}
+        ? html`<${Kosong} judul="Menu masih kosong" teks=${peranAkun(db) === 'dapur' ? 'Masukkan resep atau paket ke menu jual di halaman admin.' : 'Minta admin memasukkan produk ke menu jual.'}>
+            ${peranAkun(db) === 'dapur' && html`<a class="btn solid" href=${ALAMAT_ADMIN + '#/menu'}>Atur menu jual</a>`}
           <//>`
         : html`<div class="kasir">
             <div class="kolom">

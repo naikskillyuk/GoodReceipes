@@ -8,11 +8,15 @@ import { kompres } from './gambar.js';
 import { tampilToast } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
-import { peranAkun } from '../lib/toko.js';
+import { peranAkun, tampilanToko, ALAMAT_TOKO, ALAMAT_ADMIN } from '../lib/toko.js';
 
 /** Nama aplikasi untuk judul: kata terakhir diberi warna hijau (mis. "Good <em>Receipes</em>"). */
 export function NamaMerek({ nama }) {
-  const kata = String(nama || '').trim().split(/\s+/);
+  const teks = String(nama || '').trim();
+  // Satu kata bertitik (mis. "rasa.terasrumah"): bagian setelah titik diberi warna.
+  const titik = teks.lastIndexOf('.');
+  if (!/\s/.test(teks) && titik > 0 && titik < teks.length - 1) return html`${teks.slice(0, titik + 1)}<em>${teks.slice(titik + 1)}</em>`;
+  const kata = teks.split(/\s+/);
   const akhir = kata.length > 1 ? kata.pop() : '';
   return html`${kata.join(' ')}${akhir && html` <em>${akhir}</em>`}`;
 }
@@ -34,31 +38,49 @@ export function LogoMerek({ src, ukuran = 40, kelas = '' }) {
 }
 
 // pil = tampil di navigasi bawah HP (maks. 5). Semua tampil di sisi kiri laptop.
-const MENU_DAPUR = [
+// luar = alamat situs lain (halaman toko "/" atau admin "/admin"), bukan rute di dalam halaman ini.
+// Halaman admin (/admin): resep, HPP, harga jual, stok bahan & produk, paket, dan pengaturan.
+const MENU_ADMIN = [
   { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
-  { kunci: 'resep', jalur: '/resep', label: 'Daftar Resep', ikon: 'resep', pil: true },
+  { kunci: 'resep', jalur: '/resep', label: 'Resep & HPP', ikon: 'resep', pil: true },
+  { kunci: 'paket', jalur: '/paket', label: 'Paket Produk', ikon: 'kotak' },
   { kunci: 'bahan', jalur: '/bahan', label: 'Daftar Bahan', ikon: 'keranjang', pil: true },
-  { kunci: 'stok-bahan', jalur: '/stok-bahan', label: 'Stok & Belanja', ikon: 'kotak' },
+  { kunci: 'stok-bahan', jalur: '/stok-bahan', label: 'Stok Bahan & Belanja', ikon: 'kotak' },
   { kunci: 'produksi', jalur: '/produksi', label: 'Produksi', ikon: 'panci' },
-  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Makanan', ikon: 'kue' },
-  { kunci: 'menu', jalur: '/menu', label: 'Menu Jual', ikon: 'buku' },
-  { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk' },
-  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
-  { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
+  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
+  { kunci: 'menu', jalur: '/menu', label: 'Menu & Harga Jual', ikon: 'tag' },
+  { kunci: 'pesanan', jalur: '/pesanan', label: 'Laporan Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan & Promo', ikon: 'pelanggan' },
   { kunci: 'ulasan', jalur: '/ulasan', label: 'Ulasan', ikon: 'obrolan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
+  { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Buka Halaman Toko', ikon: 'toko', luar: true },
 ];
+// Halaman toko (/): POS untuk kasir.
 const MENU_TOKO = [
-  { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
-  { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk', pil: true },
-  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
-  { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
-  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Makanan', ikon: 'kue', pil: true },
-  { kunci: 'menu', jalur: '/menu', label: 'Menu Jual', ikon: 'buku' },
-  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan & Promo', ikon: 'pelanggan' },
-  { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
+  { kunci: 'kasir', jalur: '/', label: 'Katalog', ikon: 'struk', pil: true },
+  { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah', pil: true },
+  { kunci: 'pesanan', jalur: '/pesanan', label: 'Status Pesanan', ikon: 'dompet', pil: true },
+  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue', pil: true },
+  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan' },
+  { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Akun', ikon: 'orang', pil: true },
 ];
+const KE_ADMIN = { kunci: 'ke-admin', jalur: ALAMAT_ADMIN, label: 'Buka Halaman Admin', ikon: 'gerigi', luar: true };
+const hrefMenu = (m) => (m.luar ? m.jalur : tautan(m.jalur));
+
+/**
+ * Pindah antara halaman toko dan admin (memuat ulang halaman): tulis dulu perubahan terakhir
+ * ke perangkat dan coba kirim ke server, supaya tidak ada yang hilang.
+ */
+export async function pindahHalaman(k, alamat) {
+  try {
+    await k.db.tulis();
+    if (k.db.jumlahKotor() > 0) await Promise.race([k.sinkronSekarang(), new Promise((r) => setTimeout(r, 3000))]);
+  } catch {
+    /* tetap pindah; salinan di perangkat tetap ada */
+  }
+  location.href = alamat;
+}
+const klikMenu = (k, m) => (m.luar ? (e) => (e.preventDefault(), pindahHalaman(k, m.jalur)) : undefined);
 
 /**
  * Kerangka halaman pemilik.
@@ -67,17 +89,18 @@ const MENU_TOKO = [
  */
 export function Kerangka({ k, aktif, plus, children }) {
   const { db } = k;
-  const toko = peranAkun(db) === 'toko';
-  const MENU = toko ? MENU_TOKO : MENU_DAPUR;
+  const toko = tampilanToko(db);
+  // Pemilik (akun dapur) yang membuka halaman toko tetap punya jalan ke admin.
+  const MENU = toko ? (peranAkun(db) === 'dapur' ? [...MENU_TOKO, KE_ADMIN] : MENU_TOKO) : MENU_ADMIN;
   const kategori = toko ? [] : daftarKategori(db);
   const kategoriAktif = k.rute.kueri.kat || '';
   const merek = ambilMerek(db);
   return html`<div class="app">
     <aside class="sisi" aria-label="Menu utama">
-      <div class="merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /><span>${merek.nama}</span></div>
+      <div class="merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /><span>${merek.nama.split('.').map((b, i) => (i ? html`.<wbr />${b}` : b))}<small class="merek-mode">${toko ? 'Toko' : 'Admin'}</small></span></div>
       <nav>
         ${MENU.map(
-          (m) => html`<a href=${tautan(m.jalur)} class=${aktif === m.kunci && !(m.kunci === 'resep' && kategoriAktif) ? 'aktif' : ''} aria-current=${aktif === m.kunci ? 'page' : null}>
+          (m) => html`<a href=${hrefMenu(m)} onClick=${klikMenu(k, m)} class=${aktif === m.kunci && !(m.kunci === 'resep' && kategoriAktif) ? 'aktif' : ''} aria-current=${aktif === m.kunci ? 'page' : null}>
             <${Ikon} nama=${m.ikon} ukuran=${20} />${m.label}
           </a>`,
         )}
@@ -99,7 +122,7 @@ export function Kerangka({ k, aktif, plus, children }) {
       <div class="bawah">
         <nav class="nav-pil" aria-label="Navigasi">
           ${MENU.filter((m) => m.pil).map(
-            (m) => html`<a href=${tautan(m.jalur)} class=${aktif === m.kunci ? 'aktif' : ''} aria-label=${m.label} aria-current=${aktif === m.kunci ? 'page' : null}>
+            (m) => html`<a href=${hrefMenu(m)} onClick=${klikMenu(k, m)} class=${aktif === m.kunci ? 'aktif' : ''} aria-label=${m.label} aria-current=${aktif === m.kunci ? 'page' : null}>
               <${Ikon} nama=${m.ikon} />
             </a>`,
           )}

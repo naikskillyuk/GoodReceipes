@@ -4234,3 +4234,29 @@ details.pembeli summary {
   font-size: 12px;
   font-weight: 700;
 }
+
+/* Halaman toko (/) dan admin (/admin) */
+.sambut-judul p.sambut-mode {
+  display: inline-block;
+  width: max-content;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--hijau-muda);
+  color: var(--hijau-2);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 18px;
+}
+.sambut-pindah {
+  align-self: center;
+}
+.merek-mode {
+  display: block;
+  font-family: var(--teks, inherit);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}

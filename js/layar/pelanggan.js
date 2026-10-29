@@ -4,7 +4,7 @@ import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, Tab, InputRupiah, InputAngka, unduhBerkas } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
-import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, peranAkun } from '../lib/toko.js';
+import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, tampilanToko } from '../lib/toko.js';
 import { rupiah, tanggal, tampilJumlah } from '../lib/util.js';
 
 const UNTUK = { semua: 'Semua pembeli', baru: 'Pelanggan baru (pesanan pertama)', lama: 'Pelanggan lama (pernah memesan)' };
@@ -151,7 +151,7 @@ export function PelangganPromo({ k }) {
         { label: 'Pelanggan', href: '/pelanggan', aktif: tab === 'pelanggan' },
         { label: 'Kode promo', href: '/pelanggan?tab=promo', aktif: tab === 'promo' },
       ]} />
-      ${tab === 'pelanggan' ? html`<${Pelanggan} db=${db} />` : html`<${Promo} db=${db} bisaUbah=${peranAkun(db) === 'dapur'} />`}
+      ${tab === 'pelanggan' ? html`<${Pelanggan} db=${db} />` : html`<${Promo} db=${db} bisaUbah=${!tampilanToko(db)} />`}
     </div>
   <//>`;
 }

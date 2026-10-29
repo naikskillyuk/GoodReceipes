@@ -14,6 +14,7 @@ const { masukUji, cariBrowser } = await import('./bantu.mjs');
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = 8800 + Math.floor(Math.random() * 500);
 const BASE = `http://localhost:${PORT}`;
+const ADMIN = BASE + '/admin'; // halaman admin (resep, HPP, harga, stok)
 const DATA = path.join(os.tmpdir(), `e2e-masuk-${PORT}.json`);
 const SS = process.env.SS || '';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -59,14 +60,14 @@ try {
   console.log('Nama, logo, data di server, ekspor, dan hapus resep:');
 
   tahap('masuk ke akun uji');
-  await masukUji(page, BASE);
+  await masukUji(page, BASE, { jalur: '/admin' });
 
   tahap('tampilan bawaan; tidak ada kunci aplikasi, tombol sinkron, cadangan, atau data contoh');
-  await page.goto(BASE + '/');
-  await page.locator('.sapa-merek-nama', { hasText: 'Good Receipes' }).waitFor();
+  await page.goto(ADMIN + '');
+  await page.locator('.sapa-merek-nama', { hasText: 'rasa.terasrumah' }).waitFor();
   assert.match(await page.locator('.sapa h1').innerText(), /^Halo/, 'Beranda menyapa pengguna');
-  assert.equal(await page.title(), 'Good Receipes');
-  await page.goto(BASE + '/#/pengaturan');
+  assert.equal(await page.title(), 'rasa.terasrumah');
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByRole('heading', { name: 'Pengaturan', level: 1 }).waitFor();
   for (const teks of [/Kunci/, /Sinkron/, /cadangan/i, /Pulihkan/, /data contoh/i, /Kosongkan/]) {
     assert.equal(await page.getByRole('button', { name: teks }).count(), 0, `tidak ada tombol ${teks}`);
@@ -116,7 +117,7 @@ try {
   assert.deepEqual(ukuran, [256, 128], 'rasio dipertahankan, sisi terpanjang 256');
 
   tahap('nama dan logo tampil di beranda, judul tab, dan ikon tab; bertahan setelah muat ulang');
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await page.locator('.sapa-merek-nama', { hasText: 'Dapur Bu Sari' }).waitFor();
   assert.equal(await page.title(), 'Dapur Bu Sari');
   assert.match(await page.locator('link[rel=icon]').getAttribute('href'), /^data:image\/png/);
@@ -160,7 +161,7 @@ try {
 
   tahap('export PDF: satu resep lengkap dengan semua eksperimen, tombol tidak ikut tercetak');
   const idResep = await page.evaluate((id) => window.__app.db.ambil('Eksperimen', id).idResep, idEks);
-  await page.goto(BASE + '/#/resep/' + idResep);
+  await page.goto(ADMIN + '#/resep/' + idResep);
   await page.getByRole('link', { name: 'Export PDF' }).first().click();
   await page.locator('.cetak-kertas h1', { hasText: 'Brownies Fudgy' }).waitFor();
   assert.equal(await page.locator('.cetak-eks').count(), 4, 'keempat eksperimen ikut');
@@ -176,7 +177,7 @@ try {
 
   tahap('hapus resep dari halaman resep: konfirmasi, lalu hilang dari perangkat dan server');
   const jumlahResep = await page.evaluate(() => window.__app.db.semua('Resep').length);
-  await page.goto(BASE + '/#/resep/' + idResep);
+  await page.goto(ADMIN + '#/resep/' + idResep);
   await page.getByRole('button', { name: 'Hapus resep' }).click();
   await page.getByRole('dialog', { name: /Hapus “Brownies Fudgy”/ }).getByRole('button', { name: 'Batal' }).click();
   assert.ok(await page.evaluate((id) => !!window.__app.db.ambil('Resep', id), idResep), 'batal tidak menghapus');
@@ -188,19 +189,19 @@ try {
   await page.waitForFunction(() => window.__app.db.jumlahKotor() === 0, null, { timeout: 15000 });
 
   tahap('keluar lalu masuk lagi: semua data kembali dari database server (resep yang dihapus tetap hilang)');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByRole('button', { name: 'Keluar', exact: true }).click();
   await page.getByRole('dialog', { name: 'Keluar dari akun?' }).getByRole('button', { name: 'Keluar' }).click();
   await page.getByRole('button', { name: 'Login', exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.__app.db.semua('Resep').length), 0, 'salinan di perangkat dibuang');
-  await masukUji(page, BASE);
+  await masukUji(page, BASE, { jalur: '/admin' });
   await page.waitForFunction((n) => window.__app.db.semua('Resep').length === n, jumlahResep - 1, { timeout: 15000 });
   assert.equal(await page.evaluate((id) => window.__app.db.ambil('Resep', id), idResep), null);
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await page.locator('.sapa-merek-nama', { hasText: 'Dapur Bu Sari' }).waitFor();
 
   tahap('ganti kata sandi akun: kata sandi saat ini yang salah ditolak');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByRole('button', { name: 'Ganti kata sandi akun' }).click();
   const dAkun = page.getByRole('dialog', { name: 'Ganti kata sandi akun' });
   await dAkun.getByLabel('Kata sandi saat ini').fill('bukan-sandi-ini');
@@ -217,17 +218,17 @@ try {
   await dAkun.waitFor({ state: 'detached' });
 
   tahap('kembalikan bawaan: nama dan logo kembali seperti semula');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByRole('button', { name: 'Kembalikan bawaan' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Kembalikan' }).click();
   await page.getByText('Kembali ke tampilan bawaan.').waitFor();
-  await page.goto(BASE + '/#/');
-  await page.locator('.sapa-merek-nama', { hasText: 'Good Receipes' }).waitFor();
-  assert.equal(await page.title(), 'Good Receipes');
+  await page.goto(ADMIN + '#/');
+  await page.locator('.sapa-merek-nama', { hasText: 'rasa.terasrumah' }).waitFor();
+  assert.equal(await page.title(), 'rasa.terasrumah');
   assert.equal(await page.locator('link[rel=icon]').getAttribute('href'), 'icons/icon-192.png');
 
   tahap('nama sangat panjang tidak merusak tata letak di beranda, pengaturan, QR, dan halaman export');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.goto(ADMIN + '#/pengaturan');
   // Tunggu penyimpanan ke server selesai, supaya formulir tidak diisi ulang saat sedang diketik.
   await page.waitForFunction(() => window.__app.db.jumlahKotor() === 0 && !window.__app.penyinkron.status.sedang, null, { timeout: 15000 });
   await page.getByLabel('Nama aplikasi').fill('Dapur Keluarga Besar Sejahtera Bersama Selalu');
@@ -241,14 +242,14 @@ try {
   for (const [lebar, tinggi] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
     await page.setViewportSize({ width: lebar, height: tinggi });
     for (const r of ['/', '/pengaturan', `/eksperimen/${idE}/bagikan`, `/resep/${idR}`, `/resep/${idR}/cetak`]) {
-      await page.goto(BASE + '/#' + r);
+      await page.goto(ADMIN + '#' + r);
       await page.waitForTimeout(100);
       assert.ok((await sisaLebar(page)) <= 1, `${r} melebar pada lebar ${lebar}`);
     }
     if (lebar === 360) await foto(page, '8-export-360');
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await foto(page, '10-beranda-nama-panjang');
   await browser.close();
 } catch (e) {

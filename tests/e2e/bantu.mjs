@@ -1,8 +1,11 @@
 // Bantuan bersama untuk uji e2e.
 
-/** Masuk ke akun uji lewat layar Masuk, memakai tiruan akun dev-server (kata sandi kunci-dev). */
-export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'kunci-dev' } = {}) {
-  await page.goto(base + '/');
+/**
+ * Masuk ke akun uji lewat layar Masuk, memakai tiruan akun dev-server (kata sandi kunci-dev).
+ * jalur '/' = halaman toko (POS), '/admin' = halaman admin.
+ */
+export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'kunci-dev', jalur = '/' } = {}) {
+  await page.goto(base + jalur);
   // Layar sambutan: formulir baru muncul setelah tombol Login ditekan.
   const tombolLogin = page.getByRole('button', { name: 'Login', exact: true });
   await tombolLogin.or(page.locator('#login-akun')).first().waitFor();

@@ -26,7 +26,7 @@ export function DaftarPaket({ k }) {
     pergi('/paket/' + p.id);
   };
 
-  return html`<${Kerangka} k=${k} aktif="resep">
+  return html`<${Kerangka} k=${k} aktif="paket">
     <${Hero} warna="var(--navy)" label="HPP & Harga" judul="Paket" kembali="/resep?tujuan=hpp" stat=${html`<${Stat} nilai=${semua.length} label="paket" />`} />
     <div class="isi">
       <div class="kartu">
@@ -59,7 +59,7 @@ export function DetailPaket({ k, id }) {
   const { db } = k;
   const d = dataPaket(db, id);
   if (!d) {
-    return html`<${Kerangka} k=${k} aktif="resep">
+    return html`<${Kerangka} k=${k} aktif="paket">
       <${Hero} label="Paket" judul="Tidak ada" kembali="/paket" />
       <div class="isi"><${Kosong} judul="Paket tidak ditemukan" teks="Mungkin sudah dihapus."><a class="btn solid" href=${tautan('/paket')}>Ke daftar paket</a><//></div>
     <//>`;
@@ -161,7 +161,7 @@ export function DetailPaket({ k, id }) {
     <${KartuHarga} key=${id} hpp=${d.hppPaket} marginTarget=${Number(paket.marginTarget) || 40} hargaJual=${Number(paket.hargaJual) || 0} onUbah=${ubahPaket} unit="paket" />
   </div>`;
 
-  return html`<${Kerangka} k=${k} aktif="resep">
+  return html`<${Kerangka} k=${k} aktif="paket">
     <${Hero} warna="var(--navy)" label="Paket" judul=${paket.nama || 'Paket'} kembali="/paket" stat=${html`<${Stat} nilai=${angka(d.isi.length)} label="resep" />`} />
     <div class="isi"><div class="kolom-2">${kiri}${kanan}</div></div>
   <//>`;

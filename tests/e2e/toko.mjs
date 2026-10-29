@@ -15,6 +15,7 @@ const { masukUji, cariBrowser } = await import('./bantu.mjs');
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PORT = 8800 + Math.floor(Math.random() * 500);
 const BASE = `http://localhost:${PORT}`;
+const ADMIN = BASE + '/admin'; // halaman admin (resep, HPP, harga, stok)
 const DATA = path.join(os.tmpdir(), `e2e-toko-${PORT}.json`);
 const SS = process.env.SS || '';
 
@@ -61,7 +62,7 @@ try {
   console.log('Stok, produksi, kasir, Mayar, link pemesanan, dan akun toko:');
 
   tahap('masuk sebagai akun dapur dengan data contoh + paket');
-  await masukUji(page, BASE);
+  await masukUji(page, BASE, { jalur: '/admin' });
   const ids = await page.evaluate(async () => {
     const seed = await import('/js/lib/seed.js');
     const repo = await import('/js/lib/repo.js');
@@ -71,11 +72,11 @@ try {
     repo.tambahIsiPaket(db, paket.id, c.brownies);
     return { brownies: c.brownies, paket: paket.id };
   });
-  await page.goto(BASE + '/#/');
+  await page.goto(ADMIN + '#/');
   await page.getByRole('link', { name: 'Stok & belanja' }).waitFor();
 
   tahap('catat belanja: stok bahan bertambah');
-  await page.goto(BASE + '/#/stok-bahan');
+  await page.goto(ADMIN + '#/stok-bahan');
   await page.getByRole('button', { name: 'Catat belanja' }).first().click();
   await page.getByLabel('Bahan baris 1').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Simpan belanja' }).click();
@@ -85,7 +86,7 @@ try {
   assert.ok((await sisaLebar(page)) <= 0, 'stok bahan tidak melebar di HP');
 
   tahap('produksi 1x brownies: stok makanan +16, bahan terpotong');
-  await page.goto(BASE + '/#/produksi?resep=' + ids.brownies);
+  await page.goto(ADMIN + '#/produksi?resep=' + ids.brownies);
   await page.getByRole('button', { name: 'Catat produksi' }).click();
   await page.getByRole('button', { name: 'Tetap catat' }).click();
   await page.getByText(/Produksi dicatat: \+16 potong/).waitFor();
@@ -93,7 +94,7 @@ try {
   await foto(page, '02-produksi');
 
   tahap('menu jual: brownies (harga dari HPP Jual) dan paket');
-  await page.goto(BASE + '/#/menu');
+  await page.goto(ADMIN + '#/menu');
   await page.locator('select').first().selectOption('resep:' + ids.brownies);
   await page.getByRole('button', { name: 'Masukkan ke menu' }).click();
   await page.getByText('masuk menu, harga Rp 8.000').waitFor();
@@ -103,13 +104,15 @@ try {
   await foto(page, '03-menu');
 
   tahap('promo HEMAT10 (10%)');
-  await page.goto(BASE + '/#/pelanggan?tab=promo');
+  await page.goto(ADMIN + '#/pelanggan?tab=promo');
   await page.getByRole('button', { name: 'Promo baru' }).click();
   await page.getByPlaceholder('HEMAT10').fill('hemat10');
   await page.getByRole('button', { name: 'Simpan promo' }).click();
   await page.getByText('Promo HEMAT10 disimpan.').waitFor();
 
   tahap('kasir: 2 brownies + promo, bayar tunai dengan kembalian');
+  // Dari /admin ke halaman toko (POS) = muat ulang halaman: simpan dulu, seperti tombol "Buka Halaman Toko".
+  await page.evaluate(() => window.__app.db.tulis());
   await page.goto(BASE + '/#/kasir');
   const tambahBrownies = page.getByRole('button', { name: 'Tambah Brownies Fudgy ke keranjang' });
   await tambahBrownies.click();
@@ -140,7 +143,8 @@ try {
   const urlPesananKasir = page.url().replace('?bayar=1', '');
 
   tahap('pengaturan: kunci Mayar, link pemesanan, toko buka, akun toko');
-  await page.goto(BASE + '/#/pengaturan');
+  await page.evaluate(() => window.__app.db.tulis());
+  await page.goto(ADMIN + '#/pengaturan');
   await page.getByPlaceholder('Tempel kunci API di sini').fill('kunci-mayar-uji-yang-panjang-12345');
   await page.getByRole('button', { name: 'Simpan kunci' }).click();
   await page.getByText('Aktif', { exact: true }).waitFor();
@@ -191,17 +195,22 @@ try {
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 13 - 2, '2 paket = 2 brownies');
   assert.equal(await evalDb(page, 'return db.semua("Pesanan").filter((p) => p.sumber === "online" && p.status === "baru").length'), 1);
 
-  tahap('akun toko: masuk, lihat pesanan, tidak bisa membuka resep');
+  tahap('akun toko: halaman utama = katalog, lihat pesanan, tidak bisa membuka resep atau /admin');
   const kasir = await browser.newPage({ viewport: { width: 390, height: 844 } });
   pantau(kasir, 'toko');
   await masukUji(kasir, BASE, { login: 'toko.pagi' });
-  await kasir.getByText('Pesanan aktif').waitFor();
-  await kasir.getByText('· Sari').waitFor({ timeout: 15000 });
-  await foto(kasir, '09-beranda-toko');
+  await kasir.getByRole('heading', { name: 'Katalog' }).waitFor();
+  await kasir.getByRole('button', { name: 'Tambah Brownies Fudgy ke keranjang' }).waitFor({ timeout: 15000 });
+  await foto(kasir, '09-katalog-toko');
   assert.equal(await kasir.evaluate(() => window.__app.db.semua('Bahan').length), 0, 'akun toko tidak menerima data bahan');
   await kasir.goto(BASE + '/#/resep');
   await kasir.getByText('Halaman tidak ditemukan').waitFor();
+  await kasir.goto(ADMIN);
+  await kasir.getByText('Khusus admin').waitFor();
+  await kasir.getByRole('link', { name: 'Ke halaman toko' }).click();
+  await kasir.getByRole('heading', { name: 'Katalog' }).waitFor();
   await kasir.goto(BASE + '/#/pesanan');
+  await kasir.getByText('· Sari').waitFor({ timeout: 15000 });
   await kasir.locator('.kartu-pesanan').first().click();
   await kasir.getByRole('button', { name: 'Mulai proses' }).click();
   await kasir.getByRole('button', { name: 'Tandai siap' }).waitFor();

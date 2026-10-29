@@ -1,4 +1,4 @@
-// Beranda: sapaan, banner resep yang masih dikembangkan, menu 4 kotak, lalu slider resep juara.
+// Beranda admin: sapaan, banner resep yang masih dikembangkan, menu 4 kotak, lalu slider resep juara.
 
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Foto, Kosong } from '../ui/komponen.js';
@@ -7,7 +7,7 @@ import { IkonKategori } from '../ui/ikon-kategori.js';
 import { tautan } from '../ui/router.js';
 import { daftarJuara, ambilMerek, ringkasResep } from '../lib/repo.js';
 import { desimal1, rupiah } from '../lib/util.js';
-import { peranAkun, ringkasPenjualan, daftarPesanan, daftarStokBahan, daftarStokMakanan, STATUS_PESANAN } from '../lib/toko.js';
+import { ringkasPenjualan, daftarStokBahan } from '../lib/toko.js';
 
 function sapaan() {
   const j = new Date().getHours();
@@ -102,16 +102,10 @@ const MENU = [
 
 // Baris kedua: dapur sampai penjualan.
 const MENU_JUAL = [
-  { href: '/stok-bahan', label: 'Stok & belanja', ikon: 'kotak', warna: '#e8f4df', tinta: '#2f6e1c' },
+  { href: '/stok-bahan', label: 'Stok & belanja', ikon: 'keranjang', warna: '#e8f4df', tinta: '#2f6e1c' },
   { href: '/produksi', label: 'Produksi', ikon: 'panci', warna: '#fde3d6', tinta: '#b4461b' },
-  { href: '/menu', label: 'Menu jual', ikon: 'buku', warna: '#fff1cc', tinta: '#8a5a00' },
-  { href: '/kasir', label: 'Kasir', ikon: 'struk', warna: '#e2e9f6', tinta: '#2a4170' },
-];
-const MENU_TOKO = [
-  { href: '/kasir', label: 'Kasir', ikon: 'struk', warna: '#e8f4df', tinta: '#2f6e1c' },
-  { href: '/pesanan', label: 'Pesanan', ikon: 'dompet', warna: '#fde3d6', tinta: '#b4461b' },
-  { href: '/stok-makanan', label: 'Stok makanan', ikon: 'kue', warna: '#fff1cc', tinta: '#8a5a00' },
-  { href: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan', warna: '#e2e9f6', tinta: '#2a4170' },
+  { href: '/menu', label: 'Menu & harga', ikon: 'tag', warna: '#fff1cc', tinta: '#8a5a00' },
+  { href: '/paket', label: 'Paket produk', ikon: 'kotak', warna: '#e2e9f6', tinta: '#2a4170' },
 ];
 
 function UbinIkon({ m, hitung }) {
@@ -132,40 +126,7 @@ function RingkasHariIni({ db }) {
   </a>`;
 }
 
-/** Beranda akun toko: ringkasan hari ini, menu kasir, pesanan aktif, dan stok habis. */
-function BerandaToko({ k }) {
-  const { db } = k;
-  const nama = ((db.pengaturan.akun && db.pengaturan.akun.nama) || '').trim();
-  const merek = ambilMerek(db);
-  const aktif = daftarPesanan(db).filter((p) => ['baru', 'diproses', 'siap'].includes(p.status));
-  const habis = daftarStokMakanan(db).filter((s) => s.stok <= 0);
-  const hitung = { '/pesanan': aktif.length, '/stok-makanan': habis.length };
-  return html`<${Kerangka} k=${k} aktif="rumah" plus=${{ href: '/kasir', label: 'Pesanan baru' }}>
-    <header class="sapa">
-      <div class="sapa-isi">
-        <h1>Halo${nama ? ', ' + nama.split(/\s+/)[0] : ''} <span aria-hidden="true">👋</span></h1>
-        <p class="sapa-teks">${sapaan()} · <span class="sapa-merek-nama">${merek.nama}</span></p>
-      </div>
-    </header>
-    <div style="padding:16px 20px 0"><${RingkasHariIni} db=${db} /></div>
-    <nav class="menu-empat" aria-label="Menu">${MENU_TOKO.map((m) => html`<${UbinIkon} m=${m} hitung=${hitung[m.href]} />`)}</nav>
-    <div class="judul-bagian"><h2>Pesanan aktif</h2>${aktif.length > 0 && html`<a class="tautan-hijau" href=${tautan('/pesanan')}>Lihat semua</a>`}</div>
-    <div style="padding:0 20px" class="kolom">
-      ${aktif.length === 0 && html`<p class="bantu">Belum ada pesanan yang perlu diproses.</p>`}
-      ${aktif.slice(0, 6).map(
-        (p) => html`<a class="kartu-pesanan" key=${p.id} href=${tautan('/pesanan/' + p.id)}>
-          <div class="baris-pisah"><b>#${p.nomor}${p.nama ? ' · ' + p.nama : ''}</b><span class=${'lencana-status s-' + p.status}>${STATUS_PESANAN[p.status]}</span></div>
-          <small class="teks-kecil">${(p.item || []).map((i) => `${i.jumlah}× ${i.nama}`).join(', ')}</small>
-        </a>`,
-      )}
-      ${habis.length > 0 && html`<p class="bantu teks-buruk">Stok habis: ${habis.map((s) => s.resep.nama).join(', ')}.</p>`}
-    </div>
-    <div style="height:12px"></div>
-  <//>`;
-}
-
 export function Beranda({ k }) {
-  if (peranAkun(k.db) === 'toko') return html`<${BerandaToko} k=${k} />`;
   return html`<${BerandaDapur} k=${k} />`;
 }
 
