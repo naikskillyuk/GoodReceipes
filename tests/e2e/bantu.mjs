@@ -19,6 +19,9 @@ export async function masukUji(page, base, { login = 'chef@uji.test', sandi = 'k
   await page.locator('#sandi-akun').fill(sandi);
   await page.getByRole('button', { name: 'Masuk', exact: true }).click();
   await page.locator('#login-akun').waitFor({ state: 'detached' });
+  // Formulir hilang begitu sesi dipasang; tunggu juga sampai sesi selesai ditulis ke perangkat,
+  // supaya langkah uji berikutnya yang memuat ulang halaman tidak memotong penulisan itu.
+  await page.evaluate(() => window.__app.db.tulis());
 }
 
 /** Chrome/Chromium yang ada di komputer: CHROMIUM=..., atau lokasi umum di Linux/Windows/Mac. */

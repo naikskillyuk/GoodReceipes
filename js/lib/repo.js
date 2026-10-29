@@ -541,7 +541,27 @@ export function dataPaket(db, idPaket) {
   });
   const biaya = biayaPaketList(db, idPaket);
   const hitung = hitungPaket({ isi, biayaPaket: biaya });
-  return { paket, biaya, ...hitung, isi: hitung.rincian };
+  // Seperti HPP resep: angka tersimpan dipakai di menu jual sampai disimpan ulang.
+  const tersimpan = typeof paket.hppSimpan === 'number' && Number.isFinite(paket.hppSimpan);
+  const berubah = tersimpan && Math.abs(hitung.hppPaket - paket.hppSimpan) >= 0.5;
+  return {
+    paket,
+    biaya,
+    ...hitung,
+    isi: hitung.rincian,
+    hppHitung: hitung.hppPaket,
+    hppPaket: tersimpan ? paket.hppSimpan : hitung.hppPaket,
+    tersimpan,
+    berubah,
+    disimpanPada: tersimpan ? paket.hppSimpanPada || null : null,
+  };
+}
+
+/** Simpan HPP paket saat ini (dipakai di menu jual). Null bila ada isi yang belum bisa dihitung. */
+export function simpanHPPPaket(db, idPaket) {
+  const d = dataPaket(db, idPaket);
+  if (!d || d.bermasalah.length || !Number.isFinite(d.hppHitung)) return null;
+  return db.simpan('Paket', { ...d.paket, hppSimpan: d.hppHitung, hppSimpanPada: Date.now() });
 }
 
 export function tambahIsiPaket(db, idPaket, idResep) {

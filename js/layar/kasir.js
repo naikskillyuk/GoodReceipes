@@ -5,7 +5,7 @@ import { Kerangka, Hero, Kosong, Foto } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, Modal } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
-import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, hargaJual, diskonBerlaku, opsiMenu, kunciBaris, namaItem } from '../lib/toko.js';
+import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, hargaJual, diskonBerlaku, opsiMenu, kunciBaris, namaItem, fotoTampilMenu } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
 import { ambilMerek } from '../lib/repo.js';
 
@@ -110,7 +110,7 @@ export function Kasir({ k }) {
                 ${menu.map(({ menu: m, sisa }) => {
                   const n = jumlahDi(m.id);
                   return html`<button class=${'ubin-menu' + (n ? ' dipilih' : '') + (sisa === 0 ? ' habis' : '')} key=${m.id} onClick=${() => ketukMenu(m)} aria-label=${`Tambah ${m.nama} ke keranjang`}>
-                    <span class="foto-ubin"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} />${diskonBerlaku(m) ? html`<i class="label-diskon">-${diskonBerlaku(m)}%</i>` : ''}${n > 0 && html`<i class="jumlah-ubin">${n}</i>`}</span>
+                    <span class="foto-ubin"><${Foto} src=${fotoTampilMenu(db, m)} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} />${diskonBerlaku(m) ? html`<i class="label-diskon">-${diskonBerlaku(m)}%</i>` : ''}${n > 0 && html`<i class="jumlah-ubin">${n}</i>`}</span>
                     <b>${m.nama}</b>
                     <span class="harga-ubin">${rupiah(hargaJual(m))}${diskonBerlaku(m) ? html` <s>${rupiah(m.harga)}</s>` : ''}</span>
                     <small>${opsiMenu(m).length ? 'Ada pilihan · ' : ''}${sisa === null ? '' : sisa <= 0 ? 'Stok habis' : `Sisa ${sisa}`}</small>

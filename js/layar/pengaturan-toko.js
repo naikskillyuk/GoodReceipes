@@ -128,7 +128,7 @@ export function KartuAkunToko({ k }) {
   };
   return html`<section class="kartu kolom" aria-labelledby="h-akun-toko">
     <h2 class="judul-kecil" id="h-akun-toko">Akun toko (kasir)</h2>
-    <p class="bantu">Akun toko masuk di halaman Masuk dengan username dan kata sandinya. Akun ini hanya bisa membuka Kasir, Pesanan, Stok makanan, Menu, dan Pelanggan; resep, bahan, dan HPP tidak terlihat.</p>
+    <p class="bantu">Akun toko masuk di halaman Masuk dengan username dan kata sandinya. Akun ini hanya bisa membuka Kasir, Catat Pesanan, Pesanan, Stok produk, dan Pelanggan; resep, bahan, dan HPP tidak terlihat.</p>
     ${galat && html`<p class="galat-teks">${galat} <button class="tautan-kecil" onClick=${muat}>Coba lagi</button></p>`}
     ${daftar && daftar.length === 0 && html`<p class="bantu">Belum ada akun toko.</p>`}
     ${(daftar || []).map(

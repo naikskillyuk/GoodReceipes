@@ -263,3 +263,32 @@ test('pilihan tambahan (varian): harga ditambahkan, hanya pilihan yang ada, nama
   assert.deepEqual(p.item[0].opsi, ['Digoreng']);
   assert.equal(p.total, 11000);
 });
+
+test('produksi ke stok produk: sebagian, impor nanti, dan tambah stok tanpa produksi', async () => {
+  const { db, brownies } = await dbContoh();
+  // Hasil 16, hanya 14 yang masuk stok (2 untuk icip).
+  const p = toko.catatProduksi(db, { idResep: brownies, kali: 1, hasil: 16, masukStok: 14 });
+  assert.equal(toko.stokMakanan(db).get(brownies), 14);
+  assert.equal(toko.sudahMasukStok(db, p), 14);
+  assert.deepEqual(toko.produksiBelumMasuk(db).map((x) => x.sisa), [2]);
+  assert.throws(() => toko.masukkanProduksiKeStok(db, p.id, 5), /Paling banyak 2/);
+  toko.masukkanProduksiKeStok(db, p.id);
+  assert.equal(toko.stokMakanan(db).get(brownies), 16);
+  assert.equal(toko.produksiBelumMasuk(db).length, 0);
+
+  // Dicatat tanpa masuk stok, lalu diimpor sebagian.
+  const q = toko.catatProduksi(db, { idResep: brownies, kali: 1, hasil: 10, masukStok: 0 });
+  assert.equal(toko.stokMakanan(db).get(brownies), 16);
+  toko.masukkanProduksiKeStok(db, q.id, 4);
+  assert.equal(toko.stokMakanan(db).get(brownies), 20);
+  assert.equal(toko.produksiBelumMasuk(db)[0].sisa, 6);
+
+  // Tambah stok langsung.
+  toko.ubahStokMakanan(db, brownies, { jenis: 'masuk', nilai: 5, catatan: 'stok awal' });
+  assert.equal(toko.stokMakanan(db).get(brownies), 25);
+  assert.ok(toko.riwayatMakanan(db, brownies).some((m) => m.jenis === 'masuk' && m.jumlah === 5 && m.catatan === 'stok awal'));
+
+  // Membatalkan produksi menghapus juga stok yang sudah diimpor darinya.
+  toko.hapusProduksi(db, q.id);
+  assert.equal(toko.stokMakanan(db).get(brownies), 21);
+});

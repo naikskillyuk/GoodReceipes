@@ -350,8 +350,14 @@ class Penjualan
             $namaKat[$kat['id']] = (string) $kat['nama'];
         }
         $katResep = [];
+        $fotoResep = [];
         foreach ($this->semua($id, 'Resep') as $r) {
             $katResep[$r['id']] = $namaKat[$r['idKategori']] ?? '';
+            $fotoResep[$r['id']] = (string) ($r['fotoAcuanUrl'] ?? '');
+        }
+        $fotoPaket = [];
+        foreach ($this->semua($id, 'Paket') as $p) {
+            $fotoPaket[$p['id']] = (string) ($p['fotoUrl'] ?? '');
         }
         $menu = [];
         foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
@@ -363,7 +369,8 @@ class Penjualan
                 'hargaAsli' => (float) $m['harga'],
                 'diskon' => self::diskonBerlaku($m),
                 'opsi' => self::opsiMenu($m),
-                'fotoUrl' => (string) $m['fotoUrl'],
+                // Foto menu sendiri, atau foto paket / foto acuan resep.
+                'fotoUrl' => (string) ($m['fotoUrl'] ?: ($m['jenis'] === 'paket' ? ($fotoPaket[$m['idRef']] ?? '') : ($fotoResep[$m['idRef']] ?? ''))),
                 'keterangan' => mb_substr((string) $m['keterangan'], 0, 300),
                 'sisa' => $this->sisaMenu($this->isiMenu($id, $m, $isiPaket), $stok),
                 'urutan' => (float) ($m['urutan'] ?? 0),

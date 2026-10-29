@@ -284,6 +284,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         const r = m.jenis === 'paket' ? null : tabel('Resep')[m.idRef];
         const kat = r && tabel('Kategori')[r.idKategori];
         const kategori = m.jenis === 'paket' ? 'Paket' : (kat && kat.nama) || 'Lainnya';
+        const fotoCadangan = m.jenis === 'paket' ? (tabel('Paket')[m.idRef] || {}).fotoUrl : (tabel('Resep')[m.idRef] || {}).fotoAcuanUrl;
+        m = { ...m, fotoUrl: m.fotoUrl || fotoCadangan || '' };
         return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
       });
     return {

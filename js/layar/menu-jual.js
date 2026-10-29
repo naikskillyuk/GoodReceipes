@@ -1,15 +1,19 @@
-// Menu jual: resep dan paket yang dijual di kasir dan di link pemesanan. Akun dapur mengatur harga; toko hanya melihat.
+// Menu & Harga Jual: resep dan paket yang dijual di kasir dan etalase, dalam bentuk tabel.
+// Akun dapur menambah / mengubah menu lewat formulir (harga, potensi keuntungan, diskon, varian); toko hanya melihat.
 
 import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, Foto, InputRupiah, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
-import { tanya, tampilToast } from '../ui/pesan.js';
+import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
-import { daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoMenu, hargaJual, diskonBerlaku, opsiMenu } from '../lib/toko.js';
+import {
+  daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoTampilMenu, hargaJual, diskonBerlaku, opsiMenu, hargaSaranMenu,
+  sisaMenu, stokIsiMenu, stokMakanan,
+} from '../lib/toko.js';
 import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
 import { dataHPP, dataPaket } from '../lib/repo.js';
 import { marginDariHarga } from '../lib/hpp.js';
-import { rupiah, persen } from '../lib/util.js';
+import { rupiah, persen, tampilJumlah } from '../lib/util.js';
 
 /** HPP satu menu (hanya akun dapur yang punya datanya). */
 function hppMenu(db, menu) {
@@ -21,127 +25,209 @@ function hppMenu(db, menu) {
   return d ? d.hppJual : NaN;
 }
 
-function TeksSisa({ sisa }) {
-  if (sisa === null) return html`<small>stok tidak dilacak</small>`;
-  return html`<small class=${sisa <= 0 ? 'teks-buruk' : ''}>${sisa <= 0 ? 'stok habis' : `sisa ${sisa}`}</small>`;
+/** Sisa stok menu. Paket: isi yang paling sedikit menentukan; disebutkan isi yang kosong. */
+function TeksSisa({ db, m, sisa }) {
+  if (sisa === null) return html`<span class="teks-kecil">tidak dilacak</span>`;
+  if (sisa > 0) return html`<b>${sisa}</b>`;
+  const kosong = m.jenis === 'paket' ? stokIsiMenu(db, m).filter((x) => !x.cukup && x.resep).map((x) => x.resep.nama) : [];
+  return html`<span class="lencana-status belum">Habis</span>${kosong.length ? html`<br /><small class="teks-buruk">${kosong.join(', ')} kosong</small>` : ''}`;
 }
 
-/** Pilihan tambahan berbayar (varian), mis. "Digoreng" +2.000, "Tambah keju" +3.000. Disimpan saat kolom ditinggalkan. */
+/** Pilihan tambahan berbayar (varian), mis. "Digoreng" +2.000, "Tambah keju" +3.000. */
 function EditorOpsi({ m, ubah }) {
   const [baris, setBaris] = useState(() => opsiMenu(m));
   const simpan = (daftar) => ubah({ opsi: daftar.filter((o) => String(o.nama || '').trim()).map((o) => ({ nama: String(o.nama).trim().slice(0, 40), harga: Math.max(0, Math.round(Number(o.harga) || 0)) })) });
-  const atur = (i, patch, langsung) => {
+  const atur = (i, patch) => {
     const baru = baris.map((o, j) => (j === i ? { ...o, ...patch } : o));
     setBaris(baru);
-    if (langsung) simpan(baru);
+    simpan(baru);
   };
   const hapus = (i) => {
     const baru = baris.filter((_, j) => j !== i);
     setBaris(baru);
     simpan(baru);
   };
-  return html`<details class="opsi-menu" open=${baris.length > 0}>
-    <summary>Pilihan tambahan / varian${baris.length ? ` (${baris.length})` : ''}</summary>
-    <p class="bantu">Pembeli dan kasir bisa mencentang beberapa pilihan; harganya ditambahkan ke harga menu.</p>
+  return html`<div class="kolom" style="gap:8px">
+    <span class="label-kecil">Pilihan tambahan / varian (opsional)</span>
     ${baris.map(
       (o, i) => html`<div class="baris-opsi" key=${i}>
-        <input class="input kecil" maxlength="40" placeholder="mis. Digoreng / Tambah keju" aria-label=${`Nama pilihan ${i + 1} ${m.nama}`} value=${o.nama} onInput=${(e) => atur(i, { nama: e.target.value })} onChange=${() => simpan(baris)} />
-        <${InputRupiah} kelas="input kecil" aria-label=${`Harga pilihan ${i + 1} ${m.nama}`} placeholder="+ Rp" nilai=${o.harga} onUbah=${(n) => atur(i, { harga: n }, true)} />
-        <button class="ikon-btn kecil" aria-label=${'Hapus pilihan ' + (o.nama || i + 1)} onClick=${() => hapus(i)}><${Ikon} nama="sampah" ukuran=${16} /></button>
+        <input class="input kecil" maxlength="40" placeholder="mis. Digoreng / Tambah keju" aria-label=${`Nama pilihan ${i + 1}`} value=${o.nama} onInput=${(e) => atur(i, { nama: e.target.value })} />
+        <${InputRupiah} kelas="input kecil" aria-label=${`Harga pilihan ${i + 1}`} placeholder="+ Rp" nilai=${o.harga} onUbah=${(n) => atur(i, { harga: n })} />
+        <button type="button" class="ikon-btn kecil" aria-label=${'Hapus pilihan ' + (o.nama || i + 1)} onClick=${() => hapus(i)}><${Ikon} nama="sampah" ukuran=${16} /></button>
       </div>`,
     )}
-    ${baris.length < 12 && html`<button class="btn kecil" onClick=${() => setBaris([...baris, { nama: '', harga: 0 }])}><${Ikon} nama="plus" ukuran=${16} />Tambah pilihan</button>`}
-  </details>`;
+    ${baris.length < 12 && html`<button type="button" class="btn kecil" style="align-self:flex-start" onClick=${() => setBaris([...baris, { nama: '', harga: 0 }])}><${Ikon} nama="plus" ukuran=${16} />Tambah pilihan</button>`}
+  </div>`;
 }
 
-function BarisMenuDapur({ k, m, sisa }) {
-  const { db } = k;
-  const hpp = hppMenu(db, m);
-  const harga = hargaJual(m);
-  const diskon = diskonBerlaku(m);
-  const lewat = (Number(m.diskon) || 0) > 0 && !diskon;
-  // Margin dihitung dari harga yang benar-benar dibayar pembeli (setelah diskon).
-  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
-  const ubah = (patch) => db.simpan('Menu', { ...db.ambil('Menu', m.id), ...patch });
-  const hapus = async () => {
-    const ya = await tanya({ judul: `Keluarkan “${m.nama}” dari menu?`, teks: 'Resep/paketnya tidak terhapus. Pesanan lama tetap tersimpan.', ya: 'Keluarkan', bahaya: true });
-    if (ya) db.hapus('Menu', m.id);
+const KOSONG = { jenis: '', idRef: '', nama: '', harga: 0, keterangan: '', aktif: true, online: true, diskon: 0, diskonSampai: 0, opsi: [] };
+
+/** Formulir tambah / ubah menu: pilih dari daftar, harga jual, potensi keuntungan, diskon, varian, dan status. */
+function FormMenu({ db, awal, onTutup }) {
+  const baru = !awal;
+  const [d, setD] = useState(() => (awal ? { ...KOSONG, ...awal, opsi: opsiMenu(awal) } : { ...KOSONG }));
+  const [galat, setGalat] = useState('');
+  const atur = (patch) => (setGalat(''), setD((x) => ({ ...x, ...patch })));
+  const pilihan = baru ? pilihanMenu(db) : [];
+  const pilih = (nilai) => {
+    const [jenis, idRef] = nilai.split(':');
+    if (!idRef) return atur({ jenis: '', idRef: '', nama: '', harga: 0 });
+    const sumber = db.ambil(jenis === 'paket' ? 'Paket' : 'Resep', idRef);
+    atur({ jenis, idRef, nama: sumber ? sumber.nama : '', harga: hargaSaranMenu(db, jenis, idRef) });
   };
-  return html`<div class=${'kartu-menu' + (m.aktif ? '' : ' mati')}>
-    <span class="foto-menu"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} /></span>
-    <div class="kolom" style="gap:8px;min-width:0;flex:1">
-      <div class="baris-pisah">
-        <input class="input kecil" style="font-weight:700" aria-label=${'Nama menu ' + m.nama} maxlength="60" value=${m.nama} onChange=${(e) => e.target.value.trim() && ubah({ nama: e.target.value.trim() })} />
-        <button class="ikon-btn kecil" aria-label=${'Keluarkan ' + m.nama + ' dari menu'} onClick=${hapus}><${Ikon} nama="sampah" ukuran=${16} /></button>
-      </div>
-      <div class="cari-baris">
-        <label class="bidang" style="flex:1"><span>Harga jual</span><${InputRupiah} kelas="input kecil" aria-label=${'Harga ' + m.nama} nilai=${m.harga} onUbah=${(n) => ubah({ harga: n })} /></label>
-        <div class="info-menu">
-          ${m.jenis === 'paket' ? html`<small class="lencana-jenis">Paket</small>` : ''}
-          <${TeksSisa} sisa=${sisa} />
-          ${Number.isFinite(hpp) && html`<small>HPP ${rupiah(hpp)}${mg ? html` · margin <b class=${mg.marginPersen < 0 ? 'teks-buruk' : ''}>${persen(mg.marginPersen)}</b>` : ''}</small>`}
+
+  const ada = !!d.idRef;
+  const hpp = ada ? hppMenu(db, d) : NaN;
+  const saran = ada ? hargaSaranMenu(db, d.jenis, d.idRef) : 0;
+  const harga = hargaJual(d);
+  const diskon = diskonBerlaku(d);
+  const laba = Number.isFinite(hpp) && harga > 0 ? harga - hpp : NaN;
+  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
+  const sisa = ada ? sisaMenu(db, d) : null;
+  const isi = ada && d.jenis === 'paket' ? stokIsiMenu(db, d) : [];
+
+  const simpan = () => {
+    if (!ada) return setGalat('Pilih resep atau paket dulu.');
+    if (!String(d.nama || '').trim()) return setGalat('Isi nama menu.');
+    if (!(d.harga > 0)) return setGalat('Isi harga jual.');
+    const isian = {
+      nama: d.nama.trim().slice(0, 60),
+      harga: d.harga,
+      keterangan: String(d.keterangan || '').trim().slice(0, 200),
+      aktif: !!d.aktif,
+      online: !!d.aktif && !!d.online,
+      diskon: Math.max(0, Math.min(90, Math.round(Number(d.diskon) || 0))),
+      diskonSampai: Number(d.diskonSampai) || 0,
+      opsi: opsiMenu(d),
+    };
+    if (baru) tambahMenu(db, d.jenis, d.idRef, isian);
+    else db.simpan('Menu', { ...db.ambil('Menu', awal.id), ...isian });
+    tampilToast(baru ? `${isian.nama} masuk menu jual.` : `${isian.nama} disimpan.`);
+    onTutup();
+  };
+
+  return html`<${Modal} judul=${baru ? 'Tambah menu' : 'Ubah menu'} onTutup=${onTutup}>
+    <div class="kolom form-menu" style="gap:12px">
+      ${baru
+        ? html`<label class="bidang"><span>Pilih dari daftar</span>
+            <select class="pilih" aria-label="Pilih resep atau paket" value=${ada ? d.jenis + ':' + d.idRef : ''} onChange=${(e) => pilih(e.target.value)}>
+              <option value="">Pilih resep atau paket…</option>
+              ${pilihan.map((p) => html`<option value=${p.jenis + ':' + p.id}>${p.jenis === 'paket' ? 'Paket · ' : ''}${p.nama}</option>`)}
+            </select>
+            ${pilihan.length === 0 && html`<small class="bantu">Semua resep dan paket sudah ada di menu. <a href=${tautan('/paket')}>Buat paket baru</a></small>`}
+          </label>`
+        : html`<div class="hasil-baris"><span>${d.jenis === 'paket' ? 'Paket' : 'Resep'}</span><b class="biasa">${(db.ambil(d.jenis === 'paket' ? 'Paket' : 'Resep', d.idRef) || {}).nama || '–'}</b></div>`}
+
+      ${ada &&
+      html`<div class="pratinjau-menu">
+          <span class="foto-menu"><${Foto} src=${fotoTampilMenu(db, d)} ikon=${d.jenis === 'paket' ? 'kotak' : 'kue'} /></span>
+          <label class="bidang" style="flex:1"><span>Nama di menu</span><input class="input kecil" maxlength="60" aria-label="Nama di menu" value=${d.nama} onInput=${(e) => atur({ nama: e.target.value })} /></label>
         </div>
-      </div>
-      <div class="baris-diskon">
-        <label class="bidang"><span>Diskon (%)</span><${InputAngka} kelas="input kecil" aria-label=${'Diskon ' + m.nama} nilai=${m.diskon || 0} onUbah=${(n) => ubah({ diskon: Math.max(0, Math.min(90, Math.round(n) || 0)) })} placeholder="0" /></label>
-        <label class="bidang"><span>Berlaku sampai (opsional)</span><input class="input kecil" type="date" aria-label=${'Diskon sampai ' + m.nama} value=${m.diskonSampai ? keInputWaktu(m.diskonSampai).slice(0, 10) : ''} onChange=${(e) => ubah({ diskonSampai: e.target.value ? dariInputWaktu(e.target.value + 'T23:59') : 0 })} /></label>
-      </div>
-      ${diskon > 0 && html`<p class="bantu teks-baik">Harga setelah diskon ${diskon}%: <b>${rupiah(harga)}</b> (dari ${rupiah(m.harga)})${mg && mg.marginPersen < 0 ? html` · <b class="teks-buruk">rugi, di bawah HPP</b>` : ''}</p>`}
-      ${lewat && html`<p class="bantu teks-buruk">Masa diskon sudah lewat; harga normal berlaku. <button class="tautan-kecil" onClick=${() => ubah({ diskon: 0, diskonSampai: 0 })}>Hapus diskon</button></p>`}
-      <${EditorOpsi} m=${m} ubah=${ubah} />
-      <input class="input kecil" aria-label=${'Keterangan ' + m.nama} maxlength="200" placeholder="Keterangan singkat untuk pembeli (opsional)" value=${m.keterangan || ''} onChange=${(e) => ubah({ keterangan: e.target.value.trim() })} />
-      <div class="baris-saklar">
-        <label class="saklar"><input type="checkbox" checked=${!!m.aktif} onChange=${(e) => ubah({ aktif: e.target.checked })} /><span>Dijual</span></label>
-        <label class="saklar"><input type="checkbox" checked=${!!m.online} disabled=${!m.aktif} onChange=${(e) => ubah({ online: e.target.checked })} /><span>Tampil di link pemesanan</span></label>
-        ${!m.fotoUrl && fotoMenu(db, m.jenis, m.idRef) && html`<button class="btn kecil" onClick=${() => ubah({ fotoUrl: fotoMenu(db, m.jenis, m.idRef) })}>Pakai foto resep</button>`}
+        <div class="dua-kolom">
+          <label class="bidang"><span>Harga jual</span><${InputRupiah} kelas="input" aria-label="Harga jual" nilai=${d.harga} onUbah=${(n) => atur({ harga: n })} /></label>
+          <div class="bidang"><span>Harga saran</span>
+            <button type="button" class="btn" disabled=${!saran || saran === d.harga} onClick=${() => atur({ harga: saran })}>${saran ? 'Pakai ' + rupiah(saran) : 'Belum ada HPP'}</button>
+          </div>
+        </div>
+
+        <div class="ringkas-laba" aria-label="Potensi keuntungan">
+          <div><small>HPP</small><b>${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</b></div>
+          <div><small>Harga jual${diskon ? ` (−${diskon}%)` : ''}</small><b>${rupiah(harga)}</b></div>
+          <div class=${Number.isFinite(laba) && laba < 0 ? 'rugi' : 'untung'}><small>Untung per jual</small><b>${Number.isFinite(laba) ? rupiah(laba) : '–'}</b></div>
+          <div><small>Margin</small><b>${mg ? persen(mg.marginPersen) : '–'}</b></div>
+        </div>
+        ${Number.isFinite(laba) && laba < 0 && html`<p class="galat-teks">Harga di bawah HPP: rugi ${rupiah(-laba)} per jual.</p>`}
+        <p class="bantu">Stok: ${sisa === null ? 'tidak dilacak' : sisa > 0 ? `bisa dijual ${sisa}` : 'habis'}${isi.length ? ` · isi paket: ${isi.map((x) => `${x.resep ? x.resep.nama : '?'} ${tampilJumlah(x.stok)}${x.per !== 1 ? `/${tampilJumlah(x.per)}` : ''}`).join(', ')}` : ''}</p>
+
+        <div class="baris-diskon">
+          <label class="bidang"><span>Diskon (%)</span><${InputAngka} kelas="input kecil" aria-label="Diskon persen" nilai=${d.diskon || 0} onUbah=${(n) => atur({ diskon: Math.max(0, Math.min(90, Math.round(n) || 0)) })} placeholder="0" /></label>
+          <label class="bidang"><span>Diskon sampai (opsional)</span><input class="input kecil" type="date" aria-label="Diskon sampai" value=${d.diskonSampai ? keInputWaktu(d.diskonSampai).slice(0, 10) : ''} onChange=${(e) => atur({ diskonSampai: e.target.value ? dariInputWaktu(e.target.value + 'T23:59') : 0 })} /></label>
+        </div>
+        <${EditorOpsi} m=${d} ubah=${atur} />
+        <label class="bidang"><span>Keterangan untuk pembeli (opsional)</span><input class="input kecil" maxlength="200" value=${d.keterangan || ''} onInput=${(e) => atur({ keterangan: e.target.value })} placeholder="mis. isi 6 potong, tahan 2 hari" /></label>
+        <div class="baris-saklar">
+          <label class="saklar"><input type="checkbox" checked=${!!d.aktif} onChange=${(e) => atur({ aktif: e.target.checked })} /><span>Dijual</span></label>
+          <label class="saklar"><input type="checkbox" checked=${!!d.online} disabled=${!d.aktif} onChange=${(e) => atur({ online: e.target.checked })} /><span>Tampil di etalase</span></label>
+        </div>`}
+      ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <div class="baris-btn">
+        <button class="btn solid" disabled=${!ada} onClick=${simpan}><${Ikon} nama="centang" ukuran=${18} />${baru ? 'Masukkan ke menu' : 'Simpan'}</button>
+        <button class="btn abu" onClick=${onTutup}>Batal</button>
       </div>
     </div>
-  </div>`;
+  <//>`;
 }
 
 export function MenuJual({ k }) {
   const { db } = k;
   const dapur = peranAkun(db) === 'dapur';
   const daftar = daftarMenu(db);
-  const pilihan = dapur ? pilihanMenu(db) : [];
-  const [pilih, setPilih] = useState('');
-  const tambah = () => {
-    const [jenis, id] = pilih.split(':');
-    const m = tambahMenu(db, jenis, id);
-    setPilih('');
-    if (m) tampilToast(m.harga > 0 ? `${m.nama} masuk menu, harga ${rupiah(m.harga)}.` : `${m.nama} masuk menu. Isi harganya.`);
+  const stok = stokMakanan(db);
+  const [form, setForm] = useState(null); // null | 'baru' | menu
+  const [cari, setCari] = useState('');
+  const q = cari.trim().toLowerCase();
+  const tampil = daftar.filter(({ menu: m }) => !q || m.nama.toLowerCase().includes(q));
+  const hapus = async (m) => {
+    const ya = await tanya({ judul: `Keluarkan “${m.nama}” dari menu?`, teks: 'Resep/paketnya tidak terhapus. Pesanan lama tetap tersimpan.', ya: 'Keluarkan', bahaya: true });
+    if (ya) db.hapus('Menu', m.id);
   };
 
   return html`<${Kerangka} k=${k} aktif="menu">
-    <${Hero} warna="var(--hijau)" label="Toko" judul="Menu jual" kembali="/" stat=${html`<${Stat} nilai=${daftar.filter((d) => d.menu.aktif).length} label="dijual" />`}>
-      <p class="hero-sub">${dapur ? 'Harga saran diambil dari HPP Jual / paket. Isi Diskon (%) untuk harga coret di etalase dan kasir. Menu yang dijual muncul di Kasir; yang ditandai online muncul di etalase.' : 'Harga diatur oleh akun dapur.'}</p>
+    <${Hero} warna="var(--hijau)" label="Toko" judul="Menu & harga jual" kembali="/" stat=${html`<${Stat} nilai=${daftar.filter((x) => x.menu.aktif).length} label="dijual" />`}>
+      <p class="hero-sub">${dapur ? 'Menu yang dijual muncul di Kasir; yang tampil di etalase muncul untuk pembeli. Paket habis bila salah satu isinya kosong.' : 'Harga diatur oleh admin.'}</p>
     <//>
     <div class="isi">
-      ${dapur &&
-      html`<div class="kartu kolom">
-        <label class="bidang"><span>Tambah ke menu</span>
-          <select class="pilih" value=${pilih} onChange=${(e) => setPilih(e.target.value)}>
-            <option value="">Pilih resep atau paket…</option>
-            ${pilihan.map((p) => html`<option value=${p.jenis + ':' + p.id}>${p.jenis === 'paket' ? 'Paket · ' : ''}${p.nama}</option>`)}
-          </select>
-        </label>
-        <div class="baris-btn">
-          <button class="btn solid" disabled=${!pilih} onClick=${tambah}><${Ikon} nama="plus" ukuran=${18} />Masukkan ke menu</button>
-          <a class="btn" href=${tautan('/paket')}>Buat paket</a>
-        </div>
-      </div>`}
-      ${daftar.length === 0 && html`<${Kosong} judul="Menu masih kosong" teks=${dapur ? 'Masukkan resep atau paket yang mau dijual.' : 'Akun dapur belum memasukkan menu.'} />`}
-      <div class="daftar daftar-lebar">
-        ${daftar.map(({ menu: m, sisa }) =>
-          dapur
-            ? html`<${BarisMenuDapur} key=${m.id} k=${k} m=${m} sisa=${sisa} />`
-            : html`<div class=${'kartu-menu' + (m.aktif ? '' : ' mati')} key=${m.id}>
-                <span class="foto-menu"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} /></span>
-                <div class="kolom" style="gap:4px;flex:1;min-width:0"><b>${m.nama}</b><span class="teks-kecil">${m.aktif ? (m.online ? 'Dijual · online' : 'Dijual di toko') : 'Tidak dijual'}</span><${TeksSisa} sisa=${sisa} /></div>
-                <b class="harga-menu">${rupiah(hargaJual(m))}${diskonBerlaku(m) ? html`<br /><s class="teks-kecil">${rupiah(m.harga)}</s>` : ''}</b>
-              </div>`,
-        )}
+      <div class="baris-cari">
+        <input class="input" type="search" placeholder="Cari menu…" aria-label="Cari menu" value=${cari} onInput=${(e) => setCari(e.target.value)} />
+        ${dapur && html`<button class="btn solid" onClick=${() => setForm('baru')}><${Ikon} nama="plus" ukuran=${18} />Tambah menu</button>`}
       </div>
+      ${daftar.length === 0
+        ? html`<${Kosong} judul="Menu masih kosong" teks=${dapur ? 'Tekan Tambah menu, lalu pilih resep atau paket yang mau dijual.' : 'Admin belum memasukkan menu.'} />`
+        : html`<div class="tabel-gulir kartu tabel-kartu">
+            <table class="tabel-data">
+              <thead>
+                <tr>
+                  <th>Menu</th>
+                  ${dapur && html`<th class="angka">HPP</th>`}
+                  <th class="angka">Harga jual</th>
+                  ${dapur && html`<th class="angka">Untung / jual</th>`}
+                  ${dapur && html`<th class="angka">Margin</th>`}
+                  <th class="angka">Stok</th>
+                  <th>Status</th>
+                  ${dapur && html`<th aria-label="Aksi"></th>`}
+                </tr>
+              </thead>
+              <tbody>
+                ${tampil.map(({ menu: m, sisa }) => {
+                  const hpp = dapur ? hppMenu(db, m) : NaN;
+                  const harga = hargaJual(m);
+                  const laba = Number.isFinite(hpp) && harga > 0 ? harga - hpp : NaN;
+                  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
+                  const opsi = opsiMenu(m);
+                  return html`<tr key=${m.id} class=${m.aktif ? '' : 'mati'}>
+                    <td>
+                      <span class="sel-menu">
+                        <span class="foto-mini"><${Foto} src=${fotoTampilMenu(db, m)} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} ukuranIkon=${18} /></span>
+                        <span><b>${m.nama}</b><small>${m.jenis === 'paket' ? 'Paket' : 'Resep'}${opsi.length ? ` · ${opsi.length} varian` : ''}${diskonBerlaku(m) ? ` · diskon ${diskonBerlaku(m)}%` : ''}</small></span>
+                      </span>
+                    </td>
+                    ${dapur && html`<td class="angka">${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</td>`}
+                    <td class="angka"><b>${rupiah(harga)}</b>${diskonBerlaku(m) ? html`<br /><s class="teks-kecil">${rupiah(m.harga)}</s>` : ''}</td>
+                    ${dapur && html`<td class=${'angka ' + (laba < 0 ? 'teks-buruk' : 'teks-baik')}>${Number.isFinite(laba) ? rupiah(laba) : '–'}</td>`}
+                    ${dapur && html`<td class=${'angka' + (mg && mg.marginPersen < 0 ? ' teks-buruk' : '')}>${mg ? persen(mg.marginPersen) : '–'}</td>`}
+                    <td class="angka"><${TeksSisa} db=${db} m=${m} sisa=${sisaMenu(db, m, stok) ?? sisa} /></td>
+                    <td><span class=${'lencana-status ' + (m.aktif ? 'lunas' : 'belum')}>${m.aktif ? 'Dijual' : 'Tidak dijual'}</span>${m.aktif && m.online ? html`<br /><small class="teks-kecil">+ etalase</small>` : ''}</td>
+                    ${dapur &&
+                    html`<td class="aksi">
+                      <button class="btn kecil" aria-label=${'Ubah ' + m.nama} onClick=${() => setForm(m)}>Ubah</button>
+                      <button class="ikon-btn kecil" aria-label=${'Keluarkan ' + m.nama + ' dari menu'} onClick=${() => hapus(m)}><${Ikon} nama="sampah" ukuran=${16} /></button>
+                    </td>`}
+                  </tr>`;
+                })}
+              </tbody>
+            </table>
+          </div>`}
     </div>
+    ${form && html`<${FormMenu} key=${form === 'baru' ? 'baru' : form.id} db=${db} awal=${form === 'baru' ? null : form} onTutup=${() => setForm(null)} />`}
   <//>`;
 }

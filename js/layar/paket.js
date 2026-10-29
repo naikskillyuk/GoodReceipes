@@ -3,15 +3,16 @@
 // Biaya per porsi tiap resep (kemasan, label, ongkir) tidak ikut, karena paket punya kemasannya sendiri.
 
 import { html, useState } from '../../vendor/preact-htm.js';
-import { Kerangka, Hero, Kosong, Stat, InputRupiah, InputAngka } from '../ui/komponen.js';
+import { Kerangka, Hero, Kosong, Stat, InputRupiah, InputAngka, FotoInput } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { KartuHarga } from '../ui/harga.js';
 import { Langkah } from './hpp.js';
-import { daftarPaket, buatPaket, hapusPaket, dataPaket, tambahIsiPaket, biayaPaketList } from '../lib/repo.js';
+import { daftarPaket, buatPaket, hapusPaket, dataPaket, tambahIsiPaket, biayaPaketList, simpanHPPPaket } from '../lib/repo.js';
+import { tambahMenu } from '../lib/toko.js';
 import { marginDariHarga } from '../lib/hpp.js';
-import { rupiah, angka, persen, tampilJumlah } from '../lib/util.js';
+import { rupiah, angka, persen, tampilJumlah, tanggal } from '../lib/util.js';
 
 const PRESET_PAKET = ['Kotak / dus', 'Kantong', 'Label dan stiker', 'Sendok dan tisu', 'Ongkos kirim'];
 
@@ -45,7 +46,7 @@ export function DaftarPaket({ k }) {
                 <span class="nomor"><${Ikon} nama="kalkulator" /></span>
                 <span class="teks">
                   <b>${d.paket.nama}</b>
-                  <small>${d.isi.length} resep · HPP ${rupiah(d.hppPaket)}</small>
+                  <small>${d.isi.length} resep · HPP ${rupiah(d.hppPaket)}${!d.tersimpan ? ' · belum disimpan' : d.berubah ? ' · hitungan berubah' : ''}</small>
                   <small>${d.paket.hargaJual > 0 ? `Dijual ${rupiah(d.paket.hargaJual)} · margin ${persen(m.marginPersen)}` : 'Harga jual belum diisi'}</small>
                 </span>
               </a>`;
@@ -66,6 +67,11 @@ export function DetailPaket({ k, id }) {
   }
   const { paket } = d;
   const ubahPaket = (patch) => db.simpan('Paket', { ...db.ambil('Paket', id), ...patch });
+  // Foto paket: menu paket ini ikut memakai foto paket (foto menu lama dikosongkan).
+  const gantiFoto = (data) => {
+    ubahPaket({ fotoLokal: data || '', fotoUrl: '' });
+    db.semua('Menu', (m) => m.jenis === 'paket' && m.idRef === id && m.fotoUrl).forEach((m) => db.simpan('Menu', { ...m, fotoUrl: '' }));
+  };
   const sudah = new Set(d.isi.map((i) => i.idResep));
   const pilihan = db.semua('Resep', (r) => !sudah.has(r.id)).sort((a, b) => (a.nama || '').localeCompare(b.nama || ''));
   const jenisAda = new Set(d.biaya.map((b) => (b.jenis || '').toLowerCase()));
@@ -83,6 +89,10 @@ export function DetailPaket({ k, id }) {
       <span>Nama paket</span>
       <input class="input" value=${paket.nama} onInput=${(e) => ubahPaket({ nama: e.target.value })} />
     </label>
+    <div class="bidang">
+      <span>Foto paket</span>
+      <${FotoInput} nilai=${paket.fotoLokal || paket.fotoUrl || ''} onUbah=${gantiFoto} judul=${paket.fotoLokal || paket.fotoUrl ? 'Ganti foto paket' : 'Tambah foto paket'} bantu="Tampil di menu jual, kasir, dan etalase." aksen="var(--hijau)" />
+    </div>
 
     <${Langkah}
       no="1"
@@ -151,16 +161,43 @@ export function DetailPaket({ k, id }) {
     <button class="btn bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${18} />Hapus paket</button>
   </div>`;
 
+  const menuPaket = db.semua('Menu', (m) => m.jenis === 'paket' && m.idRef === id)[0] || null;
+  const bisaSimpan = d.isi.length > 0 && d.bermasalah.length === 0 && Number.isFinite(d.hppHitung);
+  const simpan = () => {
+    if (!simpanHPPPaket(db, id)) return tampilToast('HPP paket belum bisa dihitung. Periksa isi paket.');
+    tampilToast(`Paket “${paket.nama}” disimpan, HPP ${rupiah(d.hppHitung)}.`);
+  };
+  const keMenu = () => {
+    const m = tambahMenu(db, 'paket', id);
+    if (m) tampilToast(`${m.nama} masuk menu jual, harga ${rupiah(m.harga)}.`);
+    pergi('/menu');
+  };
+  let status;
+  if (!d.tersimpan) {
+    status = html`<div class="status-simpan belum"><b>Belum disimpan.</b> Simpan supaya HPP paket ini dipakai di Menu & Harga Jual.</div>`;
+  } else if (d.berubah) {
+    status = html`<div class="status-simpan berubah"><b>Hitungan berubah.</b> Tersimpan ${rupiah(d.hppPaket)}, sekarang ${rupiah(d.hppHitung)}. Simpan ulang untuk memakai angka baru.</div>`;
+  } else {
+    status = html`<div class="status-simpan sudah"><${Ikon} nama="centang" ukuran=${18} /><span><b>Tersimpan</b>${d.disimpanPada ? ` · ${tanggal(d.disimpanPada)}` : ''}</span></div>`;
+  }
+
   const kanan = html`<div class="kolom">
     <div class="kartu-hpp">
       <div class="label-kecil">HPP (modal) per paket</div>
-      <div class="besar">${rupiah(d.hppPaket)}</div>
+      <div class="besar">${rupiah(d.hppHitung)}</div>
       <div class="hpp-pecah">
         <span><i class="no-mini">1</i>Isi paket</span><b>${rupiah(d.totalIsi)}</b>
         <span><i class="no-mini">2</i>Packing paket</span><b>${rupiah(d.totalBiaya)}</b>
       </div>
     </div>
-    <${KartuHarga} key=${id} hpp=${d.hppPaket} marginTarget=${Number(paket.marginTarget) || 40} hargaJual=${Number(paket.hargaJual) || 0} onUbah=${ubahPaket} unit="paket" />
+    <div class="kartu kolom">
+      ${status}
+      ${(!d.tersimpan || d.berubah) &&
+      html`<button class="btn solid" disabled=${!bisaSimpan} onClick=${simpan}><${Ikon} nama="centang" ukuran=${18} />${d.tersimpan ? 'Simpan ulang' : 'Simpan HPP paket'} ${rupiah(d.hppHitung)}</button>`}
+      ${d.tersimpan && !menuPaket && html`<button class="btn" onClick=${keMenu}><${Ikon} nama="tag" ukuran=${18} />Masukkan ke Menu & Harga Jual</button>`}
+      ${menuPaket && html`<a class="btn" href=${tautan('/menu')}><${Ikon} nama="tag" ukuran=${18} />Sudah di menu jual · ${rupiah(menuPaket.harga)}</a>`}
+    </div>
+    <${KartuHarga} key=${id} hpp=${d.hppHitung} marginTarget=${Number(paket.marginTarget) || 40} hargaJual=${Number(paket.hargaJual) || 0} onUbah=${ubahPaket} unit="paket" />
   </div>`;
 
   return html`<${Kerangka} k=${k} aktif="paket">

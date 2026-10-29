@@ -251,6 +251,16 @@ async function mulai() {
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker gagal', e));
+    // Versi baru terpasang (setelah deploy): muat ulang sekali supaya tidak tertahan di versi lama.
+    // Hanya di awal halaman dibuka, supaya isian yang sedang diketik tidak hilang.
+    const adaVersiLama = !!navigator.serviceWorker.controller;
+    const dibuka = Date.now();
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!adaVersiLama || window.__muatUlangSw) return;
+      window.__muatUlangSw = true;
+      if (Date.now() - dibuka < 15000) location.reload();
+      else tampilToast('Versi baru aplikasi tersedia. Muat ulang halaman untuk memakainya.');
+    });
   }
 }
 

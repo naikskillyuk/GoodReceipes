@@ -71,9 +71,11 @@ export const TABEL = {
     },
   },
   // Paket: beberapa resep dijual bersama dalam satu kemasan. Biaya paket (kotak, label) dihitung sekali.
+  // hppSimpan: HPP paket yang disimpan dengan tombol "Simpan HPP paket" (dipakai di menu jual), seperti HPP resep.
   Paket: {
     awalan: 'pkt',
-    kolom: { id: 't', nama: 't', marginTarget: 'n', hargaJual: 'n', dibuat: 'n' },
+    kolom: { id: 't', nama: 't', marginTarget: 'n', hargaJual: 'n', dibuat: 'n', hppSimpan: 'n', hppSimpanPada: 'n', fotoUrl: 't' },
+    lokal: ['fotoLokal'],
   },
   // pakaiPacking: biaya packing resep ini tetap ikut di HPP paket (mis. risol tetap diberi plastik).
   // Bawaan (kosong/false): packing resep dibuang karena paket punya packing sendiri.
@@ -228,6 +230,7 @@ export function dariBaris(tabel, mentah) {
 /** Pasangan [kolom foto lokal, kolom tautan foto di server] per tabel. */
 export const KOLOM_FOTO = {
   Resep: [['fotoAcuanLokal', 'fotoAcuanUrl']],
+  Paket: [['fotoLokal', 'fotoUrl']],
   Eksperimen: [['fotoHasilLokal', 'fotoHasilUrl']],
   Bahan: [['fotoLokal', 'fotoUrl']],
   Setelan: [['logoLokal', 'logoUrl'], ['qrisLokal', 'qrisUrl']],

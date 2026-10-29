@@ -367,11 +367,28 @@ test('paket: HPP jual tiap resep tanpa packing + packing paket sekali', async ()
   p = repo.dataPaket(db, paket.id);
   assert.equal(Math.round(p.hppPaket), Math.round(d.hppJual * 2 + 2500));
 
+  // Simpan HPP paket: angka tersimpan dipakai sampai disimpan ulang; perubahan isi ditandai "berubah".
+  assert.equal(p.tersimpan, false);
+  const hppTadi = p.hppHitung;
+  assert.ok(repo.simpanHPPPaket(db, paket.id));
+  p = repo.dataPaket(db, paket.id);
+  assert.equal(p.tersimpan, true);
+  assert.equal(p.berubah, false);
+  db.simpan('BiayaPaket', { idPaket: paket.id, jenis: 'Pita', nilai: 1000, urutan: 1 });
+  p = repo.dataPaket(db, paket.id);
+  assert.equal(p.hppPaket, hppTadi, 'menu jual tetap memakai HPP tersimpan');
+  assert.equal(Math.round(p.hppHitung), Math.round(hppTadi + 1000));
+  assert.equal(p.berubah, true);
+  repo.simpanHPPPaket(db, paket.id);
+  assert.equal(Math.round(repo.dataPaket(db, paket.id).hppPaket), Math.round(hppTadi + 1000));
+  db.hapus('BiayaPaket', db.semua('BiayaPaket', (b) => b.jenis === 'Pita')[0].id);
+
   // Menghapus resep mengeluarkannya dari paket.
   repo.hapusResep(db, brownies);
   p = repo.dataPaket(db, paket.id);
   assert.equal(p.isi.length, 0);
-  assert.equal(p.hppPaket, 2500);
+  assert.equal(p.hppHitung, 2500);
+  assert.equal(repo.simpanHPPPaket(db, paket.id) && repo.dataPaket(db, paket.id).hppPaket, 2500);
 
   repo.hapusPaket(db, paket.id);
   assert.equal(repo.dataPaket(db, paket.id), null);

@@ -221,7 +221,7 @@ export function DetailPesanan({ k, id }) {
   const LABEL_BERIKUT = { baru: 'Terima pesanan', diproses: 'Mulai proses', siap: 'Tandai siap', selesai: 'Selesai' };
   const ubah = async (status) => {
     if (status === 'batal') {
-      const ya = await tanya({ judul: `Batalkan pesanan #${p.nomor}?`, teks: s.lunas ? 'Pesanan ini sudah dibayar. Stok makanan dikembalikan; uang dikembalikan ke pembeli secara manual.' : 'Stok makanan dikembalikan.', ya: 'Batalkan pesanan', bahaya: true });
+      const ya = await tanya({ judul: `Batalkan pesanan #${p.nomor}?`, teks: s.lunas ? 'Pesanan ini sudah dibayar. Stok produk dikembalikan; uang dikembalikan ke pembeli secara manual.' : 'Stok produk dikembalikan.', ya: 'Batalkan pesanan', bahaya: true });
       if (!ya) return;
     }
     if (p.status === 'menunggu' && status === 'baru' && !s.lunas) {

@@ -106,7 +106,7 @@ return [
         // Paket: beberapa resep dijual bersama dalam satu kemasan.
         'Paket' => [
             'db' => 'paket',
-            'kolom' => ['id' => 't', 'nama' => 't', 'marginTarget' => 'n', 'hargaJual' => 'n', 'dibuat' => 'n'],
+            'kolom' => ['id' => 't', 'nama' => 't', 'marginTarget' => 'n', 'hargaJual' => 'n', 'dibuat' => 'n', 'hppSimpan' => 'n', 'hppSimpanPada' => 'n', 'fotoUrl' => 't'],
         ],
         'IsiPaket' => [
             'db' => 'isi_paket',

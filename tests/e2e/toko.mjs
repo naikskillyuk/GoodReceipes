@@ -85,34 +85,37 @@ try {
   await foto(page, '01-stok-bahan');
   assert.ok((await sisaLebar(page)) <= 0, 'stok bahan tidak melebar di HP');
 
-  tahap('produksi 1x brownies: stok makanan +16, bahan terpotong');
+  tahap('produksi 1x brownies: hasil 16 masuk stok produk, bahan terpotong');
   await page.goto(ADMIN + '#/produksi?resep=' + ids.brownies);
   await page.getByRole('button', { name: 'Catat produksi' }).click();
   await page.getByRole('button', { name: 'Tetap catat' }).click();
-  await page.getByText(/Produksi dicatat: \+16 potong/).waitFor();
+  await page.getByText(/Produksi dicatat, \+16 potong .* masuk stok produk/).waitFor();
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 16);
   await foto(page, '02-produksi');
 
-  tahap('menu jual: brownies (harga dari HPP Jual) dan paket dengan diskon 50%');
+  tahap('menu jual (tabel): tambah brownies (harga saran dari HPP Jual) dan paket dengan diskon 50% + varian');
   await page.goto(ADMIN + '#/menu');
-  await page.locator('select').first().selectOption('resep:' + ids.brownies);
+  await page.getByRole('button', { name: 'Tambah menu' }).click();
+  await page.getByLabel('Pilih resep atau paket').selectOption('resep:' + ids.brownies);
+  assert.equal(await page.getByLabel('Harga jual').inputValue(), '8.000', 'harga saran dari HPP Jual');
+  await page.getByLabel('Potensi keuntungan').getByText('Untung per jual').waitFor();
+  await foto(page, '03a-form-menu');
   await page.getByRole('button', { name: 'Masukkan ke menu' }).click();
-  await page.getByText('masuk menu, harga Rp 8.000').waitFor();
-  await page.locator('select').first().selectOption('paket:' + ids.paket);
+  await page.getByText('Brownies Fudgy masuk menu jual.').waitFor();
+  await page.getByRole('button', { name: 'Tambah menu' }).click();
+  await page.getByLabel('Pilih resep atau paket').selectOption('paket:' + ids.paket);
+  await page.getByLabel('Diskon persen').fill('50');
+  await page.getByLabel('Diskon persen').blur();
+  await page.getByText('Harga jual (−50%)').waitFor();
+  await page.getByRole('button', { name: 'Tambah pilihan' }).click();
+  await page.getByLabel('Nama pilihan 1').fill('Tambah keju');
+  await page.getByLabel('Harga pilihan 1').fill('1000');
+  await page.getByLabel('Harga pilihan 1').blur();
   await page.getByRole('button', { name: 'Masukkan ke menu' }).click();
-  await page.getByLabel('Harga Paket Hemat').waitFor();
-  await page.getByLabel('Diskon Paket Hemat').fill('50');
-  await page.getByLabel('Diskon Paket Hemat').blur();
-  await page.getByText('Harga setelah diskon 50%: Rp 3.000').waitFor();
-  // Pilihan tambahan berbayar untuk paket.
-  const opsiPaket = page.locator('details.opsi-menu').nth(1);
-  await opsiPaket.locator('summary').click();
-  await opsiPaket.getByRole('button', { name: 'Tambah pilihan' }).click();
-  await page.getByLabel('Nama pilihan 1 Paket Hemat').fill('Tambah keju');
-  await page.getByLabel('Nama pilihan 1 Paket Hemat').blur();
-  await page.getByLabel('Harga pilihan 1 Paket Hemat').fill('1000');
-  await page.getByLabel('Harga pilihan 1 Paket Hemat').blur();
-  assert.deepEqual(await evalDb(page, "return toko.opsiMenu(db.semua('Menu').find((m) => m.nama === 'Paket Hemat'))"), [{ nama: 'Tambah keju', harga: 1000 }]);
+  await page.getByRole('row', { name: /Paket Hemat/ }).waitFor();
+  const paketMenu = await evalDb(page, "const m = db.semua('Menu').find((x) => x.nama === 'Paket Hemat'); return { harga: toko.hargaJual(m), opsi: toko.opsiMenu(m) }");
+  assert.deepEqual(paketMenu, { harga: 3000, opsi: [{ nama: 'Tambah keju', harga: 1000 }] });
+  assert.equal(await page.locator('table.tabel-data tbody tr').count(), 2);
   await foto(page, '03-menu');
 
   tahap('promo HEMAT10 (10%)');

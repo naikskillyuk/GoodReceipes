@@ -168,7 +168,11 @@ export function rencanaProduksi(db, idResep, kali = 1) {
 }
 
 /** Catat produksi: stok bahan berkurang sesuai resep, stok makanan bertambah sebanyak hasil. */
-export function catatProduksi(db, { idResep, kali = 1, hasil, catatan = '', sekarang = Date.now() }) {
+/**
+ * Catat produksi: stok bahan dipotong sesuai takaran. Hasil masuk ke stok produk sebanyak `masukStok`
+ * (bawaan = semua hasil; 0 = belum, bisa dimasukkan nanti lewat masukkanProduksiKeStok).
+ */
+export function catatProduksi(db, { idResep, kali = 1, hasil, catatan = '', masukStok, sekarang = Date.now() }) {
   const r = rencanaProduksi(db, idResep, kali);
   if (!r || !r.eksperimen) throw new Error('Resep ini belum punya eksperimen.');
   const jadi = Number(hasil);
@@ -186,8 +190,32 @@ export function catatProduksi(db, { idResep, kali = 1, hasil, catatan = '', seka
   for (const b of r.bahan) {
     db.simpan('MutasiBahan', { idBahan: b.bahan.id, jumlah: -b.butuh, jenis: 'produksi', idRef: prd.id, harga: 0, catatan: `Produksi ${r.resep.nama}`, waktu: sekarang });
   }
-  db.simpan('MutasiMakanan', { idResep, jumlah: jadi, jenis: 'produksi', idRef: prd.id, catatan: `Produksi ${kali}x resep`, waktu: sekarang });
+  const masuk = masukStok === undefined ? jadi : Math.max(0, Math.min(jadi, Number(masukStok) || 0));
+  if (masuk > 0) db.simpan('MutasiMakanan', { idResep, jumlah: masuk, jenis: 'produksi', idRef: prd.id, catatan: `Produksi ${kali}x resep`, waktu: sekarang });
   return prd;
+}
+
+/** Jumlah hasil produksi yang sudah masuk ke stok produk. */
+export function sudahMasukStok(db, prd) {
+  return bulat(db.semua('MutasiMakanan', (m) => m.idRef === prd.id && m.jenis === 'produksi').reduce((j, m) => j + (Number(m.jumlah) || 0), 0));
+}
+
+/** Produksi yang hasilnya belum (semua) masuk ke stok produk: [{produksi, resep, sisa}]. */
+export function produksiBelumMasuk(db) {
+  return daftarProduksi(db)
+    .map((p) => ({ produksi: p, resep: db.ambil('Resep', p.idResep), sisa: bulat((Number(p.hasil) || 0) - sudahMasukStok(db, p)) }))
+    .filter((x) => x.resep && x.sisa > 0);
+}
+
+/** Impor hasil produksi ke stok produk (sebagian atau semua yang belum masuk). */
+export function masukkanProduksiKeStok(db, idProduksi, jumlah) {
+  const p = db.ambil('Produksi', idProduksi);
+  if (!p) throw new Error('Catatan produksi tidak ditemukan.');
+  const sisa = bulat((Number(p.hasil) || 0) - sudahMasukStok(db, p));
+  const n = jumlah === undefined ? sisa : Number(jumlah);
+  if (!(n > 0)) throw new Error('Isi jumlah yang dimasukkan ke stok.');
+  if (n > sisa + 1e-9) throw new Error(`Paling banyak ${sisa} (hasil produksi yang belum masuk stok).`);
+  return db.simpan('MutasiMakanan', { idResep: p.idResep, jumlah: n, jenis: 'produksi', idRef: p.id, catatan: `Dari produksi ${new Date(p.waktu).toLocaleDateString('id-ID')}`, waktu: Date.now() });
 }
 
 /** Batalkan catatan produksi: stok bahan dan stok makanan dikembalikan. */
@@ -226,12 +254,18 @@ export function daftarStokMakanan(db) {
     .sort((a, b) => a.resep.nama.localeCompare(b.resep.nama));
 }
 
-/** jenis 'koreksi' (stokNyata = hitungan nyata) atau 'rusak' (jumlah = yang dibuang). */
+const CATATAN_MUTASI = { rusak: 'Rusak / basi', masuk: 'Tambah stok', koreksi: 'Hitung ulang stok' };
+
+/**
+ * jenis 'koreksi' (nilai = hitungan nyata), 'rusak' (nilai = yang dibuang),
+ * atau 'masuk' (nilai = tambahan stok tanpa produksi, mis. titipan, beli jadi, stok awal).
+ */
 export function ubahStokMakanan(db, idResep, { jenis, nilai, catatan = '' }) {
   const kini = stokMakanan(db).get(idResep) || 0;
-  const jumlah = jenis === 'rusak' ? -Math.abs(Number(nilai)) : bulat(Number(nilai) - kini);
+  const n = Number(nilai);
+  const jumlah = jenis === 'rusak' ? -Math.abs(n) : jenis === 'masuk' ? Math.abs(n) : bulat(n - kini);
   if (!Number.isFinite(jumlah) || jumlah === 0) return null;
-  return db.simpan('MutasiMakanan', { idResep, jumlah, jenis, idRef: '', catatan: catatan.trim() || (jenis === 'rusak' ? 'Rusak / basi' : 'Hitung ulang stok'), waktu: Date.now() });
+  return db.simpan('MutasiMakanan', { idResep, jumlah, jenis, idRef: '', catatan: catatan.trim() || CATATAN_MUTASI[jenis] || '', waktu: Date.now() });
 }
 
 export function riwayatMakanan(db, idResep) {
@@ -335,13 +369,30 @@ export function hargaSaranMenu(db, jenis, idRef) {
 
 /** Foto menu: foto eksperimen juara / foto acuan resep (hanya yang sudah di server, supaya tampil di kasir dan link). */
 export function fotoMenu(db, jenis, idRef) {
+  if (jenis === 'paket') {
+    const p = db.ambil('Paket', idRef);
+    if (p && (p.fotoLokal || p.fotoUrl)) return p.fotoLokal || p.fotoUrl;
+  }
   const resep = jenis === 'resep' ? db.ambil('Resep', idRef) : db.ambil('Resep', (isiPaket(db, idRef)[0] || {}).idResep);
   if (!resep) return '';
   const juara = db.ambil('Eksperimen', resep.idJuara);
   return (juara && juara.fotoHasilUrl) || resep.fotoAcuanUrl || '';
 }
 
-export function tambahMenu(db, jenis, idRef) {
+/** Foto yang tampil untuk menu: foto menu sendiri, atau foto paket / resep. */
+export function fotoTampilMenu(db, m) {
+  return (m && m.fotoUrl) || (m ? fotoMenu(db, m.jenis, m.idRef) : '');
+}
+
+/** Isi paket/menu beserta stok tiap isinya: [{resep, per, stok, cukup}] (untuk melihat isi yang membuat paket habis). */
+export function stokIsiMenu(db, m, stok = stokMakanan(db)) {
+  return Object.entries(isiMenu(db, m)).map(([idResep, per]) => {
+    const s = bulat(stok.get(idResep) || 0);
+    return { resep: db.ambil('Resep', idResep), per, stok: s, cukup: s >= per };
+  });
+}
+
+export function tambahMenu(db, jenis, idRef, isian = {}) {
   const sumber = db.ambil(jenis === 'paket' ? 'Paket' : 'Resep', idRef);
   if (!sumber) return null;
   return db.simpan('Menu', {
@@ -349,11 +400,13 @@ export function tambahMenu(db, jenis, idRef) {
     idRef,
     nama: sumber.nama,
     harga: hargaSaranMenu(db, jenis, idRef),
-    fotoUrl: fotoMenu(db, jenis, idRef),
+    // Paket memakai fotonya sendiri (bisa diganti kapan saja di halaman paket); resep memakai foto juara/acuan.
+    fotoUrl: jenis === 'paket' ? '' : fotoMenu(db, jenis, idRef),
     keterangan: '',
     aktif: true,
     online: true,
     urutan: db.semua('Menu').length,
+    ...isian,
   });
 }
 

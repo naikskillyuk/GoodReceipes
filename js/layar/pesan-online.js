@@ -45,6 +45,9 @@ function tulis(kunci, nilai) {
 const kunciPesanan = (token) => 'pesanan-terakhir-' + token;
 const kunciKeranjang = (token) => 'keranjang-' + token;
 const kunciKode = (token) => 'kode-promo-' + token;
+// Data toko terakhir (menu, harga, logo) supaya etalase langsung tampil saat dibuka lagi,
+// sambil data terbaru diambil dari server di belakang.
+const kunciInfo = (token) => 'info-toko-' + token;
 const kunciSambut = (token) => 'sambut-' + token;
 function sudahDisambut(token) {
   try {
@@ -505,7 +508,10 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
 export function PesanOnline({ k, token }) {
   const url = alamatServer(k);
   const q = k.rute.kueri;
-  const [info, setInfo] = useState(null);
+  const [info, setInfo] = useState(() => {
+    const simpan = baca(kunciInfo(token), null);
+    return simpan && simpan.ok && Array.isArray(simpan.menu) ? simpan : null;
+  });
   const [galat, setGalat] = useState('');
   // Keranjang: {kunci: {idMenu, opsi, jumlah}}. Format lama {idMenu: jumlah} ikut dibaca.
   const [jumlah, setJumlah] = useState(() => {
@@ -519,8 +525,13 @@ export function PesanOnline({ k, token }) {
     if (!url) return setGalat('Link ini tidak lengkap. Minta toko mengirim ulang link pemesanannya.');
     pesanOnline
       .info(url, token)
-      .then(setInfo)
-      .catch((e) => setGalat(e.message || 'Link tidak bisa dibuka.'));
+      .then((j) => {
+        setInfo(j);
+        setGalat('');
+        tulis(kunciInfo(token), j);
+      })
+      // Bila server sedang lambat/gagal tapi ada data terakhir, tetap pakai itu.
+      .catch((e) => !baca(kunciInfo(token), null) && setGalat(e.message || 'Link tidak bisa dibuka.'));
   }, [token, url]);
   useEffect(() => tulis(kunciKeranjang(token), jumlah), [jumlah]);
 
@@ -573,7 +584,7 @@ export function PesanOnline({ k, token }) {
     isiLayar = idPesanan
       ? html`<${StatusPesanan} key=${idPesanan} url=${url} token=${token} idPesanan=${idPesanan} info=${info} keMenu=${keMenu} />`
       : html`<h1 class="et-judul-layar">Pesanan Anda</h1><${Kosong} judul="Belum ada pesanan" teks="Pesanan yang Anda buat dari perangkat ini muncul di sini."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
-  } else if (!info) isiLayar = html`<p role="status" class="et-memuat">Membuka toko…</p>`;
+  } else if (!info) isiLayar = html`<div class="et-kerangka" role="status" aria-label="Membuka toko"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i></div>`;
   else if (layar === 'menu') isiLayar = html`<${DaftarMenu} info=${info} jumlah=${isi} atur=${atur} buka=${buka} kat=${q.kat || ''} keMenu=${keMenu} />`;
   else if (layar === 'produk') {
     isiLayar = produk

@@ -5582,3 +5582,195 @@ details.opsi-menu[open] {
   color: var(--e-utama-2) !important;
   font-weight: 600;
 }
+/* Kerangka saat etalase pertama kali dibuka (belum ada data tersimpan) */
+.et-kerangka {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.et-kerangka i {
+  display: block;
+  border-radius: 22px;
+  background: linear-gradient(90deg, #eef4e9 25%, #f7faf4 50%, #eef4e9 75%);
+  background-size: 200% 100%;
+  animation: et-kilau 1.2s linear infinite;
+}
+.et-kerangka .b1 {
+  grid-column: 1 / -1;
+  height: 168px;
+}
+.et-kerangka .b2 {
+  grid-column: 1 / -1;
+  height: 74px;
+}
+.et-kerangka .b3 {
+  aspect-ratio: 3 / 4;
+}
+@keyframes et-kilau {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .et-kerangka i {
+    animation: none;
+  }
+}
+
+/* Produksi -> stok produk */
+.kotak-stok {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--hijau-muda);
+}
+.kartu-impor {
+  border-color: #f3dca0;
+  background: #fffbef;
+}
+.baris-impor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px auto;
+  gap: 8px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--garis);
+}
+.baris-impor .teks {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.baris-impor .teks small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Tabel data (menu jual, stok produk) */
+.tabel-kartu {
+  padding: 0;
+}
+.tabel-data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.tabel-data th {
+  padding: 12px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--kartu-2);
+  border-bottom: 1px solid var(--garis);
+  white-space: nowrap;
+}
+.tabel-data td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--garis);
+  vertical-align: middle;
+}
+.tabel-data tbody tr:last-child td {
+  border-bottom: 0;
+}
+.tabel-data tbody tr:hover {
+  background: #fbfdf9;
+}
+.tabel-data tr.mati td {
+  opacity: 0.55;
+}
+.tabel-data .angka {
+  text-align: right;
+  white-space: nowrap;
+}
+.tabel-data .aksi {
+  text-align: right;
+  white-space: nowrap;
+}
+.tabel-data .aksi > * + * {
+  margin-left: 4px;
+}
+.sel-menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 170px;
+}
+.sel-menu > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sel-menu small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.foto-mini {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--krem);
+  color: var(--hijau);
+}
+.foto-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pratinjau-menu {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.pratinjau-menu .foto-menu {
+  width: 64px;
+  height: 64px;
+}
+.ringkas-laba {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ringkas-laba > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--kartu-2);
+  border: 1px solid var(--garis);
+}
+.ringkas-laba small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ringkas-laba b {
+  font-size: 17px;
+}
+.ringkas-laba .untung {
+  background: var(--hijau-muda);
+  border-color: transparent;
+}
+.ringkas-laba .untung b {
+  color: var(--hijau-2);
+}
+.ringkas-laba .rugi {
+  background: #fdecea;
+  border-color: transparent;
+}
+.ringkas-laba .rugi b {
+  color: var(--bahaya);
+}
+@media (min-width: 720px) {
+  .ringkas-laba {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
