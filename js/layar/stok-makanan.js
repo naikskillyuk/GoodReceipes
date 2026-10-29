@@ -1,4 +1,4 @@
-// Stok produk jadi (dapur dan toko): bertambah dari produksi (diimpor) atau ditambah langsung, berkurang dari pesanan,
+// Stok produk jadi (dapur dan toko): bertambah dari hasil produksi yang dikirim ke stok atau ditambah langsung, berkurang dari pesanan,
 // bisa dihitung ulang atau dicatat rusak.
 
 import { html, useState } from '../../vendor/preact-htm.js';
@@ -6,7 +6,8 @@ import { Kerangka, Hero, Stat, Kosong, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tampilToast, Modal } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
-import { daftarStokMakanan, ubahStokMakanan, riwayatMakanan, tampilanToko, produksiBelumMasuk, masukkanProduksiKeStok } from '../lib/toko.js';
+import { daftarStokMakanan, ubahStokMakanan, riwayatMakanan, tampilanToko, produksiBelumMasuk } from '../lib/toko.js';
+import { DialogKirimStok } from './produksi.js';
 import { tampilJumlah, tanggal } from '../lib/util.js';
 
 const JENIS = { produksi: 'Produksi', jual: 'Terjual', koreksi: 'Hitung ulang', rusak: 'Rusak / basi', masuk: 'Tambah stok' };
@@ -82,32 +83,23 @@ function FormTambahStok({ k, onTutup }) {
   </div><//>`;
 }
 
-/** Hasil produksi yang belum masuk ke stok produk: impor sebagian atau semua. */
+/** Hasil produksi yang menunggu dikirim ke stok (setelah dicek; yang tidak lolos dicatat reject). */
 function ImporProduksi({ k }) {
   const { db } = k;
   const daftar = produksiBelumMasuk(db);
-  const [jumlah, setJumlah] = useState({});
+  const [kirim, setKirim] = useState(null);
   if (!daftar.length) return null;
-  const impor = (x) => {
-    const n = jumlah[x.produksi.id] ?? x.sisa;
-    try {
-      masukkanProduksiKeStok(db, x.produksi.id, n);
-      tampilToast(`+${tampilJumlah(n)} ${x.resep.nama} masuk stok produk.`);
-      setJumlah((j) => ({ ...j, [x.produksi.id]: undefined }));
-    } catch (e) {
-      tampilToast(e.message);
-    }
-  };
   return html`<section class="kartu kolom kartu-impor" aria-labelledby="h-impor">
-    <h2 class="judul-kecil" id="h-impor">Hasil produksi belum masuk stok</h2>
-    <p class="bantu">Impor hasil produksi ke stok produk supaya bisa dijual di kasir dan etalase.</p>
+    <h2 class="judul-kecil" id="h-impor">Hasil produksi menunggu dikirim ke stok</h2>
+    <p class="bantu">Cek hasil produksi, lalu kirim yang lolos ke stok produk supaya bisa dijual. Yang tidak lolos dicatat reject.</p>
     ${daftar.map(
       (x) => html`<div class="baris-impor" key=${x.produksi.id}>
-        <span class="teks"><b>${x.resep.nama}</b><small>${tanggal(x.produksi.waktu)} · hasil ${tampilJumlah(x.produksi.hasil)} · belum masuk ${tampilJumlah(x.sisa)}</small></span>
-        <${InputAngka} kelas="input kecil" aria-label=${'Jumlah impor ' + x.resep.nama} nilai=${jumlah[x.produksi.id] ?? x.sisa} onUbah=${(n) => setJumlah((j) => ({ ...j, [x.produksi.id]: n }))} />
-        <button class="btn kecil solid" disabled=${!((jumlah[x.produksi.id] ?? x.sisa) > 0)} onClick=${() => impor(x)}>Masukkan</button>
+        <span class="teks"><b>${x.resep.nama}</b><small>${tanggal(x.produksi.waktu)} · hasil ${tampilJumlah(x.hasil)}${x.terkirim ? ` · di stok ${tampilJumlah(x.terkirim)}` : ''}${x.reject ? ` · reject ${tampilJumlah(x.reject)}` : ''}</small></span>
+        <b class="angka">${tampilJumlah(x.sisa)}</b>
+        <button class="btn kecil solid" aria-label=${'Kirim ke stok ' + x.resep.nama} onClick=${() => setKirim(x.produksi)}>Kirim ke stok</button>
       </div>`,
     )}
+    ${kirim && html`<${DialogKirimStok} k=${k} produksi=${kirim} onTutup=${() => setKirim(null)} />`}
   </section>`;
 }
 
@@ -121,7 +113,7 @@ export function StokMakanan({ k }) {
   const habis = semua.filter((s) => s.stok <= 0).length;
   return html`<${Kerangka} k=${k} aktif="stok-makanan" plus=${dapur ? { href: '/produksi', label: 'Catat produksi' } : null}>
     <${Hero} warna="var(--kuning)" label="Siap jual" judul="Stok produk" kembali="/" stat=${html`<${Stat} nilai=${habis} label="habis" />`}>
-      <p class="hero-sub">Bertambah dari hasil produksi atau tambah stok langsung, berkurang otomatis saat ada pesanan (paket ikut memotong isinya).</p>
+      <p class="hero-sub">Bertambah dari hasil produksi yang dikirim ke stok atau tambah stok langsung, berkurang otomatis saat ada pesanan (paket ikut memotong isinya).</p>
     <//>
     <div class="isi">
       ${dapur && html`<${ImporProduksi} k=${k} />`}

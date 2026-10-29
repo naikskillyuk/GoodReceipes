@@ -5,7 +5,8 @@ import { Kerangka, Hero, Kosong, Foto } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, Modal } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
-import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, hargaJual, diskonBerlaku, opsiMenu, kunciBaris, namaItem, fotoTampilMenu } from '../lib/toko.js';
+import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, hargaJual, diskonBerlaku, opsiMenu, kunciBaris, namaItem, fotoTampilMenu, fotoHeader, daftarBanner, ambilToko } from '../lib/toko.js';
+import { KartuBanner } from '../ui/banner.js';
 import { rupiah } from '../lib/util.js';
 import { ambilMerek } from '../lib/repo.js';
 
@@ -94,7 +95,19 @@ export function Kasir({ k }) {
 
   const kosong = daftarMenu(db).length === 0;
   return html`<${Kerangka} k=${k} aktif="kasir">
-    <${Hero} warna="var(--hijau)" label=${ambilMerek(db).nama} judul=${tampilanToko(db) ? 'Katalog' : 'Kasir'} kembali=${tampilanToko(db) ? undefined : '/'} />
+    ${fotoHeader(db, 'kasir')
+      ? html`<header class="kasir-header">
+          <img src=${fotoHeader(db, 'kasir')} alt="" aria-hidden="true" />
+          ${!tampilanToko(db) && html`<a class="bulat" href=${tautan('/')} aria-label="Kembali"><${Ikon} nama="kembali" /></a>`}
+          <div><small>${ambilToko(db).namaToko || ambilMerek(db).nama}</small><h1>${tampilanToko(db) ? 'Katalog' : 'Kasir'}</h1></div>
+        </header>`
+      : html`<${Hero} warna="var(--hijau)" label=${ambilMerek(db).nama} judul=${tampilanToko(db) ? 'Katalog' : 'Kasir'} kembali=${tampilanToko(db) ? undefined : '/'} />`}
+    ${daftarBanner(db, { tampilDi: 'kasir', hanyaAktif: true }).length > 0 &&
+    html`<div class="kasir-banner">
+      ${daftarBanner(db, { tampilDi: 'kasir', hanyaAktif: true }).map(
+        (b) => html`<${KartuBanner} key=${b.id} b=${{ ...b, aksi: b.aksi === 'link' ? 'link' : '' }} foto=${b.fotoLokal || b.fotoUrl} kecil onAksi=${() => /^https?:\/\//i.test(b.nilai) && window.open(b.nilai, '_blank', 'noopener')} />`,
+      )}
+    </div>`}
     <div class="isi">
       ${kosong
         ? html`<${Kosong} judul="Menu masih kosong" teks=${peranAkun(db) === 'dapur' ? 'Masukkan resep atau paket ke menu jual dulu.' : 'Minta admin memasukkan produk ke menu jual.'}>

@@ -127,7 +127,7 @@ return [
         ],
         'Produksi' => [
             'db' => 'produksi',
-            'kolom' => ['id' => 't', 'idResep' => 't', 'idEksperimen' => 't', 'kali' => 'n', 'hasil' => 'n', 'hppPorsi' => 'n', 'catatan' => 't', 'waktu' => 'n'],
+            'kolom' => ['id' => 't', 'idResep' => 't', 'idEksperimen' => 't', 'kali' => 'n', 'hasil' => 'n', 'hppPorsi' => 'n', 'catatan' => 't', 'waktu' => 'n', 'reject' => 'n'],
         ],
         'MutasiMakanan' => [
             'db' => 'mutasi_makanan',
@@ -171,7 +171,14 @@ return [
             'kolom' => [
                 'id' => 't', 'namaAplikasi' => 't', 'logoUrl' => 't',
                 'namaToko' => 't', 'tokenToko' => 't', 'tokoBuka' => 'b', 'alamatToko' => 't', 'waToko' => 't', 'catatanToko' => 't',
-                'rekening' => 'j', 'qrisUrl' => 't', 'pakaiMayar' => 'b',
+                'rekening' => 'j', 'qrisUrl' => 't', 'pakaiMayar' => 'b', 'headerUrl' => 't', 'headerKasirUrl' => 't',
+            ],
+        ],
+        'Banner' => [
+            'db' => 'banner',
+            'kolom' => [
+                'id' => 't', 'judul' => 't', 'teks' => 't', 'fotoUrl' => 't', 'warna' => 't', 'tombol' => 't', 'aksi' => 't', 'nilai' => 't',
+                'tampilDi' => 't', 'aktif' => 'b', 'urutan' => 'n',
             ],
         ],
         'Testimoni' => [
@@ -183,7 +190,7 @@ return [
     ],
 
     // Akun toko (dibuat oleh akun dapur) hanya menerima dan mengirim tabel ini. Sama dengan js/lib/schema.js.
-    'tabel_toko_baca' => ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan'],
+    'tabel_toko_baca' => ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner'],
     'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'],
 
     // Kolom angka berisi waktu (ms): disimpan sebagai bilangan bulat besar.

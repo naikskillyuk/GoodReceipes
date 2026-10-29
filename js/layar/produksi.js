@@ -1,15 +1,60 @@
-// Produksi (akun dapur): masak X kali resep -> stok bahan berkurang sesuai resep; hasilnya dimasukkan ke stok produk
-// (langsung saat dicatat, atau belakangan lewat tombol "Masukkan ke stok").
+// Produksi (akun dapur): masak X kali resep -> stok bahan berkurang sesuai resep. Hasilnya tidak otomatis masuk stok:
+// setelah dicek, dikirim ke stok produk lewat "Kirim ke stok" (yang tidak lolos dicatat reject).
 
 import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
-import { tanya, tampilToast } from '../ui/pesan.js';
+import { tanya, tampilToast, Modal } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
-import { rencanaProduksi, catatProduksi, hapusProduksi, daftarProduksi, stokMakanan, sudahMasukStok, masukkanProduksiKeStok } from '../lib/toko.js';
+import { rencanaProduksi, catatProduksi, hapusProduksi, daftarProduksi, stokMakanan, statusKirimProduksi, kirimProduksiKeStok } from '../lib/toko.js';
 import { eksperimenResep } from '../lib/repo.js';
 import { rupiah, tampilJumlah, tanggal } from '../lib/util.js';
 import { teksStok } from './stok-bahan.js';
+
+/** Kirim hasil produksi ke stok produk setelah dicek: jumlah yang lolos masuk stok, sisanya bisa dicatat reject. */
+export function DialogKirimStok({ k, produksi, onTutup }) {
+  const { db } = k;
+  const resep = db.ambil('Resep', produksi.idResep);
+  const st = statusKirimProduksi(db, produksi);
+  const [kirim, setKirim] = useState(st.sisa);
+  const [reject, setReject] = useState(0);
+  const [catatan, setCatatan] = useState('');
+  const [galat, setGalat] = useState('');
+  const k1 = Number(kirim) || 0;
+  const r1 = Number(reject) || 0;
+  const tinggal = st.sisa - k1 - r1;
+  const simpan = () => {
+    try {
+      kirimProduksiKeStok(db, produksi.id, { kirim: k1, reject: r1, catatan });
+      tampilToast(`${k1 > 0 ? `+${tampilJumlah(k1)} ${resep ? resep.nama : ''} masuk stok produk` : 'Dicatat'}${r1 > 0 ? `, ${tampilJumlah(r1)} reject` : ''}.`);
+      onTutup();
+    } catch (e) {
+      setGalat(e.message);
+    }
+  };
+  return html`<${Modal} judul=${'Kirim ke stok · ' + (resep ? resep.nama : 'produksi')} onTutup=${onTutup}>
+    <div class="kolom" style="gap:12px">
+      <div class="ringkas-laba">
+        <div><small>Hasil produksi</small><b>${tampilJumlah(st.hasil)}</b></div>
+        <div><small>Sudah di stok</small><b>${tampilJumlah(st.terkirim)}</b></div>
+        <div><small>Reject</small><b>${tampilJumlah(st.reject)}</b></div>
+        <div class="untung"><small>Menunggu dikirim</small><b>${tampilJumlah(st.sisa)}</b></div>
+      </div>
+      <div class="dua-kolom">
+        <label class="bidang"><span>Kirim ke stok (lolos)</span><${InputAngka} kelas="input" aria-label="Jumlah dikirim ke stok" nilai=${kirim} onUbah=${(n) => (setKirim(n), setGalat(''))} /></label>
+        <label class="bidang"><span>Reject (tidak dijual)</span><${InputAngka} kelas="input" aria-label="Jumlah reject" nilai=${reject} onUbah=${(n) => (setReject(n), setGalat(''))} /></label>
+      </div>
+      ${tinggal > 0 && html`<div class="baris-btn"><button class="btn kecil" onClick=${() => setReject(r1 + tinggal)}>Sisanya (${tampilJumlah(tinggal)}) reject</button><span class="bantu">atau biarkan menunggu dikirim nanti.</span></div>`}
+      <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="80" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. 2 gosong, 1 pecah" /></label>
+      ${tinggal < 0 && html`<p class="galat-teks">Jumlah kirim + reject melebihi yang menunggu (${tampilJumlah(st.sisa)}).</p>`}
+      ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+      <div class="baris-btn">
+        <button class="btn solid" disabled=${!(k1 + r1 > 0) || tinggal < 0} onClick=${simpan}><${Ikon} nama="kotak" ukuran=${18} />Kirim ke stok</button>
+        <button class="btn abu" onClick=${onTutup}>Batal</button>
+      </div>
+    </div>
+  <//>`;
+}
 
 function FormProduksi({ k, idAwal }) {
   const { db } = k;
@@ -18,11 +63,8 @@ function FormProduksi({ k, idAwal }) {
   const [kali, setKali] = useState(1);
   const [hasil, setHasil] = useState(null);
   const [catatan, setCatatan] = useState('');
-  const [keStok, setKeStok] = useState(true);
-  const [jumlahStok, setJumlahStok] = useState(null);
   const r = idResep && kali > 0 ? rencanaProduksi(db, idResep, kali) : null;
   const hasilAkhir = hasil ?? (r ? r.hasil : 0);
-  const masukAkhir = Math.min(hasilAkhir, jumlahStok ?? hasilAkhir);
 
   const simpan = async () => {
     if (!r) return;
@@ -35,10 +77,9 @@ function FormProduksi({ k, idAwal }) {
       if (!ya) return;
     }
     try {
-      catatProduksi(db, { idResep, kali, hasil: hasilAkhir, catatan, masukStok: keStok ? masukAkhir : 0 });
-      tampilToast(keStok ? `Produksi dicatat, +${tampilJumlah(masukAkhir)} ${r.satuanPorsi} ${r.resep.nama} masuk stok produk.` : `Produksi dicatat. Hasilnya bisa dimasukkan ke stok nanti.`);
+      catatProduksi(db, { idResep, kali, hasil: hasilAkhir, catatan });
+      tampilToast(`Produksi dicatat: ${tampilJumlah(hasilAkhir)} ${r.satuanPorsi} ${r.resep.nama}. Cek hasilnya, lalu kirim ke stok.`);
       setHasil(null);
-      setJumlahStok(null);
       setCatatan('');
     } catch (e) {
       tampilToast(e.message);
@@ -71,31 +112,27 @@ function FormProduksi({ k, idAwal }) {
       )}
       ${r.bermasalah.length > 0 && html`<p class="galat-teks">Satuan ${r.bermasalah.join(', ')} belum bisa dihitung ke stok. Tambahkan konversinya di Daftar Bahan.</p>`}
       <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="120" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. untuk pesanan arisan" /></label>
-      <div class="kotak-stok">
-        <label class="saklar"><input type="checkbox" checked=${keStok} onChange=${(e) => setKeStok(e.target.checked)} /><span>Masukkan hasilnya ke stok produk</span></label>
-        ${keStok
-          ? html`<label class="bidang"><span>Jumlah masuk stok (${r.satuanPorsi})</span><${InputAngka} kelas="input" aria-label="Jumlah masuk stok" nilai=${masukAkhir} onUbah=${setJumlahStok} />
-              <small class="bantu">${masukAkhir < hasilAkhir ? `${tampilJumlah(hasilAkhir - masukAkhir)} ${r.satuanPorsi} tidak dijual (mis. icip, sampel); bisa dimasukkan nanti.` : 'Semua hasil siap dijual.'}</small></label>`
-          : html`<small class="bantu">Hasil dicatat dulu; masukkan ke stok nanti dari riwayat produksi atau halaman Stok produk.</small>`}
-      </div>
+      <div class="kotak-stok"><small class="bantu"><b>Hasil tidak langsung masuk stok.</b> Setelah dicek, tekan <b>Kirim ke stok</b> di riwayat produksi (yang tidak lolos dicatat reject).</small></div>
       <button class="btn solid lebar" disabled=${!(hasilAkhir > 0)} onClick=${simpan}><${Ikon} nama="panci" ukuran=${18} />Catat produksi</button>`}
   </section>`;
 }
 
 export function Produksi({ k }) {
   const { db, rute } = k;
+  const [kirim, setKirim] = useState(null);
   const riwayat = daftarProduksi(db);
   const stok = stokMakanan(db);
   const hapus = async (p) => {
     const resep = db.ambil('Resep', p.idResep);
-    const ya = await tanya({ judul: 'Batalkan catatan produksi?', teks: `Stok bahan dikembalikan dan stok ${resep ? resep.nama : 'makanan'} berkurang ${tampilJumlah(p.hasil)}.`, ya: 'Batalkan produksi', bahaya: true });
+    const terkirim = statusKirimProduksi(db, p).terkirim;
+    const ya = await tanya({ judul: 'Batalkan catatan produksi?', teks: `Stok bahan dikembalikan${terkirim > 0 ? ` dan stok ${resep ? resep.nama : 'produk'} berkurang ${tampilJumlah(terkirim)} (yang sudah dikirim)` : ''}.`, ya: 'Batalkan produksi', bahaya: true });
     if (!ya) return;
     hapusProduksi(db, p.id);
     tampilToast('Catatan produksi dibatalkan.');
   };
   return html`<${Kerangka} k=${k} aktif="produksi">
     <${Hero} warna="var(--tomat)" label="Dapur" judul="Produksi" kembali="/" stat=${html`<${Stat} nilai=${riwayat.length} label="catatan" />`}>
-      <p class="hero-sub">Setiap produksi memotong stok bahan sesuai takaran resep. Hasilnya dimasukkan ke stok produk yang siap dijual, langsung atau belakangan.</p>
+      <p class="hero-sub">Setiap produksi memotong stok bahan sesuai takaran resep. Hasilnya dicek dulu, lalu dikirim ke stok produk; yang tidak lolos dicatat reject.</p>
     <//>
     <div class="isi">
       <div class="kolom-2">
@@ -106,20 +143,11 @@ export function Produksi({ k }) {
             ${riwayat.length === 0 && html`<p class="bantu">Belum ada produksi.</p>`}
             ${riwayat.slice(0, 30).map((p) => {
               const resep = db.ambil('Resep', p.idResep);
-              const masuk = sudahMasukStok(db, p);
-              const sisa = (Number(p.hasil) || 0) - masuk;
-              const impor = () => {
-                try {
-                  masukkanProduksiKeStok(db, p.id);
-                  tampilToast(`+${tampilJumlah(sisa)} ${resep ? resep.nama : ''} masuk stok produk.`);
-                } catch (e) {
-                  tampilToast(e.message);
-                }
-              };
+              const st = statusKirimProduksi(db, p);
               return html`<div class="hasil-baris" key=${p.id}>
                 <span><b class="biasa">${resep ? resep.nama : 'Resep dihapus'}</b><br /><small class="teks-kecil">${tanggal(p.waktu)} · ${tampilJumlah(p.kali)}x resep${p.hppPorsi ? ' · HPP ' + rupiah(p.hppPorsi) : ''}${p.catatan ? ' · ' + p.catatan : ''}</small>
-                  <br /><small class=${sisa > 0 ? 'teks-buruk' : 'teks-baik'}>${sisa > 0 ? `${masuk > 0 ? tampilJumlah(masuk) + ' masuk stok · ' : ''}${tampilJumlah(sisa)} belum masuk stok` : 'Sudah masuk stok produk'}</small></span>
-                <span class="baris-aksi"><b class="baik">+${tampilJumlah(p.hasil)}</b>${sisa > 0 && resep && html`<button class="btn kecil solid" onClick=${impor}>Masukkan ke stok</button>`}<button class="ikon-btn kecil" aria-label="Batalkan produksi" onClick=${() => hapus(p)}><${Ikon} nama="sampah" ukuran=${16} /></button></span>
+                  <br /><small class=${st.sisa > 0 ? 'teks-buruk' : 'teks-baik'}>${[st.terkirim > 0 ? `${tampilJumlah(st.terkirim)} di stok` : '', st.reject > 0 ? `${tampilJumlah(st.reject)} reject` : '', st.sisa > 0 ? `${tampilJumlah(st.sisa)} menunggu dikirim` : 'selesai dikirim'].filter(Boolean).join(' · ')}</small></span>
+                <span class="baris-aksi"><b class="baik">${tampilJumlah(p.hasil)}</b>${st.sisa > 0 && resep && html`<button class="btn kecil solid" onClick=${() => setKirim(p)}>Kirim ke stok</button>`}<button class="ikon-btn kecil" aria-label="Batalkan produksi" onClick=${() => hapus(p)}><${Ikon} nama="sampah" ukuran=${16} /></button></span>
               </div>`;
             })}
             ${stok.size > 0 && html`<p class="bantu">Stok produk dipotong otomatis saat ada pesanan.</p>`}
@@ -127,5 +155,6 @@ export function Produksi({ k }) {
         </div>
       </div>
     </div>
+    ${kirim && html`<${DialogKirimStok} k=${k} produksi=${kirim} onTutup=${() => setKirim(null)} />`}
   <//>`;
 }

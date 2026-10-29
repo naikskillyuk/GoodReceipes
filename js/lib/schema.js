@@ -100,9 +100,11 @@ export const TABEL = {
     kolom: { id: 't', idBahan: 't', jumlah: 'n', jenis: 't', idRef: 't', harga: 'n', catatan: 't', waktu: 'n' },
   },
   // Satu kali produksi di dapur: `kali` resep dari eksperimen idEksperimen, menghasilkan `hasil` porsi.
+  // Hasil produksi tidak otomatis masuk stok: dikirim ke stok produk (MutasiMakanan jenis 'produksi', idRef = id produksi)
+  // setelah dicek. reject = jumlah hasil yang tidak lolos (tidak dijual).
   Produksi: {
     awalan: 'prd',
-    kolom: { id: 't', idResep: 't', idEksperimen: 't', kali: 'n', hasil: 'n', hppPorsi: 'n', catatan: 't', waktu: 'n' },
+    kolom: { id: 't', idResep: 't', idEksperimen: 't', kali: 'n', hasil: 'n', hppPorsi: 'n', catatan: 't', waktu: 'n', reject: 'n' },
   },
   // Stok makanan jadi per resep (dalam satuan porsi resep). jenis: 'produksi' | 'jual' | 'koreksi' | 'rusak'.
   MutasiMakanan: {
@@ -151,6 +153,17 @@ export const TABEL = {
     },
   },
   // Satu baris saja (id tetap 'stl_merek'): nama dan logo aplikasi, ikut tersinkron dan tampil di halaman penilai.
+  // Banner informasi di etalase / kasir (diatur admin): judul, teks, gambar, warna, dan tombol.
+  // aksi: '' | 'menu' | 'kategori' | 'promo' | 'wa' | 'link'; nilai = nama kategori / kode promo / alamat link.
+  // tampilDi: 'etalase' | 'kasir' | 'semua'.
+  Banner: {
+    awalan: 'bnr',
+    kolom: {
+      id: 't', judul: 't', teks: 't', fotoUrl: 't', warna: 't', tombol: 't', aksi: 't', nilai: 't',
+      tampilDi: 't', aktif: 'b', urutan: 'n',
+    },
+    lokal: ['fotoLokal'],
+  },
   // Testimoni pembeli: dikirim pembeli dari halaman status pesanan (tampil setelah disetujui admin),
   // atau ditulis admin. Yang tampil = muncul di bawah halaman pemesanan.
   Testimoni: {
@@ -165,15 +178,17 @@ export const TABEL = {
       id: 't', namaAplikasi: 't', logoUrl: 't',
       namaToko: 't', tokenToko: 't', tokoBuka: 'b', alamatToko: 't', waToko: 't', catatanToko: 't',
       rekening: 'j', qrisUrl: 't', pakaiMayar: 'b',
+      // Foto header beranda etalase pembeli dan halaman katalog kasir.
+      headerUrl: 't', headerKasirUrl: 't',
     },
-    lokal: ['logoLokal', 'qrisLokal'],
+    lokal: ['logoLokal', 'qrisLokal', 'headerLokal', 'headerKasirLokal'],
   },
 };
 
 export const NAMA_TABEL = Object.keys(TABEL);
 
 // Akun toko hanya menerima dan mengirim tabel berikut (sama dengan backend/config/goodrecipes.php).
-export const TABEL_TOKO_BACA = ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan'];
+export const TABEL_TOKO_BACA = ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner'];
 export const TABEL_TOKO_TULIS = ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'];
 
 const META = { diubah: 'n', dihapus: 'b' };
@@ -231,7 +246,8 @@ export function dariBaris(tabel, mentah) {
 export const KOLOM_FOTO = {
   Resep: [['fotoAcuanLokal', 'fotoAcuanUrl']],
   Paket: [['fotoLokal', 'fotoUrl']],
+  Banner: [['fotoLokal', 'fotoUrl']],
   Eksperimen: [['fotoHasilLokal', 'fotoHasilUrl']],
   Bahan: [['fotoLokal', 'fotoUrl']],
-  Setelan: [['logoLokal', 'logoUrl'], ['qrisLokal', 'qrisUrl']],
+  Setelan: [['logoLokal', 'logoUrl'], ['qrisLokal', 'qrisUrl'], ['headerLokal', 'headerUrl'], ['headerKasirLokal', 'headerKasirUrl']],
 };

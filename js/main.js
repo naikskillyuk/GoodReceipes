@@ -29,6 +29,7 @@ import { StokMakanan } from './layar/stok-makanan.js';
 import { MenuJual } from './layar/menu-jual.js';
 import { Kasir } from './layar/kasir.js';
 import { CatatPesanan } from './layar/catat-pesanan.js';
+import { BannerHeader } from './layar/banner.js';
 import { DaftarPesanan, DetailPesanan } from './layar/pesanan.js';
 import { PelangganPromo } from './layar/pelanggan.js';
 import { PesanOnline, TiruanMayar } from './layar/pesan-online.js';
@@ -75,6 +76,7 @@ function Layar({ k }) {
   if (a === 'catat-pesanan') return html`<${CatatPesanan} key=${k.rute.kueri.id || 'baru'} k=${k} />`;
   if (a === 'pesanan') return b ? html`<${DetailPesanan} key=${b} k=${k} id=${b} />` : html`<${DaftarPesanan} k=${k} />`;
   if (a === 'pelanggan') return html`<${PelangganPromo} k=${k} />`;
+  if (a === 'banner') return html`<${BannerHeader} k=${k} />`;
   if (a === 'resep') {
     if (!b) return html`<${DaftarResep} k=${k} />`;
     if (b === 'baru') return html`<${FormResep} k=${k} />`;

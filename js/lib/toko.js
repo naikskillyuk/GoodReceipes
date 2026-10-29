@@ -169,8 +169,9 @@ export function rencanaProduksi(db, idResep, kali = 1) {
 
 /** Catat produksi: stok bahan berkurang sesuai resep, stok makanan bertambah sebanyak hasil. */
 /**
- * Catat produksi: stok bahan dipotong sesuai takaran. Hasil masuk ke stok produk sebanyak `masukStok`
- * (bawaan = semua hasil; 0 = belum, bisa dimasukkan nanti lewat masukkanProduksiKeStok).
+ * Catat produksi: stok bahan dipotong sesuai takaran. Hasilnya TIDAK langsung masuk stok produk:
+ * menunggu dikirim lewat kirimProduksiKeStok (setelah dicek, ada yang mungkin reject).
+ * `masukStok` (opsional) langsung mengirim sebagian/semua, dipakai untuk impor data lama dan uji.
  */
 export function catatProduksi(db, { idResep, kali = 1, hasil, catatan = '', masukStok, sekarang = Date.now() }) {
   const r = rencanaProduksi(db, idResep, kali);
@@ -190,7 +191,7 @@ export function catatProduksi(db, { idResep, kali = 1, hasil, catatan = '', masu
   for (const b of r.bahan) {
     db.simpan('MutasiBahan', { idBahan: b.bahan.id, jumlah: -b.butuh, jenis: 'produksi', idRef: prd.id, harga: 0, catatan: `Produksi ${r.resep.nama}`, waktu: sekarang });
   }
-  const masuk = masukStok === undefined ? jadi : Math.max(0, Math.min(jadi, Number(masukStok) || 0));
+  const masuk = Math.max(0, Math.min(jadi, Number(masukStok) || 0));
   if (masuk > 0) db.simpan('MutasiMakanan', { idResep, jumlah: masuk, jenis: 'produksi', idRef: prd.id, catatan: `Produksi ${kali}x resep`, waktu: sekarang });
   return prd;
 }
@@ -200,22 +201,46 @@ export function sudahMasukStok(db, prd) {
   return bulat(db.semua('MutasiMakanan', (m) => m.idRef === prd.id && m.jenis === 'produksi').reduce((j, m) => j + (Number(m.jumlah) || 0), 0));
 }
 
-/** Produksi yang hasilnya belum (semua) masuk ke stok produk: [{produksi, resep, sisa}]. */
+/** Status kirim satu produksi: hasil, sudah dikirim ke stok, reject, dan sisa yang menunggu. */
+export function statusKirimProduksi(db, prd) {
+  const hasil = Number(prd.hasil) || 0;
+  const terkirim = sudahMasukStok(db, prd);
+  const reject = bulat(Number(prd.reject) || 0);
+  return { hasil, terkirim, reject, sisa: bulat(Math.max(0, hasil - terkirim - reject)) };
+}
+
+/** Produksi yang hasilnya masih menunggu dikirim ke stok: [{produksi, resep, ...status}]. */
 export function produksiBelumMasuk(db) {
   return daftarProduksi(db)
-    .map((p) => ({ produksi: p, resep: db.ambil('Resep', p.idResep), sisa: bulat((Number(p.hasil) || 0) - sudahMasukStok(db, p)) }))
+    .map((p) => ({ produksi: p, resep: db.ambil('Resep', p.idResep), ...statusKirimProduksi(db, p) }))
     .filter((x) => x.resep && x.sisa > 0);
 }
 
-/** Impor hasil produksi ke stok produk (sebagian atau semua yang belum masuk). */
+/**
+ * Kirim hasil produksi ke stok produk setelah dicek: `kirim` masuk stok, `reject` dicatat tidak lolos.
+ * Boleh sebagian; sisanya tetap menunggu.
+ */
+export function kirimProduksiKeStok(db, idProduksi, { kirim = 0, reject = 0, catatan = '' } = {}) {
+  const p = db.ambil('Produksi', idProduksi);
+  if (!p) throw new Error('Catatan produksi tidak ditemukan.');
+  const { sisa } = statusKirimProduksi(db, p);
+  const k = Math.max(0, Number(kirim) || 0);
+  const r = Math.max(0, Number(reject) || 0);
+  if (!(k + r > 0)) throw new Error('Isi jumlah yang dikirim ke stok atau jumlah reject.');
+  if (k + r > sisa + 1e-9) throw new Error(`Paling banyak ${sisa} (hasil produksi yang belum dikirim).`);
+  if (r > 0) db.simpan('Produksi', { ...p, reject: bulat((Number(p.reject) || 0) + r) });
+  if (k > 0) {
+    const ket = `Dari produksi ${new Date(p.waktu).toLocaleDateString('id-ID')}${r > 0 ? ` (reject ${r})` : ''}${catatan.trim() ? ' · ' + catatan.trim() : ''}`;
+    return db.simpan('MutasiMakanan', { idResep: p.idResep, jumlah: k, jenis: 'produksi', idRef: p.id, catatan: ket, waktu: Date.now() });
+  }
+  return null;
+}
+
+/** Kirim semua sisa (atau `jumlah`) ke stok tanpa reject. */
 export function masukkanProduksiKeStok(db, idProduksi, jumlah) {
   const p = db.ambil('Produksi', idProduksi);
   if (!p) throw new Error('Catatan produksi tidak ditemukan.');
-  const sisa = bulat((Number(p.hasil) || 0) - sudahMasukStok(db, p));
-  const n = jumlah === undefined ? sisa : Number(jumlah);
-  if (!(n > 0)) throw new Error('Isi jumlah yang dimasukkan ke stok.');
-  if (n > sisa + 1e-9) throw new Error(`Paling banyak ${sisa} (hasil produksi yang belum masuk stok).`);
-  return db.simpan('MutasiMakanan', { idResep: p.idResep, jumlah: n, jenis: 'produksi', idRef: p.id, catatan: `Dari produksi ${new Date(p.waktu).toLocaleDateString('id-ID')}`, waktu: Date.now() });
+  return kirimProduksiKeStok(db, idProduksi, { kirim: jumlah === undefined ? statusKirimProduksi(db, p).sisa : jumlah });
 }
 
 /** Batalkan catatan produksi: stok bahan dan stok makanan dikembalikan. */
@@ -784,6 +809,64 @@ export function ringkasPenjualan(db, { sejak = awalHari() } = {}) {
 // ---------- Toko online (link pemesanan) ----------
 
 export const ID_TOKO = 'stl_toko';
+
+// ---------- Banner & header ----------
+
+export const WARNA_BANNER = {
+  hijau: { latar: '#e8f4df', tinta: '#1f4d14' },
+  kuning: { latar: '#fff3cf', tinta: '#5c4300' },
+  krem: { latar: '#f7efe3', tinta: '#4a3523' },
+  putih: { latar: '#ffffff', tinta: '#1f2d1a' },
+  tua: { latar: '#2f5d22', tinta: '#ffffff' },
+};
+export const AKSI_BANNER = { '': 'Tanpa tombol', menu: 'Buka menu', kategori: 'Buka kategori', promo: 'Pakai kode promo', wa: 'Chat WhatsApp toko', link: 'Buka link' };
+
+/** Banner urut tampil. tampilDi: 'etalase' | 'kasir' | '' (semua, untuk admin). */
+export function daftarBanner(db, { tampilDi = '', hanyaAktif = false } = {}) {
+  return db
+    .semua('Banner', (b) => (!hanyaAktif || b.aktif) && (!tampilDi || !b.tampilDi || b.tampilDi === 'semua' || b.tampilDi === tampilDi))
+    .sort((a, b) => (Number(a.urutan) || 0) - (Number(b.urutan) || 0) || String(a.judul || '').localeCompare(String(b.judul || '')));
+}
+
+export function simpanBanner(db, data) {
+  const judul = String(data.judul || '').trim().slice(0, 60);
+  if (!judul) throw new Error('Isi judul banner.');
+  const lama = data.id ? db.ambil('Banner', data.id) : null;
+  const foto = data.foto;
+  return db.simpan('Banner', {
+    ...(lama || { urutan: daftarBanner(db).length, aktif: true }),
+    ...(data.id ? { id: data.id } : {}),
+    judul,
+    teks: String(data.teks || '').trim().slice(0, 160),
+    warna: WARNA_BANNER[data.warna] ? data.warna : 'hijau',
+    tombol: String(data.tombol || '').trim().slice(0, 30),
+    aksi: data.aksi in AKSI_BANNER ? data.aksi : '',
+    nilai: String(data.nilai || '').trim().slice(0, 300),
+    tampilDi: ['etalase', 'kasir', 'semua'].includes(data.tampilDi) ? data.tampilDi : 'etalase',
+    aktif: data.aktif === undefined ? (lama ? !!lama.aktif : true) : !!data.aktif,
+    ...(foto !== undefined && foto !== ((lama && (lama.fotoLokal || lama.fotoUrl)) || '') ? { fotoLokal: foto || '', fotoUrl: '' } : {}),
+  });
+}
+
+/** Geser urutan banner (arah -1 naik, +1 turun). */
+export function geserBanner(db, id, arah) {
+  const daftar = daftarBanner(db);
+  const i = daftar.findIndex((b) => b.id === id);
+  const j = i + arah;
+  if (i < 0 || j < 0 || j >= daftar.length) return;
+  [daftar[i], daftar[j]] = [daftar[j], daftar[i]];
+  daftar.forEach((b, n) => Number(b.urutan) !== n && db.simpan('Banner', { ...b, urutan: n }));
+}
+
+/** Foto header: 'etalase' atau 'kasir' (data lokal sebelum terunggah, lalu tautan di server). */
+export function fotoHeader(db, untuk = 'etalase') {
+  const t = ambilToko(db);
+  return untuk === 'kasir' ? t.headerKasirLokal || t.headerKasirUrl || '' : t.headerLokal || t.headerUrl || '';
+}
+
+export function simpanFotoHeader(db, untuk, foto) {
+  return simpanToko(db, untuk === 'kasir' ? { headerKasirLokal: foto || '', headerKasirUrl: '' } : { headerLokal: foto || '', headerUrl: '' });
+}
 
 /** Rekening bank yang lengkap saja: [{bank, nomor, atasNama}]. */
 export function rekeningToko(db) {

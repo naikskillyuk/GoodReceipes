@@ -32,7 +32,7 @@ test('belanja menambah stok bahan (satuan dasar) dan bisa memperbarui harga', as
   assert.equal(toko.daftarStokBahan(db).find((x) => x.bahan.id === bahan.id).menipis, true);
 });
 
-test('produksi memotong bahan sesuai resep dan menambah stok makanan; dibatalkan kembali', async () => {
+test('produksi memotong bahan; hasil dikirim ke stok setelah dicek (lolos + reject); dibatalkan kembali', async () => {
   const { db, brownies } = await dbContoh();
   const r = toko.rencanaProduksi(db, brownies, 2);
   assert.equal(r.porsi, 16);
@@ -42,7 +42,17 @@ test('produksi memotong bahan sesuai resep dan menambah stok makanan; dibatalkan
 
   const prd = toko.catatProduksi(db, { idResep: brownies, kali: 2, hasil: 30 });
   assert.ok(prd.hppPorsi > 0);
-  assert.equal(toko.stokMakanan(db).get(brownies), 30);
+  assert.equal(toko.stokMakanan(db).get(brownies) || 0, 0, 'hasil produksi tidak otomatis masuk stok');
+  assert.deepEqual(toko.statusKirimProduksi(db, prd), { hasil: 30, terkirim: 0, reject: 0, sisa: 30 });
+  // Dicek: 27 lolos, 2 reject, 1 masih menunggu.
+  toko.kirimProduksiKeStok(db, prd.id, { kirim: 27, reject: 2, catatan: 'gosong' });
+  assert.equal(toko.stokMakanan(db).get(brownies), 27);
+  assert.deepEqual(toko.statusKirimProduksi(db, db.ambil('Produksi', prd.id)), { hasil: 30, terkirim: 27, reject: 2, sisa: 1 });
+  assert.throws(() => toko.kirimProduksiKeStok(db, prd.id, { kirim: 2 }), /Paling banyak 1/);
+  assert.throws(() => toko.kirimProduksiKeStok(db, prd.id, {}), /Isi jumlah/);
+  toko.kirimProduksiKeStok(db, prd.id, { reject: 1 });
+  assert.equal(toko.produksiBelumMasuk(db).length, 0, 'semua sudah dikirim / reject');
+  assert.equal(toko.stokMakanan(db).get(brownies), 27);
   const stok = toko.stokBahan(db);
   for (const b of r.bahan) assert.equal(Math.round(stok.get(b.bahan.id) * 1000) / 1000, -b.butuh);
 
@@ -291,4 +301,32 @@ test('produksi ke stok produk: sebagian, impor nanti, dan tambah stok tanpa prod
   // Membatalkan produksi menghapus juga stok yang sudah diimpor darinya.
   toko.hapusProduksi(db, q.id);
   assert.equal(toko.stokMakanan(db).get(brownies), 21);
+});
+
+test('banner & header: simpan, urutan, tampil di etalase/kasir, foto header', async () => {
+  const { db } = await dbContoh();
+  assert.throws(() => toko.simpanBanner(db, { judul: '  ' }), /judul/);
+  const a = toko.simpanBanner(db, { judul: 'Pre-order Lebaran', teks: 'Pesan sebelum 20 Maret', aksi: 'promo', nilai: 'LEBARAN', tombol: 'Pakai kode', warna: 'kuning', tampilDi: 'etalase' });
+  const b = toko.simpanBanner(db, { judul: 'Jam buka', warna: 'ungu', aksi: 'aneh', tampilDi: 'kasir' });
+  const c = toko.simpanBanner(db, { judul: 'Follow IG', tampilDi: 'semua', foto: 'data:image/png;base64,AAAA' });
+  assert.equal(b.warna, 'hijau', 'warna tak dikenal jadi hijau');
+  assert.equal(b.aksi, '');
+  assert.equal(c.fotoLokal, 'data:image/png;base64,AAAA');
+  assert.deepEqual(toko.daftarBanner(db).map((x) => x.judul), ['Pre-order Lebaran', 'Jam buka', 'Follow IG']);
+  assert.deepEqual(toko.daftarBanner(db, { tampilDi: 'etalase' }).map((x) => x.judul), ['Pre-order Lebaran', 'Follow IG']);
+  assert.deepEqual(toko.daftarBanner(db, { tampilDi: 'kasir' }).map((x) => x.judul), ['Jam buka', 'Follow IG']);
+  toko.geserBanner(db, c.id, -1);
+  assert.deepEqual(toko.daftarBanner(db).map((x) => x.judul), ['Pre-order Lebaran', 'Follow IG', 'Jam buka']);
+  db.simpan('Banner', { ...db.ambil('Banner', a.id), aktif: false });
+  assert.deepEqual(toko.daftarBanner(db, { tampilDi: 'etalase', hanyaAktif: true }).map((x) => x.judul), ['Follow IG']);
+  toko.simpanBanner(db, { id: a.id, judul: 'Pre-order Lebaran!', aktif: true });
+  assert.equal(db.ambil('Banner', a.id).judul, 'Pre-order Lebaran!');
+  assert.equal(db.ambil('Banner', a.id).urutan, 0, 'urutan tetap saat diubah');
+
+  toko.simpanFotoHeader(db, 'etalase', 'data:image/jpeg;base64,BBBB');
+  toko.simpanFotoHeader(db, 'kasir', 'data:image/jpeg;base64,CCCC');
+  assert.equal(toko.fotoHeader(db, 'etalase'), 'data:image/jpeg;base64,BBBB');
+  assert.equal(toko.fotoHeader(db, 'kasir'), 'data:image/jpeg;base64,CCCC');
+  toko.simpanFotoHeader(db, 'kasir', '');
+  assert.equal(toko.fotoHeader(db, 'kasir'), '');
 });

@@ -85,11 +85,22 @@ try {
   await foto(page, '01-stok-bahan');
   assert.ok((await sisaLebar(page)) <= 0, 'stok bahan tidak melebar di HP');
 
-  tahap('produksi 1x brownies: hasil 16 masuk stok produk, bahan terpotong');
+  tahap('produksi 1x brownies: bahan terpotong, hasil dicek lalu dikirim ke stok (15 lolos, 1 reject)');
   await page.goto(ADMIN + '#/produksi?resep=' + ids.brownies);
   await page.getByRole('button', { name: 'Catat produksi' }).click();
   await page.getByRole('button', { name: 'Tetap catat' }).click();
-  await page.getByText(/Produksi dicatat, \+16 potong .* masuk stok produk/).waitFor();
+  await page.getByText(/Produksi dicatat: 16 potong .* kirim ke stok/).waitFor();
+  assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a) || 0', ids.brownies), 0, 'belum masuk stok sebelum dikirim');
+  await page.getByRole('button', { name: 'Kirim ke stok' }).first().click();
+  const dialogKirim = page.getByRole('dialog');
+  await dialogKirim.getByLabel('Jumlah dikirim ke stok').fill('15');
+  await dialogKirim.getByLabel('Jumlah reject').fill('1');
+  await dialogKirim.getByLabel('Jumlah reject').blur();
+  await foto(page, '02a-kirim-stok');
+  await dialogKirim.getByRole('button', { name: 'Kirim ke stok' }).click();
+  await page.getByText('15 di stok · 1 reject · selesai dikirim').waitFor();
+  // Stok produk dipakai uji berikutnya: tambah 1 lagi lewat Tambah stok (tanpa produksi) supaya genap 16.
+  await evalDb(page, 'toko.ubahStokMakanan(db, a, { jenis: "masuk", nilai: 1, catatan: "uji" })', ids.brownies);
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 16);
   await foto(page, '02-produksi');
 
@@ -204,6 +215,23 @@ try {
   await page.getByText(/lunas\.$/).waitFor({ timeout: 15000 });
   await page.getByText('Lunas · Online').waitFor();
 
+  tahap('admin: foto header etalase dan banner informasi');
+  await page.goto(ADMIN + '#/banner');
+  const kartuHeader = page.getByRole('region', { name: 'Foto header etalase' });
+  await kartuHeader.locator('input[type=file]').setInputFiles(path.join(AKAR, 'gambar/latar-masuk.jpg'));
+  await kartuHeader.getByRole('button', { name: 'Simpan foto header etalase' }).click();
+  await page.getByText('Foto header etalase disimpan.').waitFor();
+  await page.getByRole('button', { name: 'Tambah banner' }).click();
+  const dlgBanner = page.getByRole('dialog');
+  await dlgBanner.getByPlaceholder('mis. Pre-order Lebaran dibuka').fill('Pre-order Lebaran');
+  await dlgBanner.getByPlaceholder('mis. Pesan kue kering sebelum 20 Maret').fill('Pesan kue kering sebelum 20 Maret');
+  await dlgBanner.getByLabel('Aksi tombol').selectOption('menu');
+  await dlgBanner.getByRole('button', { name: 'kuning' }).click();
+  await foto(page, '09a-form-banner');
+  await dlgBanner.getByRole('button', { name: 'Simpan banner' }).click();
+  await page.getByText('Banner ditambahkan.').waitFor();
+  await foto(page, '09b-banner-admin');
+
   tahap('pembeli memesan lewat link, membayar, pesanan masuk dan stok terpotong');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   const pembeli = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -216,6 +244,9 @@ try {
   await pembeli.getByRole('button', { name: 'Mulai pesan' }).click();
   await pembeli.getByRole('heading', { name: 'Menu kami' }).waitFor();
   await pembeli.getByRole('button', { name: 'Pakai kode HEMAT10' }).first().waitFor();
+  await pembeli.getByText('Halo, selamat datang di').waitFor();
+  await pembeli.locator('.et-header-foto[src*="/foto/"]').waitFor();
+  await pembeli.getByText('Pre-order Lebaran').first().waitFor();
   await pembeli.locator('.et-diskon', { hasText: '-50%' }).first().waitFor();
   await foto(pembeli, '07a-etalase-beranda');
   assert.ok((await sisaLebar(pembeli)) <= 0, 'etalase tidak melebar');

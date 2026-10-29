@@ -284,7 +284,9 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         const r = m.jenis === 'paket' ? null : tabel('Resep')[m.idRef];
         const kat = r && tabel('Kategori')[r.idKategori];
         const kategori = m.jenis === 'paket' ? 'Paket' : (kat && kat.nama) || 'Lainnya';
-        const fotoCadangan = m.jenis === 'paket' ? (tabel('Paket')[m.idRef] || {}).fotoUrl : (tabel('Resep')[m.idRef] || {}).fotoAcuanUrl;
+        const isiPertama = hidup('IsiPaket', (i) => i.idPaket === m.idRef).sort((a, b) => angka(a.urutan) - angka(b.urutan))[0];
+        const fotoResep = (id) => (tabel('Resep')[id] || {}).fotoAcuanUrl;
+        const fotoCadangan = m.jenis === 'paket' ? (tabel('Paket')[m.idRef] || {}).fotoUrl || (isiPertama && fotoResep(isiPertama.idResep)) : fotoResep(m.idRef);
         m = { ...m, fotoUrl: m.fotoUrl || fotoCadangan || '' };
         return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
       });
@@ -304,6 +306,11 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         .slice(0, 6)
         .map((p) => ({ kode: String(p.kode).trim().toUpperCase(), nama: String(p.nama || ''), jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), minBelanja: angka(p.minBelanja), maksDiskon: angka(p.maksDiskon), untuk: p.untuk || 'semua', sampai: angka(p.sampai) })),
       latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '',
+      banner: hidup('Banner', (b) => benar(b.aktif, false) && ['etalase', 'semua'].includes(b.tampilDi || 'etalase') && String(b.judul || '').trim())
+        .sort((a, b) => angka(a.urutan) - angka(b.urutan))
+        .slice(0, 8)
+        .map((b) => ({ judul: String(b.judul), teks: String(b.teks || ''), fotoUrl: /^(https?:|\/foto\/)/.test(String(b.fotoUrl || '')) ? String(b.fotoUrl) : '', warna: b.warna || 'hijau', tombol: String(b.tombol || ''), aksi: String(b.aksi || ''), nilai: String(b.nilai || '') })),
+      headerUrl: /^(https?:|\/foto\/)/.test(String(s.headerUrl || '')) ? String(s.headerUrl) : '',
       menu,
     };
   }

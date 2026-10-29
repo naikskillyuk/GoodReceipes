@@ -247,6 +247,23 @@ class Penjualan
         return array_slice($hasil, 0, 12);
     }
 
+    /** Banner informasi aktif untuk etalase, urut tampil. */
+    private function bannerEtalase(int $id): array
+    {
+        $daftar = $this->semua($id, 'Banner', fn ($b) => $b['aktif'] && in_array($b['tampilDi'] ?: 'etalase', ['etalase', 'semua'], true) && trim((string) $b['judul']) !== '');
+        usort($daftar, fn ($a, $b) => ((float) $a['urutan']) <=> ((float) $b['urutan']));
+
+        return array_map(fn ($b) => [
+            'judul' => mb_substr((string) $b['judul'], 0, 60),
+            'teks' => mb_substr((string) $b['teks'], 0, 160),
+            'fotoUrl' => str_starts_with((string) $b['fotoUrl'], 'http') ? (string) $b['fotoUrl'] : '',
+            'warna' => (string) ($b['warna'] ?: 'hijau'),
+            'tombol' => mb_substr((string) $b['tombol'], 0, 30),
+            'aksi' => (string) $b['aksi'],
+            'nilai' => mb_substr((string) $b['nilai'], 0, 300),
+        ], array_slice($daftar, 0, 8));
+    }
+
     /** Promo yang sedang berlaku di link pemesanan, untuk banner etalase (tanpa info kuota). */
     private function promoTampil(int $id): array
     {
@@ -355,9 +372,11 @@ class Penjualan
             $katResep[$r['id']] = $namaKat[$r['idKategori']] ?? '';
             $fotoResep[$r['id']] = (string) ($r['fotoAcuanUrl'] ?? '');
         }
+        // Foto paket: foto paket sendiri, atau foto resep isi pertamanya.
         $fotoPaket = [];
         foreach ($this->semua($id, 'Paket') as $p) {
-            $fotoPaket[$p['id']] = (string) ($p['fotoUrl'] ?? '');
+            $isiPertama = $isiPaket[$p['id']][0]['idResep'] ?? '';
+            $fotoPaket[$p['id']] = (string) (($p['fotoUrl'] ?? '') ?: ($fotoResep[$isiPertama] ?? ''));
         }
         $menu = [];
         foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
@@ -394,6 +413,8 @@ class Penjualan
             'bayarManual' => $mayar ? null : $manual,
             'testimoni' => $this->testimoniTampil($id),
             'promo' => $this->promoTampil($id),
+            'banner' => $this->bannerEtalase($id),
+            'headerUrl' => str_starts_with((string) ($s['headerUrl'] ?? ''), 'http') ? (string) $s['headerUrl'] : '',
             'latarUrl' => app(Situs::class)->tampilan()['latarUrl'],
             'menu' => $menu,
         ];

@@ -158,7 +158,12 @@ class TokoTest extends TestCase
             'Menu' => [$this->baris(['id' => 'mnu_a', 'jenis' => 'resep', 'idRef' => 'res_a', 'nama' => 'Brownies', 'harga' => 8000, 'aktif' => true, 'online' => true, 'diskon' => 25,
                 'opsi' => [['nama' => 'Digoreng', 'harga' => 2000], ['nama' => 'Tambah keju', 'harga' => 3000]]])],
             'Setelan' => [$this->baris(['id' => 'stl_toko', 'namaToko' => 'Toko Uji', 'tokenToko' => 'token-toko-manual-1', 'tokoBuka' => true, 'waToko' => '0812 1111 2222',
-                'rekening' => [['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa'], ['bank' => '', 'nomor' => '']], 'qrisUrl' => 'https://contoh.test/qris.png'])],
+                'rekening' => [['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa'], ['bank' => '', 'nomor' => '']], 'qrisUrl' => 'https://contoh.test/qris.png', 'headerUrl' => 'https://contoh.test/header.jpg'])],
+            'Banner' => [
+                $this->baris(['id' => 'bnr_1', 'judul' => 'Pre-order', 'teks' => 'Buka', 'aksi' => 'menu', 'tombol' => 'Lihat', 'tampilDi' => 'etalase', 'aktif' => true, 'urutan' => 1]),
+                $this->baris(['id' => 'bnr_2', 'judul' => 'Khusus kasir', 'tampilDi' => 'kasir', 'aktif' => true, 'urutan' => 0]),
+                $this->baris(['id' => 'bnr_3', 'judul' => 'Tersembunyi', 'tampilDi' => 'semua', 'aktif' => false, 'urutan' => 2]),
+            ],
             'Testimoni' => [
                 $this->baris(['id' => 'tst_a', 'nama' => 'Sari', 'isi' => 'Enak sekali!', 'bintang' => 5, 'tampil' => true, 'sumber' => 'admin', 'waktu' => 1]),
                 $this->baris(['id' => 'tst_b', 'nama' => 'Rahasia', 'isi' => 'Belum disetujui', 'bintang' => 3, 'tampil' => false, 'sumber' => 'pembeli', 'waktu' => 2]),
@@ -174,6 +179,8 @@ class TokoTest extends TestCase
         $this->assertSame('Kue', $info['menu'][0]['kategori']);
         $this->assertEquals([6000, 8000, 25], [$info['menu'][0]['harga'], $info['menu'][0]['hargaAsli'], $info['menu'][0]['diskon']], 'diskon produk 25%');
         $this->assertSame(['Sari'], array_column($info['testimoni'], 'nama'), 'hanya testimoni yang tayang');
+        $this->assertSame(['Pre-order'], array_column($info['banner'], 'judul'), 'hanya banner etalase yang aktif');
+        $this->assertSame('https://contoh.test/header.jpg', $info['headerUrl']);
 
         // Halaman depan situs (tanpa token) = toko utama yang sudah aktif.
         $depan = $this->api(['aksi' => 'infoToko', 'token' => '']);

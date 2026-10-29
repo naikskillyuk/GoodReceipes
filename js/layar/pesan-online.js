@@ -11,6 +11,7 @@ import { pergi } from '../ui/router.js';
 import { terapkanMerekDokumen } from '../ui/merek.js';
 import { scriptUrlAman } from './penilai.js';
 import { InfoTransfer } from './pesanan.js';
+import { KartuBanner } from '../ui/banner.js';
 import { Bintang } from './pelanggan.js';
 import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris } from '../lib/toko.js';
 import { panggilApi } from '../lib/sync.js';
@@ -196,10 +197,42 @@ function Sambutan({ info, logo, onMulai }) {
   </div>`;
 }
 
+/** Header beranda etalase: foto header, logo + keranjang, sapaan, nama toko, dan kolom cari. */
+function HeaderEtalase({ info, logo, jumlahKeranjang, ke, cariMenu }) {
+  const [cari, setCari] = useState('');
+  const foto = info.headerUrl || info.latarUrl || ((info.menu || []).find((m) => m.fotoUrl) || {}).fotoUrl || '';
+  return html`<header class="et-header">
+    ${foto ? html`<img class="et-header-foto" src=${foto} alt="" aria-hidden="true" />` : ''}
+    <div class="et-header-atas">
+      <span class="et-header-logo"><${LogoMerek} src=${logo} ukuran=${40} /></span>
+      <button type="button" class="et-ikon-keranjang" aria-label=${`Keranjang (${jumlahKeranjang})`} onClick=${() => ke('keranjang')}>
+        <${Ikon} nama="keranjang" ukuran=${22} />${jumlahKeranjang > 0 && html`<i>${jumlahKeranjang}</i>`}
+      </button>
+    </div>
+    <div class="et-header-teks">
+      <small>Halo, selamat datang di</small>
+      <h1>${info.namaToko}</h1>
+    </div>
+    <form class="et-header-cari" role="search" onSubmit=${(e) => (e.preventDefault(), cariMenu(cari.trim()))}>
+      <${Ikon} nama="cari" ukuran=${20} />
+      <input type="search" placeholder="Cari kue, camilan…" aria-label="Cari di toko" value=${cari} onInput=${(e) => setCari(e.target.value)} />
+      <button type="submit" aria-label="Cari"><${Ikon} nama="panah" ukuran=${18} /></button>
+    </form>
+  </header>`;
+}
+
 const teksPromo = (p) => (p.jenis === 'persen' ? `Diskon ${p.nilai.toLocaleString('id-ID')}%` : `Hemat ${rupiah(p.nilai)}`);
 
 function BannerPromo({ info, pakaiKode, keMenu }) {
   const foto = (info.menu || []).filter((m) => m.fotoUrl).map((m) => m.fotoUrl);
+  const aksiBanner = (b) => {
+    if (b.aksi === 'menu') keMenu('');
+    else if (b.aksi === 'kategori') keMenu(b.nilai);
+    else if (b.aksi === 'promo') pakaiKode(b.nilai);
+    else if (b.aksi === 'wa') window.open(waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.'), '_blank', 'noopener');
+    else if (b.aksi === 'link' && /^https?:\/\//i.test(b.nilai)) window.open(b.nilai, '_blank', 'noopener');
+  };
+  const admin = (info.banner || []).map((b, i) => ({ kunci: 'b' + i, banner: b }));
   const slide = [
     ...(info.promo || []).map((p, i) => ({
       kunci: 'p' + p.kode,
@@ -212,10 +245,14 @@ function BannerPromo({ info, pakaiKode, keMenu }) {
     ...(info.catatan ? [{ kunci: 'info', label: 'Info toko', judul: 'Pengumuman', teks: info.catatan, foto: foto[1] || foto[0] || '', aksi: null }] : []),
     { kunci: 'menu', label: info.namaToko, judul: 'Fresh dari dapur kami', teks: 'Pilih kue dan camilan favorit, ambil atau diantar.', foto: foto[0] || '', aksi: html`<button type="button" class="et-banner-kode" onClick=${() => keMenu('')}>Lihat menu</button>` },
   ];
-  const [ref, aktif] = useGeserOtomatis(slide.length, 5000);
+  // Bila admin sudah membuat banner, slide "Fresh dari dapur kami" bawaan tidak perlu ditampilkan.
+  const otomatis = admin.length ? slide.filter((x) => x.kunci !== 'menu') : slide;
+  const jumlah = admin.length + otomatis.length;
+  const [ref, aktif] = useGeserOtomatis(jumlah, 5000);
   return html`<section class="et-bagian" aria-label="Promo dan info">
     <div class="et-geser et-geser-banner" ref=${ref}>
-      ${slide.map(
+      ${admin.map((x) => html`<div class="et-banner-admin" key=${x.kunci}><${KartuBanner} b=${x.banner} foto=${x.banner.fotoUrl} onAksi=${() => aksiBanner(x.banner)} /></div>`)}
+      ${otomatis.map(
         (s) => html`<article class="et-banner" key=${s.kunci}>
           ${s.foto && html`<img src=${s.foto} alt="" aria-hidden="true" />`}
           <div class="et-banner-isi">
@@ -227,11 +264,11 @@ function BannerPromo({ info, pakaiKode, keMenu }) {
         </article>`,
       )}
     </div>
-    <${Titik} jumlah=${slide.length} aktif=${aktif} />
+    <${Titik} jumlah=${jumlah} aktif=${aktif} />
   </section>`;
 }
 
-function Beranda({ info, jumlah, atur, buka, keMenu, ke }) {
+function Beranda({ info, jumlah, atur, buka, keMenu, ke, logo, jumlahKeranjang, cariMenu }) {
   const menu = info.menu || [];
   const kategori = [...new Set(menu.map((m) => m.kategori || 'Lainnya'))];
   const pakaiKode = (kode) => {
@@ -246,6 +283,7 @@ function Beranda({ info, jumlah, atur, buka, keMenu, ke }) {
     ...(info.wa ? [{ label: 'Chat toko', ikon: 'obrolan', href: waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.') }] : [{ label: 'Keranjang', ikon: 'keranjang', klik: () => ke('keranjang') }]),
   ];
   return html`
+    <${HeaderEtalase} info=${info} logo=${logo} jumlahKeranjang=${jumlahKeranjang} ke=${ke} cariMenu=${cariMenu} />
     ${!info.buka && html`<div class="et-tutup" role="status"><${Ikon} nama="jam" ukuran=${18} />Toko sedang tutup. ${info.catatan ? '' : 'Anda tetap bisa melihat menu.'}</div>`}
     <${BannerPromo} info=${info} pakaiKode=${pakaiKode} keMenu=${keMenu} />
 
@@ -276,8 +314,8 @@ function Beranda({ info, jumlah, atur, buka, keMenu, ke }) {
   `;
 }
 
-function DaftarMenu({ info, jumlah, atur, buka, kat, keMenu }) {
-  const [cari, setCari] = useState('');
+function DaftarMenu({ info, jumlah, atur, buka, kat, keMenu, cariAwal = '' }) {
+  const [cari, setCari] = useState(cariAwal);
   const menu = info.menu || [];
   const kategori = [...new Set(menu.map((m) => m.kategori || 'Lainnya'))];
   const q = cari.trim().toLowerCase();
@@ -585,14 +623,14 @@ export function PesanOnline({ k, token }) {
       ? html`<${StatusPesanan} key=${idPesanan} url=${url} token=${token} idPesanan=${idPesanan} info=${info} keMenu=${keMenu} />`
       : html`<h1 class="et-judul-layar">Pesanan Anda</h1><${Kosong} judul="Belum ada pesanan" teks="Pesanan yang Anda buat dari perangkat ini muncul di sini."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
   } else if (!info) isiLayar = html`<div class="et-kerangka" role="status" aria-label="Membuka toko"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i></div>`;
-  else if (layar === 'menu') isiLayar = html`<${DaftarMenu} info=${info} jumlah=${isi} atur=${atur} buka=${buka} kat=${q.kat || ''} keMenu=${keMenu} />`;
+  else if (layar === 'menu') isiLayar = html`<${DaftarMenu} key=${'m' + (q.cari || '')} info=${info} jumlah=${isi} atur=${atur} buka=${buka} kat=${q.kat || ''} keMenu=${keMenu} cariAwal=${q.cari || ''} />`;
   else if (layar === 'produk') {
     isiLayar = produk
       ? html`<${DetailProduk} key=${produk.id} info=${info} m=${produk} diKeranjang=${perMenu(produk.id)} tambah=${tambah} kembali=${() => history.back()} keKeranjang=${() => ke('keranjang')} />`
       : html`<${Kosong} judul="Menu tidak ditemukan" teks="Mungkin sudah tidak dijual."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
   } else if (layar === 'keranjang') {
     isiLayar = html`<${Keranjang} k=${k} info=${info} url=${url} token=${token} baris=${baris} aturBaris=${aturBaris} kosongkan=${() => (tulis(kunciKeranjang(token), {}), setJumlah({}))} keMenu=${keMenu} selesai=${(id) => ke('pesanan', { id })} />`;
-  } else isiLayar = html`<${Beranda} info=${{ ...info, token }} jumlah=${isi} atur=${atur} buka=${buka} keMenu=${keMenu} ke=${ke} />`;
+  } else isiLayar = html`<${Beranda} info=${{ ...info, token }} jumlah=${isi} atur=${atur} buka=${buka} keMenu=${keMenu} ke=${ke} logo=${logo} jumlahKeranjang=${jumlahKeranjang} cariMenu=${(c) => ke('menu', { cari: c })} />`;
 
   // Sambutan sekali per kunjungan, hanya saat membuka beranda etalase.
   const mulai = () => {
@@ -614,14 +652,14 @@ export function PesanOnline({ k, token }) {
   const aktif = layar === 'produk' ? 'menu' : layar;
 
   return html`<div class="etalase">
-    ${layar !== 'produk' &&
+    ${layar !== 'produk' && (layar || !info || galat) &&
     html`<header class="et-kepala">
       <button type="button" class="et-merek" onClick=${() => ke('')}><${LogoMerek} src=${logo} ukuran=${36} /><span>${namaToko}</span></button>
       <button type="button" class="et-ikon-keranjang" aria-label=${`Keranjang (${jumlahKeranjang})`} onClick=${() => ke('keranjang')}>
         <${Ikon} nama="keranjang" ukuran=${22} />${jumlahKeranjang > 0 && html`<i>${jumlahKeranjang}</i>`}
       </button>
     </header>`}
-    <main class=${'et-isi' + (layar === 'produk' ? ' penuh' : '')}>${isiLayar}</main>
+    <main class=${'et-isi' + (layar === 'produk' ? ' penuh' : '') + (!layar && info && !galat ? ' beranda' : '')}>${isiLayar}</main>
     ${jumlahKeranjang > 0 && layar !== 'keranjang' && layar !== 'pesanan' && layar !== 'produk' &&
     html`<button type="button" class="et-bar-keranjang" onClick=${() => ke('keranjang')}>
       <span>${jumlahKeranjang} item · ${rupiah(totalKeranjang)}</span><b>Buka keranjang</b>

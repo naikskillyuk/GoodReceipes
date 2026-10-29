@@ -53,6 +53,7 @@ const MENU_ADMIN = [
   { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
   { kunci: 'pesanan', jalur: '/pesanan', label: 'Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan, Promo & Testimoni', ikon: 'pelanggan' },
+  { kunci: 'banner', jalur: '/banner', label: 'Banner & Header', ikon: 'gambar' },
   { kunci: 'ulasan', jalur: '/ulasan', label: 'Ulasan', ikon: 'obrolan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
   { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Lihat Etalase Toko', ikon: 'toko', luar: true },
