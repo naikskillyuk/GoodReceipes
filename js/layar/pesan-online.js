@@ -3,7 +3,7 @@
 // Bayar: transfer / QRIS toko (dicek manual oleh toko) atau Mayar bila diaktifkan admin.
 // Layar dipilih dari kueri ?l= (beranda | menu | produk | keranjang | pesanan) supaya tombol kembali HP bekerja.
 
-import { html, useState, useEffect } from '../../vendor/preact-htm.js';
+import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
 import { Kosong, Foto, LogoMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tampilToast } from '../ui/pesan.js';
@@ -12,9 +12,9 @@ import { terapkanMerekDokumen } from '../ui/merek.js';
 import { scriptUrlAman } from './penilai.js';
 import { InfoTransfer } from './pesanan.js';
 import { Bintang } from './pelanggan.js';
-import { pesanOnline, kirimTestimoni, normalHp } from '../lib/toko.js';
+import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris } from '../lib/toko.js';
 import { panggilApi } from '../lib/sync.js';
-import { LOGO_BAWAAN } from '../lib/repo.js';
+import { LOGO_BAWAAN, ambilMerek } from '../lib/repo.js';
 import { rupiah, tanggal } from '../lib/util.js';
 
 const CEK_TIAP_MS = 5000;
@@ -44,6 +44,15 @@ function tulis(kunci, nilai) {
 }
 const kunciPesanan = (token) => 'pesanan-terakhir-' + token;
 const kunciKeranjang = (token) => 'keranjang-' + token;
+const kunciKode = (token) => 'kode-promo-' + token;
+const kunciSambut = (token) => 'sambut-' + token;
+function sudahDisambut(token) {
+  try {
+    return sessionStorage.getItem(kunciSambut(token)) === '1';
+  } catch {
+    return false;
+  }
+}
 function ingatan(token) {
   const v = baca(kunciPesanan(token), '');
   return typeof v === 'string' ? v : '';
@@ -78,27 +87,82 @@ function TombolTambah({ m, n, atur }) {
 }
 
 function KartuProduk({ m, n, atur, buka, lebar }) {
+  const berpilihan = (m.opsi || []).length > 0;
   return html`<article class=${'et-kartu' + (lebar ? ' lebar' : '') + (m.sisa !== null && m.sisa <= 0 ? ' mati' : '')}>
     <button type="button" class="et-kartu-foto" onClick=${() => buka(m)} aria-label=${'Lihat ' + m.nama}>
       <${Foto} src=${m.fotoUrl} ikon="kue" ukuranIkon=${36} />
+      ${m.diskon > 0 && html`<span class="et-diskon">-${m.diskon}%</span>`}
       ${m.sisa !== null && m.sisa > 0 && m.sisa <= 5 && html`<span class="et-pita">Sisa ${m.sisa}</span>`}
     </button>
     <div class="et-kartu-isi">
       <button type="button" class="et-kartu-nama" onClick=${() => buka(m)}>${m.nama}</button>
-      <div class="et-kartu-bawah"><b class="et-harga">${rupiah(m.harga)}</b><${TombolTambah} m=${m} n=${n} atur=${atur} /></div>
+      <div class="et-kartu-bawah"><span class="et-harga-blok"><b class="et-harga">${rupiah(m.harga)}</b>${m.diskon > 0 && html`<s>${rupiah(m.hargaAsli)}</s>`}</span><${TombolTambah} m=${m} n=${berpilihan ? 0 : n} atur=${berpilihan ? () => buka(m) : atur} /></div>
+      ${berpilihan && html`<small class="et-ada-pilihan">Ada pilihan tambahan</small>`}
     </div>
   </article>`;
 }
 
+/**
+ * Geser otomatis isi wadah horizontal (banner, testimoni) setiap `ms` milidetik, berputar ke awal.
+ * Berhenti sebentar saat disentuh, dan tidak bergerak bila pengguna memilih "kurangi gerakan".
+ * Mengembalikan [ref, indeks aktif].
+ */
+function useGeserOtomatis(jumlah, ms) {
+  const ref = useRef(null);
+  const [aktif, setAktif] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || jumlah < 2) return;
+    let jedaSampai = 0;
+    const jeda = () => (jedaSampai = Date.now() + 8000);
+    const indeks = () => {
+      const anak = [...el.children];
+      let terdekat = 0;
+      anak.forEach((c, i) => {
+        if (Math.abs(c.offsetLeft - el.offsetLeft - el.scrollLeft) < Math.abs(anak[terdekat].offsetLeft - el.offsetLeft - el.scrollLeft)) terdekat = i;
+      });
+      return terdekat;
+    };
+    const saatGeser = () => setAktif(indeks());
+    el.addEventListener('scroll', saatGeser, { passive: true });
+    el.addEventListener('pointerdown', jeda);
+    el.addEventListener('touchstart', jeda, { passive: true });
+    const diam = globalThis.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const t = diam
+      ? null
+      : setInterval(() => {
+          if (Date.now() < jedaSampai || document.hidden) return;
+          const anak = [...el.children];
+          const berikut = anak[(indeks() + 1) % anak.length];
+          const ujung = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+          el.scrollTo({ left: ujung ? 0 : berikut.offsetLeft - el.offsetLeft, behavior: 'smooth' });
+        }, ms);
+    return () => {
+      clearInterval(t);
+      el.removeEventListener('scroll', saatGeser);
+      el.removeEventListener('pointerdown', jeda);
+      el.removeEventListener('touchstart', jeda);
+    };
+  }, [jumlah, ms]);
+  return [ref, aktif];
+}
+
+function Titik({ jumlah, aktif }) {
+  if (jumlah < 2) return null;
+  return html`<div class="et-titik" aria-hidden="true">${Array.from({ length: jumlah }, (_, i) => html`<i class=${i === aktif ? 'aktif' : ''}></i>`)}</div>`;
+}
+
 function Testimoni({ daftar }) {
-  if (!daftar || !daftar.length) return null;
+  const ada = daftar && daftar.length > 0;
+  const [ref, aktif] = useGeserOtomatis(ada ? daftar.length : 0, 4000);
+  if (!ada) return null;
   const rata = daftar.reduce((j, t) => j + (Number(t.bintang) || 5), 0) / daftar.length;
   return html`<section class="et-bagian" aria-labelledby="et-h-testi">
     <div class="et-judul-bagian">
       <h2 id="et-h-testi">Kata pembeli</h2>
       <span class="et-rata"><${Bintang} nilai=${rata} /> ${rata.toFixed(1).replace('.', ',')} · ${daftar.length} ulasan</span>
     </div>
-    <div class="et-geser">
+    <div class="et-geser et-geser-testi" ref=${ref}>
       ${daftar.map(
         (t, i) => html`<figure class="et-testi" key=${i}>
           <${Bintang} nilai=${t.bintang} />
@@ -107,53 +171,93 @@ function Testimoni({ daftar }) {
         </figure>`,
       )}
     </div>
+    <${Titik} jumlah=${daftar.length} aktif=${aktif} />
   </section>`;
 }
 
 // ---------- Layar ----------
 
-function Beranda({ info, jumlah, atur, buka, keMenu }) {
+/** Layar sambutan sebelum etalase: foto latar, logo, dan salam. Muncul sekali per kunjungan. */
+function Sambutan({ info, logo, onMulai }) {
+  const latar = info.latarUrl || ((info.menu || []).find((m) => m.fotoUrl) || {}).fotoUrl || 'gambar/latar-masuk.jpg';
+  return html`<div class="etalase et-sambut" role="dialog" aria-label="Selamat datang">
+    <img class="et-sambut-latar" src=${latar} alt="" aria-hidden="true" />
+    <div class="et-sambut-isi">
+      <span class="et-sambut-logo"><${LogoMerek} src=${logo} ukuran=${84} kelas="polos" /></span>
+      <p class="et-sambut-salam">Selamat datang di</p>
+      <h1>${info.namaToko}</h1>
+      <p class="et-sambut-teks">${info.catatan || 'Kue dan camilan rumahan, dibuat hangat dari dapur kami. Pesan sekarang, ambil atau diantar.'}</p>
+      <button type="button" class="et-tombol lebar" onClick=${onMulai}>Mulai pesan<${Ikon} nama="panah" ukuran=${18} /></button>
+      ${!info.buka && html`<p class="et-sambut-tutup">Toko sedang tutup, Anda tetap bisa melihat menu.</p>`}
+    </div>
+  </div>`;
+}
+
+const teksPromo = (p) => (p.jenis === 'persen' ? `Diskon ${p.nilai.toLocaleString('id-ID')}%` : `Hemat ${rupiah(p.nilai)}`);
+
+function BannerPromo({ info, pakaiKode, keMenu }) {
+  const foto = (info.menu || []).filter((m) => m.fotoUrl).map((m) => m.fotoUrl);
+  const slide = [
+    ...(info.promo || []).map((p, i) => ({
+      kunci: 'p' + p.kode,
+      label: 'Promo',
+      judul: teksPromo(p),
+      teks: [p.nama, p.minBelanja > 0 ? `min. belanja ${rupiah(p.minBelanja)}` : '', p.untuk === 'baru' ? 'khusus pelanggan baru' : '', p.sampai ? `s/d ${tanggal(p.sampai)}` : ''].filter(Boolean).join(' · '),
+      foto: foto[i % Math.max(1, foto.length)] || '',
+      aksi: html`<button type="button" class="et-banner-kode" onClick=${() => pakaiKode(p.kode)}>Pakai kode <b>${p.kode}</b></button>`,
+    })),
+    ...(info.catatan ? [{ kunci: 'info', label: 'Info toko', judul: 'Pengumuman', teks: info.catatan, foto: foto[1] || foto[0] || '', aksi: null }] : []),
+    { kunci: 'menu', label: info.namaToko, judul: 'Fresh dari dapur kami', teks: 'Pilih kue dan camilan favorit, ambil atau diantar.', foto: foto[0] || '', aksi: html`<button type="button" class="et-banner-kode" onClick=${() => keMenu('')}>Lihat menu</button>` },
+  ];
+  const [ref, aktif] = useGeserOtomatis(slide.length, 5000);
+  return html`<section class="et-bagian" aria-label="Promo dan info">
+    <div class="et-geser et-geser-banner" ref=${ref}>
+      ${slide.map(
+        (s) => html`<article class="et-banner" key=${s.kunci}>
+          ${s.foto && html`<img src=${s.foto} alt="" aria-hidden="true" />`}
+          <div class="et-banner-isi">
+            <small>${s.label}</small>
+            <b>${s.judul}</b>
+            <span>${s.teks}</span>
+            ${s.aksi}
+          </div>
+        </article>`,
+      )}
+    </div>
+    <${Titik} jumlah=${slide.length} aktif=${aktif} />
+  </section>`;
+}
+
+function Beranda({ info, jumlah, atur, buka, keMenu, ke }) {
   const menu = info.menu || [];
-  const fotoHero = (menu.find((m) => m.fotoUrl) || {}).fotoUrl || '';
-  const kategori = [];
-  for (const m of menu) {
-    const ada = kategori.find((c) => c.nama === m.kategori);
-    if (ada) ada.jumlah++;
-    else kategori.push({ nama: m.kategori || 'Lainnya', foto: m.fotoUrl, jumlah: 1 });
-  }
-  kategori.forEach((c) => (c.foto = c.foto || (menu.find((m) => m.kategori === c.nama && m.fotoUrl) || {}).fotoUrl || ''));
-  const populer = menu.slice(0, 8);
+  const kategori = [...new Set(menu.map((m) => m.kategori || 'Lainnya'))];
+  const pakaiKode = (kode) => {
+    tulis(kunciKode(info.token), kode);
+    tampilToast(`Kode ${kode} dipasang di keranjang.`);
+  };
+  const IKON_KAT = { Paket: 'kotak', Minuman: 'gelas', Kue: 'kue', Lauk: 'panci', Camilan: 'kue', Roti: 'kue' };
+  const pintas = [
+    { label: 'Semua menu', ikon: 'buku', klik: () => keMenu('') },
+    ...kategori.slice(0, 2).map((c) => ({ label: c, ikon: IKON_KAT[c] || 'kue', klik: () => keMenu(c) })),
+    { label: 'Pesanan saya', ikon: 'struk', klik: () => ke('pesanan') },
+    ...(info.wa ? [{ label: 'Chat toko', ikon: 'obrolan', href: waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.') }] : [{ label: 'Keranjang', ikon: 'keranjang', klik: () => ke('keranjang') }]),
+  ];
   return html`
-    <section class="et-hero">
-      ${fotoHero && html`<img src=${fotoHero} alt="" aria-hidden="true" />`}
-      <div class="et-hero-isi">
-        <span class=${'et-buka ' + (info.buka ? 'ya' : 'tidak')}>${info.buka ? 'Buka · terima pesanan' : 'Sedang tutup'}</span>
-        <h1>Dibuat hangat dari dapur rumah</h1>
-        <p>${info.catatan || 'Kue dan camilan rumahan, dibuat dengan bahan pilihan. Pesan sekarang, ambil atau diantar.'}</p>
-        <button type="button" class="et-tombol" onClick=${() => keMenu('')}>Pesan sekarang</button>
-      </div>
+    ${!info.buka && html`<div class="et-tutup" role="status"><${Ikon} nama="jam" ukuran=${18} />Toko sedang tutup. ${info.catatan ? '' : 'Anda tetap bisa melihat menu.'}</div>`}
+    <${BannerPromo} info=${info} pakaiKode=${pakaiKode} keMenu=${keMenu} />
+
+    <nav class="et-pintas" aria-label="Pintasan">
+      ${pintas.map((p) =>
+        p.href
+          ? html`<a class="et-pintas-item" href=${p.href} target="_blank" rel="noopener"><span><${Ikon} nama=${p.ikon} ukuran=${24} /></span>${p.label}</a>`
+          : html`<button type="button" class="et-pintas-item" onClick=${p.klik}><span><${Ikon} nama=${p.ikon} ukuran=${24} /></span>${p.label}</button>`,
+      )}
+    </nav>
+
+    <section class="et-bagian" aria-labelledby="et-h-menu">
+      <div class="et-judul-bagian"><h2 id="et-h-menu">Menu kami</h2>${menu.length > 6 && html`<button type="button" class="et-lihat" onClick=${() => keMenu('')}>Lihat semua</button>`}</div>
+      ${menu.length === 0 ? html`<${Kosong} judul="Menu belum tersedia" teks="Silakan kembali lagi nanti." />` : html`<div class="et-grid">${menu.map((m) => html`<${KartuProduk} key=${m.id} m=${m} n=${jumlah[m.id] || 0} atur=${atur} buka=${buka} lebar />`)}</div>`}
     </section>
-
-    ${populer.length > 0 &&
-    html`<section class="et-bagian" aria-labelledby="et-h-populer">
-      <div class="et-judul-bagian"><h2 id="et-h-populer">Pilihan populer</h2><button type="button" class="et-lihat" onClick=${() => keMenu('')}>Lihat semua</button></div>
-      <div class="et-geser">${populer.map((m) => html`<${KartuProduk} key=${m.id} m=${m} n=${jumlah[m.id] || 0} atur=${atur} buka=${buka} />`)}</div>
-    </section>`}
-
-    ${kategori.length > 1 &&
-    html`<section class="et-bagian" aria-labelledby="et-h-kategori">
-      <div class="et-judul-bagian"><h2 id="et-h-kategori">Kategori</h2></div>
-      <div class="et-grid-kategori">
-        ${kategori.map(
-          (c) => html`<button type="button" class="et-kategori" key=${c.nama} onClick=${() => keMenu(c.nama)}>
-            <span class="et-kategori-foto"><${Foto} src=${c.foto} ikon=${c.nama === 'Paket' ? 'kotak' : 'kue'} ukuranIkon=${32} /></span>
-            <b>${c.nama}</b><small>${c.jumlah} menu</small>
-          </button>`,
-        )}
-      </div>
-    </section>`}
-
-    ${menu.length === 0 && html`<${Kosong} judul="Menu belum tersedia" teks="Silakan kembali lagi nanti." />`}
 
     <${Testimoni} daftar=${info.testimoni} />
 
@@ -164,7 +268,6 @@ function Beranda({ info, jumlah, atur, buka, keMenu }) {
         <span><${Ikon} nama="toko" ukuran=${20} />Ambil atau diantar</span>
       </div>
       ${info.alamat && html`<p><b>Alamat:</b> ${info.alamat}</p>`}
-      ${info.wa && html`<a class="et-tombol garis" href=${waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.')} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Tanya lewat WhatsApp</a>`}
     </section>
     <p class="et-kaki"><a href="/admin">Masuk admin & kasir</a></p>
   `;
@@ -190,13 +293,17 @@ function DaftarMenu({ info, jumlah, atur, buka, kat, keMenu }) {
   `;
 }
 
-function DetailProduk({ info, m, jumlah, atur, kembali, keKeranjang }) {
-  const [n, setN] = useState(Math.max(1, jumlah[m.id] || 1));
+function DetailProduk({ info, m, diKeranjang, tambah: tambahKe, kembali, keKeranjang }) {
+  const [n, setN] = useState(1);
+  const [dipilih, setDipilih] = useState([]);
+  const opsi = m.opsi || [];
   const habis = m.sisa !== null && m.sisa <= 0;
-  const maks = m.sisa === null ? 100 : Math.min(100, m.sisa);
+  const maks = Math.max(1, (m.sisa === null ? 100 : Math.min(100, m.sisa)) - diKeranjang);
+  const harga = m.harga + opsi.filter((o) => dipilih.includes(o.nama)).reduce((j, o) => j + o.harga, 0);
   const rata = (info.testimoni || []).length ? info.testimoni.reduce((j, t) => j + (Number(t.bintang) || 5), 0) / info.testimoni.length : 0;
+  const balik = (nama) => setDipilih((d) => (d.includes(nama) ? d.filter((x) => x !== nama) : [...d, nama]));
   const tambah = () => {
-    atur(m, n);
+    tambahKe(m, opsi.filter((o) => dipilih.includes(o.nama)).map((o) => o.nama), n);
     tampilToast(`${m.nama} masuk keranjang.`);
     kembali();
   };
@@ -210,10 +317,21 @@ function DetailProduk({ info, m, jumlah, atur, kembali, keKeranjang }) {
       <h1>${m.nama}</h1>
       <div class="et-detail-harga">
         <b>${rupiah(m.harga)}</b>
+        ${m.diskon > 0 && html`<s class="et-harga-coret">${rupiah(m.hargaAsli)}</s><span class="et-diskon statis">Hemat ${m.diskon}%</span>`}
         ${rata > 0 && html`<span class="et-rata"><${Bintang} nilai=${rata} /> (${info.testimoni.length} ulasan toko)</span>`}
       </div>
       ${m.keterangan ? html`<p class="et-deskripsi">${m.keterangan}</p>` : html`<p class="et-deskripsi">Dibuat dari resep andalan ${info.namaToko}.</p>`}
       <p class=${'et-stok' + (habis ? ' habis' : '')}>${habis ? 'Stok sedang habis' : m.sisa === null ? 'Tersedia' : `Tersedia ${m.sisa}`}</p>
+      ${opsi.length > 0 &&
+      html`<section class="et-opsi" aria-labelledby="h-opsi">
+        <h2 class="et-h2" id="h-opsi">Pilihan tambahan</h2>
+        ${opsi.map(
+          (o) => html`<label class=${'et-opsi-item' + (dipilih.includes(o.nama) ? ' aktif' : '')} key=${o.nama}>
+            <input type="checkbox" checked=${dipilih.includes(o.nama)} onChange=${() => balik(o.nama)} />
+            <span>${o.nama}</span><b>${o.harga ? '+' + rupiah(o.harga) : 'gratis'}</b>
+          </label>`,
+        )}
+      </section>`}
       ${!habis &&
       html`<div class="et-detail-aksi">
         <span class="et-stepper besar">
@@ -221,9 +339,9 @@ function DetailProduk({ info, m, jumlah, atur, kembali, keKeranjang }) {
           <output aria-label="Jumlah">${n}</output>
           <button type="button" aria-label="Tambah jumlah" onClick=${() => setN(Math.min(maks, n + 1))}><${Ikon} nama="plus" ukuran=${18} /></button>
         </span>
-        <button type="button" class="et-tombol lebar" aria-label=${'Tambah ke keranjang, ' + rupiah(m.harga * n)} onClick=${tambah}><${Ikon} nama="keranjang" ukuran=${18} />${rupiah(m.harga * n)}</button>
+        <button type="button" class="et-tombol lebar" aria-label=${'Tambah ke keranjang, ' + rupiah(harga * n)} onClick=${tambah}><${Ikon} nama="keranjang" ukuran=${18} />${rupiah(harga * n)}</button>
       </div>`}
-      ${(jumlah[m.id] || 0) > 0 && html`<button type="button" class="et-lihat" onClick=${keKeranjang}>Sudah ${jumlah[m.id]} di keranjang · buka keranjang</button>`}
+      ${diKeranjang > 0 && html`<button type="button" class="et-lihat" onClick=${keKeranjang}>Sudah ${diKeranjang} di keranjang · buka keranjang</button>`}
       <div class="et-ciri">
         <span><${Ikon} nama="kue" ukuran=${20} />Bahan pilihan</span>
         <span><${Ikon} nama="panci" ukuran=${20} />Dibuat saat dipesan</span>
@@ -233,15 +351,16 @@ function DetailProduk({ info, m, jumlah, atur, kembali, keKeranjang }) {
   `;
 }
 
-function Keranjang({ k, info, url, token, jumlah, atur, kosongkan, keMenu, selesai }) {
+function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, selesai }) {
   const [nama, setNama] = useState('');
   const [hp, setHp] = useState('');
   const [catatan, setCatatan] = useState('');
-  const [kode, setKode] = useState('');
+  const [kode, setKode] = useState(() => baca(kunciKode(token), '') || '');
   const [galat, setGalat] = useState('');
   const [mengirim, setMengirim] = useState(false);
-  const item = (info.menu || []).filter((m) => jumlah[m.id] > 0).map((m) => ({ ...m, jumlah: jumlah[m.id] }));
-  const total = item.reduce((j, m) => j + m.harga * m.jumlah, 0);
+  useEffect(() => tulis(kunciKode(token), kode.trim()), [kode]);
+  const item = baris;
+  const total = item.reduce((j, b) => j + b.harga * b.jumlah, 0);
 
   const kirim = async (e) => {
     e.preventDefault();
@@ -251,8 +370,9 @@ function Keranjang({ k, info, url, token, jumlah, atur, kosongkan, keMenu, seles
     setMengirim(true);
     setGalat('');
     try {
-      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((m) => ({ idMenu: m.id, jumlah: m.jumlah })) });
+      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
       tulis(kunciPesanan(token), j.idPesanan);
+      tulis(kunciKode(token), '');
       kosongkan();
       if (j.link) location.href = j.link;
       else selesai(j.idPesanan);
@@ -270,10 +390,10 @@ function Keranjang({ k, info, url, token, jumlah, atur, kosongkan, keMenu, seles
     <h1 class="et-judul-layar">Keranjang</h1>
     <section class="et-panel">
       ${item.map(
-        (m) => html`<div class="et-baris-keranjang" key=${m.id}>
-          <span class="et-mini-foto"><${Foto} src=${m.fotoUrl} ikon="kue" ukuranIkon=${22} /></span>
-          <span class="et-baris-teks"><b>${m.nama}</b><small>${rupiah(m.harga)}</small></span>
-          <span class="et-baris-kanan"><b>${rupiah(m.harga * m.jumlah)}</b><${TombolTambah} m=${m} n=${m.jumlah} atur=${atur} /></span>
+        (b) => html`<div class="et-baris-keranjang" key=${b.kunci}>
+          <span class="et-mini-foto"><${Foto} src=${b.m.fotoUrl} ikon="kue" ukuranIkon=${22} /></span>
+          <span class="et-baris-teks"><b>${b.m.nama}</b>${b.opsi.length ? html`<small class="et-opsi-teks">+ ${b.opsi.join(', ')}</small>` : ''}<small>${rupiah(b.harga)}</small></span>
+          <span class="et-baris-kanan"><b>${rupiah(b.harga * b.jumlah)}</b><${TombolTambah} m=${{ ...b.m, nama: namaItem({ nama: b.m.nama, opsi: b.opsi }) }} n=${b.jumlah} atur=${(_, n) => aturBaris(b.kunci, n)} /></span>
         </div>`,
       )}
       <button type="button" class="et-lihat" onClick=${() => keMenu('')}>+ Tambah menu lain</button>
@@ -370,7 +490,7 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
       ${waBukti && html`<a class="et-tombol lebar" href=${waBukti} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Kirim bukti bayar via WhatsApp</a>`}
     </section>`}
     <section class="et-panel kolom">
-      ${(s.item || []).map((i) => html`<div class="hasil-baris" key=${i.idMenu}><span>${i.jumlah}× ${i.nama}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
+      ${(s.item || []).map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${namaItem(i)}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
       <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(s.total)}</b></div>
     </section>
     ${s.link && html`<a class="et-tombol lebar" href=${s.link}>Bayar sekarang</a>`}
@@ -387,7 +507,12 @@ export function PesanOnline({ k, token }) {
   const q = k.rute.kueri;
   const [info, setInfo] = useState(null);
   const [galat, setGalat] = useState('');
-  const [jumlah, setJumlah] = useState(() => baca(kunciKeranjang(token), {}) || {});
+  // Keranjang: {kunci: {idMenu, opsi, jumlah}}. Format lama {idMenu: jumlah} ikut dibaca.
+  const [jumlah, setJumlah] = useState(() => {
+    const lama = baca(kunciKeranjang(token), {}) || {};
+    return Object.fromEntries(Object.entries(lama).map(([kunci, v]) => [kunci, typeof v === 'number' ? { idMenu: kunci, opsi: [], jumlah: v } : v]));
+  });
+  const [disambut, setDisambut] = useState(() => sudahDisambut(token));
   const terakhir = ingatan(token);
 
   useEffect(() => {
@@ -399,17 +524,39 @@ export function PesanOnline({ k, token }) {
   }, [token, url]);
   useEffect(() => tulis(kunciKeranjang(token), jumlah), [jumlah]);
 
-  const namaToko = (info && info.namaToko) || 'Pesan online';
+  const namaToko = (info && info.namaToko) || ambilMerek(k.db).nama;
   const logo = (info && info.logoUrl) || LOGO_BAWAAN;
   useEffect(() => terapkanMerekDokumen({ nama: namaToko, logo }), [namaToko, logo]);
 
   const menu = (info && info.menu) || [];
   // Buang isi keranjang yang sudah tidak ada di menu.
-  const isi = Object.fromEntries(Object.entries(jumlah).filter(([id, n]) => n > 0 && menu.some((m) => m.id === id)));
-  const jumlahKeranjang = Object.values(isi).reduce((a, b) => a + b, 0);
+  // Baris yang masih berlaku: menunya masih dijual, pilihannya masih ada; harga = harga menu + pilihan.
+  const baris = [];
+  for (const [kunci, b] of Object.entries(jumlah)) {
+    const m = b && b.jumlah > 0 && menu.find((x) => x.id === b.idMenu);
+    if (!m) continue;
+    const opsi = (m.opsi || []).filter((o) => (b.opsi || []).includes(o.nama));
+    baris.push({ kunci, m, opsi: opsi.map((o) => o.nama), jumlah: b.jumlah, harga: m.harga + opsi.reduce((j, o) => j + o.harga, 0) });
+  }
+  const perMenu = (idMenu) => baris.filter((b) => b.m.id === idMenu).reduce((j, b) => j + b.jumlah, 0);
+  const isi = Object.fromEntries(baris.filter((b) => b.kunci === b.m.id).map((b) => [b.m.id, b.jumlah]));
+  const jumlahKeranjang = baris.reduce((a, b) => a + b.jumlah, 0);
+  const totalKeranjang = baris.reduce((a, b) => a + b.harga * b.jumlah, 0);
+  const batas = (m, kunci) => (m.sisa === null ? 100 : Math.min(100, m.sisa)) - (perMenu(m.id) - ((jumlah[kunci] || {}).jumlah || 0));
+  const aturBaris = (kunci, n) => {
+    const b = jumlah[kunci];
+    const m = b && menu.find((x) => x.id === b.idMenu);
+    if (!m) return;
+    setJumlah((j) => ({ ...j, [kunci]: { ...b, jumlah: Math.max(0, Math.min(batas(m, kunci), n)) } }));
+  };
   const atur = (m, n) => {
-    const maks = m.sisa === null ? 100 : Math.min(100, m.sisa);
-    setJumlah((j) => ({ ...j, [m.id]: Math.max(0, Math.min(maks, n)) }));
+    const kunci = kunciBaris(m.id);
+    setJumlah((j) => ({ ...j, [kunci]: { idMenu: m.id, opsi: [], jumlah: Math.max(0, Math.min(batas(m, kunci), n)) } }));
+  };
+  const tambah = (m, opsi, n) => {
+    const kunci = kunciBaris(m.id, opsi);
+    const ada = (jumlah[kunci] || {}).jumlah || 0;
+    setJumlah((j) => ({ ...j, [kunci]: { idMenu: m.id, opsi, jumlah: Math.max(0, Math.min(batas(m, kunci), ada + n)) } }));
   };
 
   // ?pesanan= dari Mayar (setelah membayar) juga membuka layar pesanan.
@@ -430,11 +577,22 @@ export function PesanOnline({ k, token }) {
   else if (layar === 'menu') isiLayar = html`<${DaftarMenu} info=${info} jumlah=${isi} atur=${atur} buka=${buka} kat=${q.kat || ''} keMenu=${keMenu} />`;
   else if (layar === 'produk') {
     isiLayar = produk
-      ? html`<${DetailProduk} key=${produk.id} info=${info} m=${produk} jumlah=${isi} atur=${atur} kembali=${() => history.back()} keKeranjang=${() => ke('keranjang')} />`
+      ? html`<${DetailProduk} key=${produk.id} info=${info} m=${produk} diKeranjang=${perMenu(produk.id)} tambah=${tambah} kembali=${() => history.back()} keKeranjang=${() => ke('keranjang')} />`
       : html`<${Kosong} judul="Menu tidak ditemukan" teks="Mungkin sudah tidak dijual."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
   } else if (layar === 'keranjang') {
-    isiLayar = html`<${Keranjang} k=${k} info=${info} url=${url} token=${token} jumlah=${isi} atur=${atur} kosongkan=${() => (tulis(kunciKeranjang(token), {}), setJumlah({}))} keMenu=${keMenu} selesai=${(id) => ke('pesanan', { id })} />`;
-  } else isiLayar = html`<${Beranda} info=${info} jumlah=${isi} atur=${atur} buka=${buka} keMenu=${keMenu} />`;
+    isiLayar = html`<${Keranjang} k=${k} info=${info} url=${url} token=${token} baris=${baris} aturBaris=${aturBaris} kosongkan=${() => (tulis(kunciKeranjang(token), {}), setJumlah({}))} keMenu=${keMenu} selesai=${(id) => ke('pesanan', { id })} />`;
+  } else isiLayar = html`<${Beranda} info=${{ ...info, token }} jumlah=${isi} atur=${atur} buka=${buka} keMenu=${keMenu} ke=${ke} />`;
+
+  // Sambutan sekali per kunjungan, hanya saat membuka beranda etalase.
+  const mulai = () => {
+    try {
+      sessionStorage.setItem(kunciSambut(token), '1');
+    } catch {
+      /* tetap lanjut */
+    }
+    setDisambut(true);
+  };
+  if (info && !disambut && !galat && !layar) return html`<${Sambutan} info=${info} logo=${logo} onMulai=${mulai} />`;
 
   const NAV = [
     { l: '', label: 'Beranda', ikon: 'rumah' },
@@ -455,7 +613,7 @@ export function PesanOnline({ k, token }) {
     <main class=${'et-isi' + (layar === 'produk' ? ' penuh' : '')}>${isiLayar}</main>
     ${jumlahKeranjang > 0 && layar !== 'keranjang' && layar !== 'pesanan' && layar !== 'produk' &&
     html`<button type="button" class="et-bar-keranjang" onClick=${() => ke('keranjang')}>
-      <span>${jumlahKeranjang} item · ${rupiah(menu.reduce((j, m) => j + (isi[m.id] || 0) * m.harga, 0))}</span><b>Buka keranjang</b>
+      <span>${jumlahKeranjang} item · ${rupiah(totalKeranjang)}</span><b>Buka keranjang</b>
     </button>`}
     <nav class="et-nav" aria-label="Navigasi toko">
       ${NAV.map(

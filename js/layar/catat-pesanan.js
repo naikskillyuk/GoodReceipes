@@ -9,7 +9,7 @@ import { tanya, tampilToast } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
 import {
   daftarMenu, itemKeranjang, cekPromo, buatPesanan, ubahPesanan, bisaDiubah, kurangStok, normalHp, idPelanggan,
-  bayarTunai, bayarTransfer, SALURAN_PESANAN, pakaiMayar,
+  bayarTunai, bayarTransfer, SALURAN_PESANAN, pakaiMayar, hargaJual, diskonBerlaku, opsiMenu,
 } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
 
@@ -43,7 +43,7 @@ function keadaanAwal(lama) {
   }
   return {
     // Harga lama ikut dibawa supaya mengubah pesanan tidak diam-diam memakai harga menu yang baru.
-    baris: (lama.item || []).map((i) => ({ kunci: kunciBaru(), idMenu: i.idMenu || '', nama: i.nama, harga: Number(i.harga) || 0, jumlah: Number(i.jumlah) || 1 })),
+    baris: (lama.item || []).map((i) => ({ kunci: kunciBaru(), idMenu: i.idMenu || '', nama: i.nama, harga: Number(i.harga) || 0, jumlah: Number(i.jumlah) || 1, opsi: Array.isArray(i.opsi) ? i.opsi : [] })),
     nama: lama.nama || '',
     hp: lama.hp ? '0' + String(lama.hp).replace(/^62/, '') : '',
     saluran: lama.saluran || '',
@@ -79,22 +79,30 @@ export function CatatPesanan({ k }) {
   const menu = daftarMenu(db, { hanyaAktif: true });
   const tambahMenu = (idMenu) => {
     if (!idMenu) return;
-    const ada = f.baris.find((b) => b.idMenu === idMenu);
+    // Menu berpilihan selalu jadi baris baru, supaya tiap baris bisa punya pilihan sendiri.
+    const berpilihan = opsiMenu(db.ambil('Menu', idMenu)).length > 0;
+    const ada = !berpilihan && f.baris.find((b) => b.idMenu === idMenu && !(b.opsi || []).length);
     if (ada) aturBaris(ada.kunci, { jumlah: ada.jumlah + 1 });
-    else atur({ baris: [...f.baris, { kunci: kunciBaru(), idMenu, jumlah: 1 }] });
+    else atur({ baris: [...f.baris, { kunci: kunciBaru(), idMenu, jumlah: 1, opsi: [] }] });
     setPilihMenu('');
   };
   const tambahLain = () => atur({ baris: [...f.baris, { kunci: kunciBaru(), idMenu: '', nama: '', harga: 0, jumlah: 1 }] });
 
   // Baris menu tanpa harga sendiri memakai harga menu saat ini.
-  const keranjang = f.baris.map((b) => (b.idMenu ? { idMenu: b.idMenu, jumlah: b.jumlah, ...(b.harga !== undefined ? { harga: b.harga, nama: b.nama } : {}) } : { nama: b.nama, harga: b.harga, jumlah: b.jumlah }));
+  const keKeranjang = (b) => (b.idMenu ? { idMenu: b.idMenu, jumlah: b.jumlah, opsi: b.opsi || [], ...(b.harga !== undefined ? { harga: b.harga, nama: b.nama } : {}) } : { nama: b.nama, harga: b.harga, jumlah: b.jumlah });
+  const keranjang = f.baris.map(keKeranjang);
   const { item, subtotal } = itemKeranjang(db, keranjang);
   const nomorHp = normalHp(f.hp);
   const promo = f.kode.trim() ? cekPromo(db, f.kode, { subtotal, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '', kecuali: idUbah }) : { diskon: 0, galat: '' };
   const ongkir = f.antar ? f.ongkir : 0;
   const total = subtotal - (promo.galat ? 0 : promo.diskon) + ongkir;
   const pelanggan = nomorHp ? db.ambil('Pelanggan', idPelanggan(nomorHp)) : null;
-  const hargaBaris = (b) => (b.harga !== undefined ? b.harga : Number((db.ambil('Menu', b.idMenu) || {}).harga) || 0);
+  const hargaBaris = (b) => (b.harga !== undefined ? b.harga : (itemKeranjang(db, [{ ...keKeranjang(b), jumlah: 1 }]).item[0] || {}).harga || 0);
+  // Mengubah pilihan = hitung ulang harga dari menu (harga lama pesanan tidak dipakai lagi untuk baris ini).
+  const balikOpsi = (b, nama) => {
+    const opsi = (b.opsi || []).includes(nama) ? b.opsi.filter((x) => x !== nama) : [...(b.opsi || []), nama];
+    aturBaris(b.kunci, { opsi, harga: undefined, nama: undefined });
+  };
 
   const simpan = async () => {
     if (!f.nama.trim()) return setGalat('Isi nama pembeli.');
@@ -162,7 +170,12 @@ export function CatatPesanan({ k }) {
               const harga = hargaBaris(b);
               return html`<div class="baris-keranjang" key=${b.kunci}>
                 ${b.idMenu
-                  ? html`<span class="teks"><b>${(db.ambil('Menu', b.idMenu) || {}).nama || b.nama}</b><small>${rupiah(harga)}</small></span>`
+                  ? html`<span class="teks"><b>${(db.ambil('Menu', b.idMenu) || {}).nama || b.nama}</b><small>${rupiah(harga)}</small>
+                      ${opsiMenu(db.ambil('Menu', b.idMenu)).length > 0 &&
+                      html`<span class="chips chips-opsi" role="group" aria-label=${'Pilihan ' + ((db.ambil('Menu', b.idMenu) || {}).nama || '')}>
+                        ${opsiMenu(db.ambil('Menu', b.idMenu)).map((o) => html`<button type="button" key=${o.nama} class=${'chip' + ((b.opsi || []).includes(o.nama) ? ' aktif' : '')} aria-pressed=${(b.opsi || []).includes(o.nama)} onClick=${() => balikOpsi(b, o.nama)}>${o.nama} +${rupiah(o.harga)}</button>`)}
+                      </span>`}
+                    </span>`
                   : html`<span class="teks kolom" style="gap:6px">
                       <input class="input kecil" maxlength="80" placeholder="Nama item, mis. Kue ulang tahun 20 cm" aria-label="Nama item lain" value=${b.nama} onInput=${(e) => aturBaris(b.kunci, { nama: e.target.value })} />
                       <${InputRupiah} aria-label="Harga item lain" placeholder="Harga satuan" nilai=${b.harga} onUbah=${(n) => aturBaris(b.kunci, { harga: n })} />
@@ -178,7 +191,7 @@ export function CatatPesanan({ k }) {
             <div class="kolom" style="gap:8px">
               <select class="input kecil" aria-label="Tambah dari menu" value=${pilihMenu} onChange=${(e) => tambahMenu(e.target.value)} disabled=${!menu.length}>
                 <option value="">${menu.length ? '+ Tambah dari menu…' : 'Menu jual masih kosong'}</option>
-                ${menu.map(({ menu: m, sisa }) => html`<option value=${m.id}>${m.nama} · ${rupiah(m.harga)}${sisa === null ? '' : sisa <= 0 ? ' · stok habis' : ` · sisa ${sisa}`}</option>`)}
+                ${menu.map(({ menu: m, sisa }) => html`<option value=${m.id}>${m.nama} · ${rupiah(hargaJual(m))}${diskonBerlaku(m) ? ` (diskon ${diskonBerlaku(m)}%)` : ''}${sisa === null ? '' : sisa <= 0 ? ' · stok habis' : ` · sisa ${sisa}`}</option>`)}
               </select>
               <button class="btn" onClick=${tambahLain}><${Ikon} nama="plus" ukuran=${18} />Item di luar menu</button>
             </div>

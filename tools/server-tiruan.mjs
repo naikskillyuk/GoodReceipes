@@ -250,6 +250,27 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     kabari();
     return { ok: true, pesan: 'Terima kasih! Testimoni Anda akan tampil setelah dicek toko.' };
   }
+  // Diskon produk, sama seperti Penjualan::hargaJual.
+  function diskonMenu(m) {
+    const d = Math.max(0, Math.min(90, angka(m.diskon)));
+    return d && (!angka(m.diskonSampai) || Date.now() <= angka(m.diskonSampai)) ? d : 0;
+  }
+  function opsiMenu(m) {
+    let o = m.opsi;
+    if (typeof o === 'string') {
+      try {
+        o = JSON.parse(o);
+      } catch {
+        o = [];
+      }
+    }
+    const lihat = new Set();
+    return (Array.isArray(o) ? o : [])
+      .map((x) => ({ nama: String((x && x.nama) || '').trim().slice(0, 40), harga: Math.max(0, Math.round(Number(x && x.harga) || 0)) }))
+      .filter((x) => x.nama && !lihat.has(x.nama.toLowerCase()) && lihat.add(x.nama.toLowerCase()))
+      .slice(0, 12);
+  }
+  const hargaMenu = (m) => (diskonMenu(m) ? Math.max(0, Math.round((angka(m.harga) * (100 - diskonMenu(m))) / 100 / 100) * 100) : angka(m.harga));
   function infoToko(req) {
     const s = tokoDariToken(req.token);
     if (!s) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
@@ -263,7 +284,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         const r = m.jenis === 'paket' ? null : tabel('Resep')[m.idRef];
         const kat = r && tabel('Kategori')[r.idKategori];
         const kategori = m.jenis === 'paket' ? 'Paket' : (kat && kat.nama) || 'Lainnya';
-        return { id: m.id, nama: String(m.nama || ''), harga: angka(m.harga), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
+        return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
       });
     return {
       ok: true,
@@ -277,6 +298,10 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       mayar: pakaiMayar(s),
       bayarManual: pakaiMayar(s) ? null : bayarManual(s),
       testimoni: testimoniTampil(),
+      promo: hidup('Promo', (p) => benar(p.aktif, false) && benar(p.online, false) && String(p.kode || '').trim() && (!angka(p.mulai) || angka(p.mulai) <= Date.now()) && (!angka(p.sampai) || angka(p.sampai) >= Date.now()))
+        .slice(0, 6)
+        .map((p) => ({ kode: String(p.kode).trim().toUpperCase(), nama: String(p.nama || ''), jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), minBelanja: angka(p.minBelanja), maksDiskon: angka(p.maksDiskon), untuk: p.untuk || 'semua', sampai: angka(p.sampai) })),
+      latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '',
       menu,
     };
   }
@@ -323,8 +348,12 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       const m = menu[it && it.idMenu];
       const jumlah = Math.floor(Number(it && it.jumlah));
       if (!m || !(jumlah >= 1 && jumlah <= 100)) return { ok: false, galat: 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.' };
-      item.push({ idMenu: m.id, nama: String(m.nama), harga: angka(m.harga), jumlah });
-      subtotal += angka(m.harga) * jumlah;
+      const mau = new Set((Array.isArray(it.opsi) ? it.opsi : []).filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()));
+      const opsi = opsiMenu(m).filter((o) => mau.has(o.nama.toLowerCase()));
+      if (opsi.length !== mau.size) return { ok: false, galat: 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.' };
+      const harga = hargaMenu(m) + opsi.reduce((j, o) => j + o.harga, 0);
+      item.push({ idMenu: m.id, nama: String(m.nama), harga, jumlah, ...(opsi.length ? { opsi: opsi.map((o) => o.nama) } : {}) });
+      subtotal += harga * jumlah;
     }
     const stok = stokMakanan();
     for (const [r, butuh] of Object.entries(kebutuhan(item))) {

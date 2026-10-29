@@ -228,3 +228,38 @@ test('testimoni: admin menulis, sembunyikan, dan hanya yang tayang ikut ditampil
   toko.simpanTestimoni(db, { id: a.id, nama: 'Sari', isi: 'Browniesnya lembut banget!', bintang: 5, tampil: false });
   assert.equal(toko.testimoniTampil(db).length, 0);
 });
+
+test('diskon produk: harga jual dibulatkan, kedaluwarsa, dan dipakai di keranjang kasir', async () => {
+  const { db, brownies } = await dbContoh();
+  const menu = toko.tambahMenu(db, 'resep', brownies);
+  const m = db.simpan('Menu', { ...menu, harga: 12500, diskon: 15 });
+  assert.equal(toko.diskonBerlaku(m), 15);
+  assert.equal(toko.hargaJual(m), 10600, '12.500 - 15% = 10.625, dibulatkan ke Rp 100');
+  assert.equal(toko.itemKeranjang(db, [{ idMenu: m.id, jumlah: 2 }]).subtotal, 21200);
+  assert.equal(toko.hargaJual({ ...m, diskon: 150 }), 1300, 'diskon dibatasi 90%');
+  const lewat = { ...m, diskonSampai: Date.now() - 1000 };
+  assert.equal(toko.diskonBerlaku(lewat), 0);
+  assert.equal(toko.hargaJual(lewat), 12500);
+  assert.equal(toko.hargaJual({ ...m, diskon: 0 }), 12500);
+});
+
+test('pilihan tambahan (varian): harga ditambahkan, hanya pilihan yang ada, nama item lengkap', async () => {
+  const { db, brownies } = await dbContoh();
+  const menu = toko.tambahMenu(db, 'resep', brownies);
+  const m = db.simpan('Menu', { ...menu, harga: 10000, diskon: 10, opsi: [{ nama: 'Digoreng', harga: 2000 }, { nama: 'Tambah keju', harga: 3000.4 }, { nama: 'digoreng', harga: 9 }, { nama: '', harga: 1 }] });
+  assert.deepEqual(toko.opsiMenu(m), [{ nama: 'Digoreng', harga: 2000 }, { nama: 'Tambah keju', harga: 3000 }], 'nama kosong dan dobel dibuang');
+  const { item, subtotal } = toko.itemKeranjang(db, [
+    { idMenu: m.id, jumlah: 2, opsi: ['tambah keju', 'Digoreng', 'Palsu'] },
+    { idMenu: m.id, jumlah: 1 },
+  ]);
+  assert.deepEqual(item[0].opsi, ['Digoreng', 'Tambah keju'], 'urutan seperti di menu, pilihan palsu dibuang');
+  assert.equal(item[0].harga, 9000 + 5000, 'harga setelah diskon + pilihan');
+  assert.equal(item[1].opsi, undefined);
+  assert.equal(subtotal, 14000 * 2 + 9000);
+  assert.equal(toko.namaItem(item[0]), 'Brownies Fudgy (Digoreng, Tambah keju)');
+  assert.notEqual(toko.kunciBaris(m.id, ['Digoreng']), toko.kunciBaris(m.id));
+  assert.equal(toko.kunciBaris(m.id, ['B', 'a']), toko.kunciBaris(m.id, ['A', 'b']));
+  const p = toko.buatPesanan(db, { keranjang: [{ idMenu: m.id, jumlah: 1, opsi: ['Digoreng'] }] });
+  assert.deepEqual(p.item[0].opsi, ['Digoreng']);
+  assert.equal(p.total, 11000);
+});

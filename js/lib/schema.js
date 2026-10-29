@@ -75,9 +75,11 @@ export const TABEL = {
     awalan: 'pkt',
     kolom: { id: 't', nama: 't', marginTarget: 'n', hargaJual: 'n', dibuat: 'n' },
   },
+  // pakaiPacking: biaya packing resep ini tetap ikut di HPP paket (mis. risol tetap diberi plastik).
+  // Bawaan (kosong/false): packing resep dibuang karena paket punya packing sendiri.
   IsiPaket: {
     awalan: 'ipk',
-    kolom: { id: 't', idPaket: 't', idResep: 't', jumlah: 'n', urutan: 'n' },
+    kolom: { id: 't', idPaket: 't', idResep: 't', jumlah: 'n', urutan: 'n', pakaiPacking: 'b' },
   },
   BiayaPaket: {
     awalan: 'bpk',
@@ -108,9 +110,12 @@ export const TABEL = {
   // Menu yang dijual toko. jenis 'resep' | 'paket'; idRef = id resep/paket. online = tampil di link pemesanan.
   Menu: {
     awalan: 'mnu',
-    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n' },
+    // diskon = persen potongan harga produk (0 = tanpa diskon), diskonSampai = batas waktu (ms, 0 = tanpa batas).
+    // opsi = pilihan tambahan berbayar [{nama, harga}], mis. "Digoreng" +2000, "Tambah keju" +3000 (boleh pilih beberapa).
+    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n', diskon: 'n', diskonSampai: 'n', opsi: 'j' },
   },
-  // Pesanan. item = [{idMenu, nama, harga, jumlah}] (idMenu kosong = item di luar menu). sumber 'kasir' | 'online' | 'manual'.
+  // Pesanan. item = [{idMenu, nama, harga, jumlah, opsi?}] (idMenu kosong = item di luar menu; opsi = nama pilihan tambahan,
+  // harga sudah termasuk pilihan tambahan). sumber 'kasir' | 'online' | 'manual'.
   // Pesanan manual: saluran (WhatsApp, Telepon, ...), jadwal ambil/antar (ms), alamat antar, ongkir.
   // status: 'menunggu' (online, belum dibayar) | 'baru' | 'diproses' | 'siap' | 'selesai' | 'batal'.
   // Status bayar dibaca dari tabel Pembayaran (ada yang lunas = lunas).

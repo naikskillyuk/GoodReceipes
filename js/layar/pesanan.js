@@ -8,7 +8,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { buatQR, salin } from './bagikan.js';
 import {
   daftarPesanan, statusBayar, ubahStatusPesanan, bayarTunai, bayarTransfer, saranUang, mintaBayarMayar, cekBayarMayar,
-  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
+  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah, angka, tanggal } from '../lib/util.js';
 
@@ -162,7 +162,7 @@ function KartuPesanan({ db, p }) {
       <b>#${p.nomor}${p.nama ? ' · ' + p.nama : ''}</b>
       <span class=${'lencana-status s-' + p.status}>${STATUS_PESANAN[p.status] || p.status}</span>
     </div>
-    <small class="teks-kecil">${item.map((i) => `${i.jumlah}× ${i.nama}`).join(', ')}</small>
+    <small class="teks-kecil">${item.map((i) => `${i.jumlah}× ${namaItem(i)}`).join(', ')}</small>
     ${p.jadwal > 0 && html`<small class="jadwal-pesanan"><${Ikon} nama="jam" ukuran=${14} />${p.alamat || p.ongkir ? 'Antar' : 'Ambil'} ${teksJadwal(p.jadwal)}</small>`}
     <div class="baris-pisah">
       <span class="teks-kecil">${tanggal(p.waktu)} ${jam(p.waktu)} · ${labelSumber(p)}</span>
@@ -238,7 +238,7 @@ export function DetailPesanan({ k, id }) {
       <div class="kolom-2">
         <div class="kolom">
           <section class="kartu kolom">
-            ${item.map((i) => html`<div class="hasil-baris" key=${i.idMenu}><span>${i.jumlah}× ${i.nama}<br /><small class="teks-kecil">@ ${rupiah(i.harga)}</small></span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
+            ${item.map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${i.nama}${i.opsi && i.opsi.length ? html`<br /><small class="teks-opsi">+ ${i.opsi.join(', ')}</small>` : ''}<br /><small class="teks-kecil">@ ${rupiah(i.harga)}</small></span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
             ${(p.diskon > 0 || p.ongkir > 0) && html`<div class="hasil-baris"><span>Subtotal</span><b class="biasa">${rupiah(p.subtotal)}</b></div>`}
             ${p.diskon > 0 && html`<div class="hasil-baris"><span>Diskon${p.kodePromo ? ' (' + p.kodePromo + ')' : ''}</span><b class="baik">−${rupiah(p.diskon)}</b></div>`}
             ${p.ongkir > 0 && html`<div class="hasil-baris"><span>Ongkir</span><b class="biasa">${rupiah(p.ongkir)}</b></div>`}

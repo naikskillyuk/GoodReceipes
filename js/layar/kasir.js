@@ -3,11 +3,42 @@
 import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Kosong, Foto } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
-import { tanya } from '../ui/pesan.js';
+import { tanya, Modal } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
-import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko } from '../lib/toko.js';
+import { daftarMenu, itemKeranjang, cekPromo, buatPesanan, kurangStok, normalHp, idPelanggan, peranAkun, tampilanToko, hargaJual, diskonBerlaku, opsiMenu, kunciBaris, namaItem } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
 import { ambilMerek } from '../lib/repo.js';
+
+/** Pilih pilihan tambahan (varian) dan jumlah sebelum masuk keranjang. */
+export function DialogOpsi({ m, onTutup, onTambah }) {
+  const opsi = opsiMenu(m);
+  const [dipilih, setDipilih] = useState([]);
+  const [n, setN] = useState(1);
+  const harga = hargaJual(m) + opsi.filter((o) => dipilih.includes(o.nama)).reduce((j, o) => j + o.harga, 0);
+  const balik = (nama) => setDipilih((d) => (d.includes(nama) ? d.filter((x) => x !== nama) : [...d, nama]));
+  return html`<${Modal} judul=${m.nama} onTutup=${onTutup}>
+    <div class="kolom" style="gap:12px">
+      <p class="bantu">Harga dasar ${rupiah(hargaJual(m))}. Centang pilihan tambahan:</p>
+      <div class="daftar-opsi">
+        ${opsi.map(
+          (o) => html`<label class="pilih-opsi" key=${o.nama}>
+            <input type="checkbox" checked=${dipilih.includes(o.nama)} onChange=${() => balik(o.nama)} />
+            <span>${o.nama}</span><b>${o.harga ? '+' + rupiah(o.harga) : 'gratis'}</b>
+          </label>`,
+        )}
+      </div>
+      <div class="baris-pisah">
+        <span class="stepper">
+          <button aria-label="Kurangi jumlah" onClick=${() => setN(Math.max(1, n - 1))}><${Ikon} nama="minus" ukuran=${16} /></button>
+          <output aria-label="Jumlah">${n}</output>
+          <button aria-label="Tambah jumlah" onClick=${() => setN(Math.min(999, n + 1))}><${Ikon} nama="plus" ukuran=${16} /></button>
+        </span>
+        <b class="total-kasir">${rupiah(harga * n)}</b>
+      </div>
+      <button class="btn solid lebar" onClick=${() => onTambah(dipilih, n)}><${Ikon} nama="plus" ukuran=${18} />Masukkan ke keranjang</button>
+    </div>
+  <//>`;
+}
 
 export function Kasir({ k }) {
   const { db } = k;
@@ -18,13 +49,22 @@ export function Kasir({ k }) {
   const [kode, setKode] = useState('');
   const [cari, setCari] = useState('');
   const [galat, setGalat] = useState('');
+  const [pilihOpsi, setPilihOpsi] = useState(null);
   const menu = daftarMenu(db, { hanyaAktif: true }).filter(({ menu: m }) => m.nama.toLowerCase().includes(cari.trim().toLowerCase()));
 
-  const jumlahDi = (idMenu) => (keranjang.find((x) => x.idMenu === idMenu) || {}).jumlah || 0;
-  const atur = (idMenu, jumlah) => {
+  // Baris keranjang: {kunci, idMenu, opsi, jumlah}. Menu sama dengan pilihan berbeda = baris berbeda.
+  const jumlahDi = (idMenu) => keranjang.filter((x) => x.idMenu === idMenu).reduce((j, x) => j + x.jumlah, 0);
+  const aturBaris = (kunci, jumlah) => {
     setGalat('');
-    setKeranjang((arr) => (jumlah <= 0 ? arr.filter((x) => x.idMenu !== idMenu) : arr.some((x) => x.idMenu === idMenu) ? arr.map((x) => (x.idMenu === idMenu ? { ...x, jumlah } : x)) : [...arr, { idMenu, jumlah }]));
+    setKeranjang((arr) => (jumlah <= 0 ? arr.filter((x) => x.kunci !== kunci) : arr.map((x) => (x.kunci === kunci ? { ...x, jumlah } : x))));
   };
+  const tambahKe = (m, opsi = [], n = 1) => {
+    setGalat('');
+    const kunci = kunciBaris(m.id, opsi);
+    setKeranjang((arr) => (arr.some((x) => x.kunci === kunci) ? arr.map((x) => (x.kunci === kunci ? { ...x, jumlah: x.jumlah + n } : x)) : [...arr, { kunci, idMenu: m.id, opsi, jumlah: n }]));
+  };
+  const ketukMenu = (m) => (opsiMenu(m).length ? setPilihOpsi(m) : tambahKe(m));
+  const baris = keranjang.map((b) => ({ ...b, item: itemKeranjang(db, [b]).item[0] })).filter((b) => b.item);
   const { item, subtotal } = itemKeranjang(db, keranjang);
   const nomorHp = normalHp(hp);
   const promo = kode.trim() ? cekPromo(db, kode, { subtotal, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '' }) : { diskon: 0, galat: '' };
@@ -69,11 +109,11 @@ export function Kasir({ k }) {
               <div class="grid-menu">
                 ${menu.map(({ menu: m, sisa }) => {
                   const n = jumlahDi(m.id);
-                  return html`<button class=${'ubin-menu' + (n ? ' dipilih' : '') + (sisa === 0 ? ' habis' : '')} key=${m.id} onClick=${() => atur(m.id, n + 1)} aria-label=${`Tambah ${m.nama} ke keranjang`}>
-                    <span class="foto-ubin"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} />${n > 0 && html`<i class="jumlah-ubin">${n}</i>`}</span>
+                  return html`<button class=${'ubin-menu' + (n ? ' dipilih' : '') + (sisa === 0 ? ' habis' : '')} key=${m.id} onClick=${() => ketukMenu(m)} aria-label=${`Tambah ${m.nama} ke keranjang`}>
+                    <span class="foto-ubin"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} />${diskonBerlaku(m) ? html`<i class="label-diskon">-${diskonBerlaku(m)}%</i>` : ''}${n > 0 && html`<i class="jumlah-ubin">${n}</i>`}</span>
                     <b>${m.nama}</b>
-                    <span class="harga-ubin">${rupiah(m.harga)}</span>
-                    <small>${sisa === null ? '' : sisa <= 0 ? 'Stok habis' : `Sisa ${sisa}`}</small>
+                    <span class="harga-ubin">${rupiah(hargaJual(m))}${diskonBerlaku(m) ? html` <s>${rupiah(m.harga)}</s>` : ''}</span>
+                    <small>${opsiMenu(m).length ? 'Ada pilihan · ' : ''}${sisa === null ? '' : sisa <= 0 ? 'Stok habis' : `Sisa ${sisa}`}</small>
                   </button>`;
                 })}
               </div>
@@ -81,13 +121,13 @@ export function Kasir({ k }) {
             <section class="kartu kolom keranjang" aria-labelledby="h-keranjang">
               <h2 class="judul-kecil" id="h-keranjang">Keranjang</h2>
               ${item.length === 0 && html`<p class="bantu">Ketuk menu untuk menambahkan.</p>`}
-              ${item.map(
-                (i) => html`<div class="baris-keranjang" key=${i.idMenu}>
-                  <span class="teks"><b>${i.nama}</b><small>${rupiah(i.harga)}</small></span>
+              ${baris.map(
+                ({ kunci, item: i }) => html`<div class="baris-keranjang" key=${kunci}>
+                  <span class="teks"><b>${i.nama}</b>${i.opsi && i.opsi.length ? html`<small class="teks-opsi">+ ${i.opsi.join(', ')}</small>` : ''}<small>${rupiah(i.harga)}</small></span>
                   <span class="stepper">
-                    <button aria-label=${'Kurangi ' + i.nama} onClick=${() => atur(i.idMenu, i.jumlah - 1)}><${Ikon} nama="minus" ukuran=${16} /></button>
-                    <output aria-label=${'Jumlah ' + i.nama}>${i.jumlah}</output>
-                    <button aria-label=${'Tambah ' + i.nama} onClick=${() => atur(i.idMenu, i.jumlah + 1)}><${Ikon} nama="plus" ukuran=${16} /></button>
+                    <button aria-label=${'Kurangi ' + namaItem(i)} onClick=${() => aturBaris(kunci, i.jumlah - 1)}><${Ikon} nama="minus" ukuran=${16} /></button>
+                    <output aria-label=${'Jumlah ' + namaItem(i)}>${i.jumlah}</output>
+                    <button aria-label=${'Tambah ' + namaItem(i)} onClick=${() => aturBaris(kunci, i.jumlah + 1)}><${Ikon} nama="plus" ukuran=${16} /></button>
                   </span>
                   <b class="subtotal">${rupiah(i.harga * i.jumlah)}</b>
                 </div>`,
@@ -113,5 +153,6 @@ export function Kasir({ k }) {
             </section>
           </div>`}
     </div>
+    ${pilihOpsi && html`<${DialogOpsi} m=${pilihOpsi} onTutup=${() => setPilihOpsi(null)} onTambah=${(opsi, n) => (tambahKe(pilihOpsi, opsi, n), setPilihOpsi(null))} />`}
   <//>`;
 }

@@ -527,7 +527,8 @@ export function dataPaket(db, idPaket) {
     const d = dataHPP(db, i.idResep);
     const ada = d && d.eksperimen;
     const packing = ada && Number.isFinite(d.packingPorsi) ? d.packingPorsi : 0;
-    const biayaProduksi = ada ? d.hppJual - packing : NaN;
+    // Bawaan: packing resep dibuang (paket punya packing sendiri). Dicentang: packing resep tetap dihitung.
+    const biayaProduksi = ada ? d.hppJual - (i.pakaiPacking ? 0 : packing) : NaN;
     const alasan = !d ? 'resepnya sudah dihapus' : !d.eksperimen ? 'belum punya eksperimen' : !Number.isFinite(biayaProduksi) ? 'jumlah porsinya belum diisi' : '';
     return {
       ...i,

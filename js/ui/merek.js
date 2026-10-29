@@ -20,5 +20,5 @@ export function terapkanMerekDokumen({ nama, logo }) {
   const ikon = tautanIkon();
   const bawaan = !logo || logo === LOGO_BAWAAN;
   ikon.setAttribute('href', bawaan ? LOGO_BAWAAN : logo);
-  ikon.setAttribute('type', bawaan ? 'image/svg+xml' : /^data:(image\/[a-z+.-]+)/i.exec(logo)?.[1] || 'image/png');
+  ikon.setAttribute('type', bawaan ? 'image/png' : /^data:(image\/[a-z+.-]+)/i.exec(logo)?.[1] || (/\.svg(\?|$)/i.test(logo) ? 'image/svg+xml' : 'image/png'));
 }

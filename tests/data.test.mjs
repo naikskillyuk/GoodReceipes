@@ -362,6 +362,11 @@ test('paket: HPP jual tiap resep tanpa packing + packing paket sekali', async ()
   assert.equal(Math.round(p.hppPaket), Math.round((d.hppJual - d.packingPorsi) * 2 + 2500));
   assert.equal(p.bermasalah.length, 0);
 
+  // Dicentang "tetap pakai packing": packing resep ikut dihitung (mis. risol tetap diberi plastik).
+  db.simpan('IsiPaket', { ...db.ambil('IsiPaket', isi.id), pakaiPacking: true });
+  p = repo.dataPaket(db, paket.id);
+  assert.equal(Math.round(p.hppPaket), Math.round(d.hppJual * 2 + 2500));
+
   // Menghapus resep mengeluarkannya dari paket.
   repo.hapusResep(db, brownies);
   p = repo.dataPaket(db, paket.id);

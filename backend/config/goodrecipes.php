@@ -110,7 +110,7 @@ return [
         ],
         'IsiPaket' => [
             'db' => 'isi_paket',
-            'kolom' => ['id' => 't', 'idPaket' => 't', 'idResep' => 't', 'jumlah' => 'n', 'urutan' => 'n'],
+            'kolom' => ['id' => 't', 'idPaket' => 't', 'idResep' => 't', 'jumlah' => 'n', 'urutan' => 'n', 'pakaiPacking' => 'b'],
         ],
         'BiayaPaket' => [
             'db' => 'biaya_paket',
@@ -137,7 +137,7 @@ return [
             'db' => 'menu',
             'kolom' => [
                 'id' => 't', 'jenis' => 't', 'idRef' => 't', 'nama' => 't', 'harga' => 'n', 'fotoUrl' => 't', 'keterangan' => 't',
-                'aktif' => 'b', 'online' => 'b', 'urutan' => 'n',
+                'aktif' => 'b', 'online' => 'b', 'urutan' => 'n', 'diskon' => 'n', 'diskonSampai' => 'n', 'opsi' => 'j',
             ],
         ],
         'Pesanan' => [
@@ -187,7 +187,7 @@ return [
     'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'],
 
     // Kolom angka berisi waktu (ms): disimpan sebagai bilangan bulat besar.
-    'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal'],
+    'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal', 'diskonSampai'],
 
     // Mayar (payment gateway). Kunci API milik tiap akun dapur disimpan terenkripsi di tabel users.
     'mayar' => [

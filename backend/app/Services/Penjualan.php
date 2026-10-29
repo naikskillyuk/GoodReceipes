@@ -212,6 +212,60 @@ class Penjualan
         return [max(0, min($subtotal, $diskon)), $p, ''];
     }
 
+    /** Diskon produk yang berlaku (persen). Sama dengan diskonBerlaku di js/lib/toko.js. */
+    public static function diskonBerlaku(array $m): float
+    {
+        $d = max(0.0, min(90.0, (float) ($m['diskon'] ?? 0)));
+        $sampai = (int) ($m['diskonSampai'] ?? 0);
+
+        return $d > 0 && (! $sampai || self::sekarang() <= $sampai) ? $d : 0.0;
+    }
+
+    /** Harga jual setelah diskon produk, dibulatkan ke Rp 100. */
+    public static function hargaJual(array $m): float
+    {
+        $harga = (float) ($m['harga'] ?? 0);
+        $d = self::diskonBerlaku($m);
+
+        return $d > 0 ? max(0.0, round($harga * (100 - $d) / 100 / 100) * 100) : $harga;
+    }
+
+    /** Pilihan tambahan berbayar menu: [{nama, harga}]. Sama dengan opsiMenu di js/lib/toko.js. */
+    public static function opsiMenu(array $m): array
+    {
+        $hasil = [];
+        $lihat = [];
+        foreach (is_array($m['opsi'] ?? null) ? $m['opsi'] : [] as $o) {
+            $nama = is_array($o) ? mb_substr(trim((string) ($o['nama'] ?? '')), 0, 40) : '';
+            if ($nama === '' || isset($lihat[mb_strtolower($nama)])) {
+                continue;
+            }
+            $lihat[mb_strtolower($nama)] = true;
+            $hasil[] = ['nama' => $nama, 'harga' => max(0, (int) round((float) ($o['harga'] ?? 0)))];
+        }
+
+        return array_slice($hasil, 0, 12);
+    }
+
+    /** Promo yang sedang berlaku di link pemesanan, untuk banner etalase (tanpa info kuota). */
+    private function promoTampil(int $id): array
+    {
+        $sekarang = self::sekarang();
+        $daftar = $this->semua($id, 'Promo', fn ($p) => $p['aktif'] && $p['online'] && trim((string) $p['kode']) !== ''
+            && (! $p['mulai'] || $p['mulai'] <= $sekarang) && (! $p['sampai'] || $p['sampai'] >= $sekarang));
+
+        return array_map(fn ($p) => [
+            'kode' => Str::upper(trim((string) $p['kode'])),
+            'nama' => mb_substr((string) $p['nama'], 0, 60),
+            'jenis' => $p['jenis'] === 'persen' ? 'persen' : 'rupiah',
+            'nilai' => (float) $p['nilai'],
+            'minBelanja' => (float) $p['minBelanja'],
+            'maksDiskon' => (float) $p['maksDiskon'],
+            'untuk' => (string) ($p['untuk'] ?: 'semua'),
+            'sampai' => (int) ($p['sampai'] ?: 0),
+        ], array_slice($daftar, 0, 6));
+    }
+
     // ---------- Link pemesanan pembeli (tanpa login) ----------
 
     /** Baris setelan toko dari token link, beserta id pemilik data. */
@@ -305,7 +359,10 @@ class Penjualan
                 'kategori' => $m['jenis'] === 'paket' ? 'Paket' : (($katResep[$m['idRef']] ?? '') ?: 'Lainnya'),
                 'id' => $m['id'],
                 'nama' => (string) $m['nama'],
-                'harga' => (float) $m['harga'],
+                'harga' => self::hargaJual($m),
+                'hargaAsli' => (float) $m['harga'],
+                'diskon' => self::diskonBerlaku($m),
+                'opsi' => self::opsiMenu($m),
                 'fotoUrl' => (string) $m['fotoUrl'],
                 'keterangan' => mb_substr((string) $m['keterangan'], 0, 300),
                 'sisa' => $this->sisaMenu($this->isiMenu($id, $m, $isiPaket), $stok),
@@ -329,6 +386,8 @@ class Penjualan
             'mayar' => $mayar,
             'bayarManual' => $mayar ? null : $manual,
             'testimoni' => $this->testimoniTampil($id),
+            'promo' => $this->promoTampil($id),
+            'latarUrl' => app(Situs::class)->tampilan()['latarUrl'],
             'menu' => $menu,
         ];
     }
@@ -375,8 +434,16 @@ class Penjualan
             if (! $m || $jumlah < 1 || $jumlah > config('goodrecipes.maks_jumlah_per_item')) {
                 return ['ok' => false, 'galat' => 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.'];
             }
-            $item[] = ['idMenu' => $m['id'], 'nama' => (string) $m['nama'], 'harga' => (float) $m['harga'], 'jumlah' => $jumlah];
-            $subtotal += (float) $m['harga'] * $jumlah;
+            // Pilihan tambahan: hanya yang memang ada di menu, harganya dari server.
+            $mau = array_map(fn ($x) => mb_strtolower(trim((string) $x)), is_array($it['opsi'] ?? null) ? array_filter($it['opsi'], 'is_string') : []);
+            $opsi = array_values(array_filter(self::opsiMenu($m), fn ($o) => in_array(mb_strtolower($o['nama']), $mau, true)));
+            if (count($opsi) !== count(array_unique($mau))) {
+                return ['ok' => false, 'galat' => 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.'];
+            }
+            $harga = self::hargaJual($m) + array_sum(array_column($opsi, 'harga'));
+            $item[] = ['idMenu' => $m['id'], 'nama' => (string) $m['nama'], 'harga' => $harga, 'jumlah' => $jumlah]
+                + ($opsi ? ['opsi' => array_column($opsi, 'nama')] : []);
+            $subtotal += $harga * $jumlah;
         }
         // Cek stok untuk semua item sekaligus (paket ikut dihitung).
         $stok = $this->stokMakanan($id);

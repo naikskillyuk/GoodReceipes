@@ -240,6 +240,48 @@ export function riwayatMakanan(db, idResep) {
 
 // ---------- Menu jual ----------
 
+/** Diskon produk yang sedang berlaku (persen, 0 bila tidak ada / sudah lewat batas). */
+export function diskonBerlaku(menu, sekarang = Date.now()) {
+  const d = Math.max(0, Math.min(90, Number(menu && menu.diskon) || 0));
+  if (!d) return 0;
+  const sampai = Number(menu.diskonSampai) || 0;
+  return sampai && sekarang > sampai ? 0 : d;
+}
+
+/** Pilihan tambahan berbayar sebuah menu: [{nama, harga}] (maks. 12, nama unik). */
+export function opsiMenu(menu) {
+  const daftar = Array.isArray(menu && menu.opsi) ? menu.opsi : [];
+  const lihat = new Set();
+  const hasil = [];
+  for (const o of daftar) {
+    const nama = String((o && o.nama) || '').trim().slice(0, 40);
+    if (!nama || lihat.has(nama.toLowerCase())) continue;
+    lihat.add(nama.toLowerCase());
+    hasil.push({ nama, harga: Math.max(0, Math.round(Number(o.harga) || 0)) });
+  }
+  return hasil.slice(0, 12);
+}
+
+/** Pilihan yang dipilih (hanya yang ada di menu, urutan seperti di menu) dan tambahan harganya. */
+export function pilihOpsi(menu, nama = []) {
+  const mau = new Set((Array.isArray(nama) ? nama : []).map((x) => String(x).trim().toLowerCase()));
+  const opsi = opsiMenu(menu).filter((o) => mau.has(o.nama.toLowerCase()));
+  return { opsi: opsi.map((o) => o.nama), tambah: opsi.reduce((j, o) => j + o.harga, 0) };
+}
+
+/** Nama item pesanan beserta pilihannya, mis. "Risol (Digoreng, Tambah keju)". */
+export const namaItem = (i) => (i ? i.nama + (Array.isArray(i.opsi) && i.opsi.length ? ` (${i.opsi.join(', ')})` : '') : '');
+
+/** Kunci baris keranjang: menu yang sama dengan pilihan berbeda = baris berbeda. */
+export const kunciBaris = (idMenu, opsi = []) => idMenu + (opsi.length ? '|' + [...opsi].map((x) => String(x).toLowerCase()).sort().join('|') : '');
+
+/** Harga jual setelah diskon produk, dibulatkan ke Rp 100. Sama dengan Penjualan::hargaJual. */
+export function hargaJual(menu, sekarang = Date.now()) {
+  const harga = Number(menu && menu.harga) || 0;
+  const d = diskonBerlaku(menu, sekarang);
+  return d ? Math.max(0, Math.round((harga * (100 - d)) / 100 / 100) * 100) : harga;
+}
+
 /** Resep yang terpakai untuk 1 menu: {idResep: jumlah}. Paket = isi paketnya. */
 export function isiMenu(db, menu) {
   if (!menu) return {};
@@ -436,7 +478,8 @@ export function nomorPesanan(sekarang = Date.now()) {
 export const SALURAN_PESANAN = ['WhatsApp', 'Telepon', 'Instagram', 'Datang langsung', 'Lainnya'];
 
 /**
- * keranjang = [{idMenu, jumlah}] -> item pesanan dengan nama dan harga menu saat ini.
+ * keranjang = [{idMenu, jumlah, opsi?}] -> item pesanan dengan nama dan harga menu saat ini
+ * (harga setelah diskon + pilihan tambahan).
  * Item di luar menu: {nama, harga, jumlah} tanpa idMenu (tidak memotong stok).
  * Baris yang membawa harga sendiri (mis. saat mengubah pesanan lama) memakai harga itu.
  */
@@ -452,8 +495,9 @@ export function itemKeranjang(db, keranjang) {
     }
     const m = db.ambil('Menu', k.idMenu);
     if (!m && k.nama === undefined) continue;
-    const harga = k.harga !== undefined ? Number(k.harga) || 0 : Number(m.harga) || 0;
-    item.push({ idMenu: k.idMenu, nama: m ? m.nama : k.nama, harga, jumlah });
+    const pilih = m ? pilihOpsi(m, k.opsi) : { opsi: Array.isArray(k.opsi) ? k.opsi : [], tambah: 0 };
+    const harga = k.harga !== undefined ? Number(k.harga) || 0 : hargaJual(m) + pilih.tambah;
+    item.push({ idMenu: k.idMenu, nama: m ? m.nama : k.nama, harga, jumlah, ...(pilih.opsi.length ? { opsi: pilih.opsi } : {}) });
   }
   return { item, subtotal: item.reduce((j, i) => j + i.harga * i.jumlah, 0) };
 }

@@ -155,7 +155,8 @@ class TokoTest extends TestCase
             'Resep' => [$this->baris(['id' => 'res_a', 'nama' => 'Brownies', 'idKategori' => 'kat_kue'])],
             'Kategori' => [$this->baris(['id' => 'kat_kue', 'nama' => 'Kue'])],
             'MutasiMakanan' => [$this->baris(['id' => 'mmk_p1', 'idResep' => 'res_a', 'jumlah' => 10, 'jenis' => 'produksi'])],
-            'Menu' => [$this->baris(['id' => 'mnu_a', 'jenis' => 'resep', 'idRef' => 'res_a', 'nama' => 'Brownies', 'harga' => 8000, 'aktif' => true, 'online' => true])],
+            'Menu' => [$this->baris(['id' => 'mnu_a', 'jenis' => 'resep', 'idRef' => 'res_a', 'nama' => 'Brownies', 'harga' => 8000, 'aktif' => true, 'online' => true, 'diskon' => 25,
+                'opsi' => [['nama' => 'Digoreng', 'harga' => 2000], ['nama' => 'Tambah keju', 'harga' => 3000]]])],
             'Setelan' => [$this->baris(['id' => 'stl_toko', 'namaToko' => 'Toko Uji', 'tokenToko' => 'token-toko-manual-1', 'tokoBuka' => true, 'waToko' => '0812 1111 2222',
                 'rekening' => [['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa'], ['bank' => '', 'nomor' => '']], 'qrisUrl' => 'https://contoh.test/qris.png'])],
             'Testimoni' => [
@@ -171,6 +172,7 @@ class TokoTest extends TestCase
         $this->assertSame([['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa']], $info['bayarManual']['rekening']);
         $this->assertSame('https://contoh.test/qris.png', $info['bayarManual']['qrisUrl']);
         $this->assertSame('Kue', $info['menu'][0]['kategori']);
+        $this->assertEquals([6000, 8000, 25], [$info['menu'][0]['harga'], $info['menu'][0]['hargaAsli'], $info['menu'][0]['diskon']], 'diskon produk 25%');
         $this->assertSame(['Sari'], array_column($info['testimoni'], 'nama'), 'hanya testimoni yang tayang');
 
         // Halaman depan situs (tanpa token) = toko utama yang sudah aktif.
@@ -178,9 +180,16 @@ class TokoTest extends TestCase
         $this->assertTrue($depan['ok'], json_encode($depan));
         $this->assertSame('Toko Uji', $depan['namaToko']);
 
-        $pesan = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-manual-1', 'nama' => 'Budi', 'hp' => '0812345678', 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 2]]]);
+        $this->assertSame([['nama' => 'Digoreng', 'harga' => 2000], ['nama' => 'Tambah keju', 'harga' => 3000]], $info['menu'][0]['opsi']);
+        $palsu = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-manual-1', 'nama' => 'Budi', 'hp' => '0812345678', 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1, 'opsi' => ['Emas']]]]);
+        $this->assertFalse($palsu['ok'], 'pilihan yang tidak ada ditolak');
+        $pesan = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-manual-1', 'nama' => 'Budi', 'hp' => '0812345678',
+            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 2], ['idMenu' => 'mnu_a', 'jumlah' => 1, 'opsi' => ['digoreng']]]]);
         $this->assertTrue($pesan['ok'], json_encode($pesan));
         $this->assertSame('', $pesan['link']);
+        $this->assertEquals(12000 + 8000, $pesan['total'], 'harga diskon dari server: 2 x 6000 + 1 x (6000 + digoreng 2000)');
+        $item = json_decode(\DB::table('pesanan')->where('id', $pesan['idPesanan'])->value('item'), true);
+        $this->assertSame(['Digoreng'], $item[1]['opsi']);
         $this->assertSame('transfer', \DB::table('pembayaran')->where('id_pesanan', $pesan['idPesanan'])->value('metode'));
         $st = $this->api(['aksi' => 'statusPesanan', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan']]);
         $this->assertFalse($st['lunas']);

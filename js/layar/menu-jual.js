@@ -1,11 +1,12 @@
 // Menu jual: resep dan paket yang dijual di kasir dan di link pemesanan. Akun dapur mengatur harga; toko hanya melihat.
 
 import { html, useState } from '../../vendor/preact-htm.js';
-import { Kerangka, Hero, Stat, Kosong, Foto, InputRupiah } from '../ui/komponen.js';
+import { Kerangka, Hero, Stat, Kosong, Foto, InputRupiah, InputAngka } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
-import { daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoMenu } from '../lib/toko.js';
+import { daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoMenu, hargaJual, diskonBerlaku, opsiMenu } from '../lib/toko.js';
+import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
 import { dataHPP, dataPaket } from '../lib/repo.js';
 import { marginDariHarga } from '../lib/hpp.js';
 import { rupiah, persen } from '../lib/util.js';
@@ -25,10 +26,42 @@ function TeksSisa({ sisa }) {
   return html`<small class=${sisa <= 0 ? 'teks-buruk' : ''}>${sisa <= 0 ? 'stok habis' : `sisa ${sisa}`}</small>`;
 }
 
+/** Pilihan tambahan berbayar (varian), mis. "Digoreng" +2.000, "Tambah keju" +3.000. Disimpan saat kolom ditinggalkan. */
+function EditorOpsi({ m, ubah }) {
+  const [baris, setBaris] = useState(() => opsiMenu(m));
+  const simpan = (daftar) => ubah({ opsi: daftar.filter((o) => String(o.nama || '').trim()).map((o) => ({ nama: String(o.nama).trim().slice(0, 40), harga: Math.max(0, Math.round(Number(o.harga) || 0)) })) });
+  const atur = (i, patch, langsung) => {
+    const baru = baris.map((o, j) => (j === i ? { ...o, ...patch } : o));
+    setBaris(baru);
+    if (langsung) simpan(baru);
+  };
+  const hapus = (i) => {
+    const baru = baris.filter((_, j) => j !== i);
+    setBaris(baru);
+    simpan(baru);
+  };
+  return html`<details class="opsi-menu" open=${baris.length > 0}>
+    <summary>Pilihan tambahan / varian${baris.length ? ` (${baris.length})` : ''}</summary>
+    <p class="bantu">Pembeli dan kasir bisa mencentang beberapa pilihan; harganya ditambahkan ke harga menu.</p>
+    ${baris.map(
+      (o, i) => html`<div class="baris-opsi" key=${i}>
+        <input class="input kecil" maxlength="40" placeholder="mis. Digoreng / Tambah keju" aria-label=${`Nama pilihan ${i + 1} ${m.nama}`} value=${o.nama} onInput=${(e) => atur(i, { nama: e.target.value })} onChange=${() => simpan(baris)} />
+        <${InputRupiah} kelas="input kecil" aria-label=${`Harga pilihan ${i + 1} ${m.nama}`} placeholder="+ Rp" nilai=${o.harga} onUbah=${(n) => atur(i, { harga: n }, true)} />
+        <button class="ikon-btn kecil" aria-label=${'Hapus pilihan ' + (o.nama || i + 1)} onClick=${() => hapus(i)}><${Ikon} nama="sampah" ukuran=${16} /></button>
+      </div>`,
+    )}
+    ${baris.length < 12 && html`<button class="btn kecil" onClick=${() => setBaris([...baris, { nama: '', harga: 0 }])}><${Ikon} nama="plus" ukuran=${16} />Tambah pilihan</button>`}
+  </details>`;
+}
+
 function BarisMenuDapur({ k, m, sisa }) {
   const { db } = k;
   const hpp = hppMenu(db, m);
-  const mg = Number.isFinite(hpp) && m.harga > 0 ? marginDariHarga(hpp, m.harga) : null;
+  const harga = hargaJual(m);
+  const diskon = diskonBerlaku(m);
+  const lewat = (Number(m.diskon) || 0) > 0 && !diskon;
+  // Margin dihitung dari harga yang benar-benar dibayar pembeli (setelah diskon).
+  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
   const ubah = (patch) => db.simpan('Menu', { ...db.ambil('Menu', m.id), ...patch });
   const hapus = async () => {
     const ya = await tanya({ judul: `Keluarkan “${m.nama}” dari menu?`, teks: 'Resep/paketnya tidak terhapus. Pesanan lama tetap tersimpan.', ya: 'Keluarkan', bahaya: true });
@@ -49,6 +82,13 @@ function BarisMenuDapur({ k, m, sisa }) {
           ${Number.isFinite(hpp) && html`<small>HPP ${rupiah(hpp)}${mg ? html` · margin <b class=${mg.marginPersen < 0 ? 'teks-buruk' : ''}>${persen(mg.marginPersen)}</b>` : ''}</small>`}
         </div>
       </div>
+      <div class="baris-diskon">
+        <label class="bidang"><span>Diskon (%)</span><${InputAngka} kelas="input kecil" aria-label=${'Diskon ' + m.nama} nilai=${m.diskon || 0} onUbah=${(n) => ubah({ diskon: Math.max(0, Math.min(90, Math.round(n) || 0)) })} placeholder="0" /></label>
+        <label class="bidang"><span>Berlaku sampai (opsional)</span><input class="input kecil" type="date" aria-label=${'Diskon sampai ' + m.nama} value=${m.diskonSampai ? keInputWaktu(m.diskonSampai).slice(0, 10) : ''} onChange=${(e) => ubah({ diskonSampai: e.target.value ? dariInputWaktu(e.target.value + 'T23:59') : 0 })} /></label>
+      </div>
+      ${diskon > 0 && html`<p class="bantu teks-baik">Harga setelah diskon ${diskon}%: <b>${rupiah(harga)}</b> (dari ${rupiah(m.harga)})${mg && mg.marginPersen < 0 ? html` · <b class="teks-buruk">rugi, di bawah HPP</b>` : ''}</p>`}
+      ${lewat && html`<p class="bantu teks-buruk">Masa diskon sudah lewat; harga normal berlaku. <button class="tautan-kecil" onClick=${() => ubah({ diskon: 0, diskonSampai: 0 })}>Hapus diskon</button></p>`}
+      <${EditorOpsi} m=${m} ubah=${ubah} />
       <input class="input kecil" aria-label=${'Keterangan ' + m.nama} maxlength="200" placeholder="Keterangan singkat untuk pembeli (opsional)" value=${m.keterangan || ''} onChange=${(e) => ubah({ keterangan: e.target.value.trim() })} />
       <div class="baris-saklar">
         <label class="saklar"><input type="checkbox" checked=${!!m.aktif} onChange=${(e) => ubah({ aktif: e.target.checked })} /><span>Dijual</span></label>
@@ -74,7 +114,7 @@ export function MenuJual({ k }) {
 
   return html`<${Kerangka} k=${k} aktif="menu">
     <${Hero} warna="var(--hijau)" label="Toko" judul="Menu jual" kembali="/" stat=${html`<${Stat} nilai=${daftar.filter((d) => d.menu.aktif).length} label="dijual" />`}>
-      <p class="hero-sub">${dapur ? 'Harga saran diambil dari HPP Jual / paket. Menu yang dijual muncul di Kasir; yang ditandai online muncul di link pemesanan.' : 'Harga diatur oleh akun dapur.'}</p>
+      <p class="hero-sub">${dapur ? 'Harga saran diambil dari HPP Jual / paket. Isi Diskon (%) untuk harga coret di etalase dan kasir. Menu yang dijual muncul di Kasir; yang ditandai online muncul di etalase.' : 'Harga diatur oleh akun dapur.'}</p>
     <//>
     <div class="isi">
       ${dapur &&
@@ -98,7 +138,7 @@ export function MenuJual({ k }) {
             : html`<div class=${'kartu-menu' + (m.aktif ? '' : ' mati')} key=${m.id}>
                 <span class="foto-menu"><${Foto} src=${m.fotoUrl} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} /></span>
                 <div class="kolom" style="gap:4px;flex:1;min-width:0"><b>${m.nama}</b><span class="teks-kecil">${m.aktif ? (m.online ? 'Dijual · online' : 'Dijual di toko') : 'Tidak dijual'}</span><${TeksSisa} sisa=${sisa} /></div>
-                <b class="harga-menu">${rupiah(m.harga)}</b>
+                <b class="harga-menu">${rupiah(hargaJual(m))}${diskonBerlaku(m) ? html`<br /><s class="teks-kecil">${rupiah(m.harga)}</s>` : ''}</b>
               </div>`,
         )}
       </div>
