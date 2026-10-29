@@ -113,6 +113,18 @@ export async function ubahNamaAkun(db, nama, opsi) {
   return jawab.pengguna;
 }
 
+/** Logo dan foto latar halaman Login seluruh situs (hanya pemilik toko utama yang boleh mengubah). */
+export function infoTampilanSitus(db, opsi) {
+  return panggilApi(alamatServer(db), { aksi: 'infoTampilanSitus', kunci: db.pengaturan.kunci }, opsi);
+}
+
+/** jenis 'logo' | 'latar'; gambar = data URL baru, '' = kembali ke bawaan. Tampilan di perangkat ini ikut diperbarui. */
+export async function aturTampilanSitus(db, jenis, gambar, opsi) {
+  const j = await panggilApi(alamatServer(db), { aksi: 'aturTampilanSitus', kunci: db.pengaturan.kunci, jenis, gambar }, { batasWaktu: 60000, ...opsi });
+  db.aturPengaturan({ situs: { logoUrl: String(j.logoUrl || ''), latarUrl: String(j.latarUrl || '') } });
+  return j;
+}
+
 export function gantiSandiAkun(db, { lama, baru }, opsi) {
   return panggilApi(alamatServer(db), { aksi: 'gantiSandi', kunci: db.pengaturan.kunci, lama, baru }, opsi);
 }

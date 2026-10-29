@@ -210,4 +210,34 @@ class TokoTest extends TestCase
         $this->assertSame(1, \DB::table('testimoni')->where('id_pesanan', $pesan['idPesanan'])->count(), 'satu testimoni per pesanan');
         $this->assertCount(1, $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-manual-1'])['testimoni']);
     }
+
+    public function test_tampilan_login_hanya_pemilik_toko_utama(): void
+    {
+        [, $kunci] = $this->dapur();
+        $lain = app(Akun::class)->buat('Toko Lain', 'lain@uji.test', 'sandi-lain-12345', ['lunas' => true]);
+        $kunciLain = $this->api(['aksi' => 'masuk', 'login' => 'lain@uji.test', 'kataSandi' => 'sandi-lain-12345'])['sesi'];
+        \DB::table('pengaturan_situs')->insert(['kunci' => 'latar_url', 'nilai' => 'https://contoh.test/latar.jpg', 'created_at' => now(), 'updated_at' => now()]);
+
+        // Belum ada toko aktif: akun admin pertama yang boleh.
+        $this->assertTrue($this->api(['aksi' => 'infoTampilanSitus', 'kunci' => $kunci])['bolehUbah']);
+        $this->assertFalse($this->api(['aksi' => 'infoTampilanSitus', 'kunci' => $kunciLain])['bolehUbah']);
+        $tolak = $this->api(['aksi' => 'aturTampilanSitus', 'kunci' => $kunciLain, 'jenis' => 'latar', 'gambar' => '']);
+        $this->assertFalse($tolak['ok']);
+        $this->assertSame('https://contoh.test/latar.jpg', $this->api(['aksi' => 'infoSitus'])['latarUrl']);
+
+        // Toko lain mengaktifkan toko online: dia pemilik toko utama sekarang.
+        $this->api(['aksi' => 'sinkron', 'kunci' => $kunciLain, 'sejak' => 0, 'baris' => [
+            'Setelan' => [$this->baris(['id' => 'stl_toko', 'tokenToko' => 'token-toko-lain-123', 'tokoBuka' => true])],
+        ]]);
+        $this->assertFalse($this->api(['aksi' => 'infoTampilanSitus', 'kunci' => $kunci])['bolehUbah']);
+        $hapus = $this->api(['aksi' => 'aturTampilanSitus', 'kunci' => $kunciLain, 'jenis' => 'latar', 'gambar' => '']);
+        $this->assertTrue($hapus['ok'], json_encode($hapus));
+        $this->assertSame('', $this->api(['aksi' => 'infoSitus'])['latarUrl']);
+        $this->assertFalse($this->api(['aksi' => 'aturTampilanSitus', 'kunci' => $kunciLain, 'jenis' => 'latar', 'gambar' => 'bukan-gambar'])['ok']);
+
+        // TOKO_UTAMA_EMAIL menentukan pemiliknya.
+        config(['goodrecipes.toko_utama_email' => 'dapur@uji.test']);
+        $this->assertTrue($this->api(['aksi' => 'infoTampilanSitus', 'kunci' => $kunci])['bolehUbah']);
+        $this->assertFalse($this->api(['aksi' => 'infoTampilanSitus', 'kunci' => $kunciLain])['bolehUbah']);
+    }
 }

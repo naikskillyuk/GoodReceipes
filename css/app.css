@@ -5143,3 +5143,21 @@ details.pembeli summary {
 .et-kaki a {
   color: var(--e-muted);
 }
+.pratinjau-login {
+  display: block;
+  border-radius: 16px;
+  border: 1px solid var(--garis);
+  background: var(--kartu-2);
+  object-fit: cover;
+}
+.pratinjau-login.pl-logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  padding: 8px;
+}
+.pratinjau-login.pl-latar {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 16 / 10;
+}

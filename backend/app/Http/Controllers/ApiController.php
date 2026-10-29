@@ -110,7 +110,7 @@ class ApiController extends Controller
             }
 
             // Aksi khusus akun dapur (pemilik usaha).
-            $khususDapur = ['akunToko', 'buatAkunToko', 'ubahAkunToko', 'hapusAkunToko', 'infoMayar', 'aturMayar'];
+            $khususDapur = ['akunToko', 'buatAkunToko', 'ubahAkunToko', 'hapusAkunToko', 'infoMayar', 'aturMayar', 'infoTampilanSitus', 'aturTampilanSitus'];
             if ($user->adalahToko() && in_array($aksi, $khususDapur, true)) {
                 return $this->keluar(['ok' => false, 'galat' => 'Hanya akun dapur yang bisa melakukan ini.']);
             }
@@ -130,6 +130,8 @@ class ApiController extends Controller
                 'ubahAkunToko' => $akun->ubahToko($user, $req['id'] ?? null, array_intersect_key($req, array_flip(['nama', 'aktif', 'kataSandi']))),
                 'hapusAkunToko' => $akun->hapusToko($user, $req['id'] ?? null),
                 'infoMayar' => $this->infoMayar($request, $user),
+                'infoTampilanSitus' => $situs->tampilan() + ['ok' => true, 'bolehUbah' => $this->pemilikSitus($user, $jual)],
+                'aturTampilanSitus' => $this->aturTampilanSitus($user, $req, $situs, $foto, $jual),
                 'aturMayar' => $this->aturMayar($request, $user, $mayar, $req),
                 'bayarMayar' => $jual->bayarMayarKasir($user, $req),
                 'cekBayar' => $jual->cekBayar($user, $req['idPembayaran'] ?? null),
@@ -172,6 +174,48 @@ class ApiController extends Controller
     private function alamatWebhook(Request $request, User $user): string
     {
         return $user->token_webhook ? rtrim($request->getSchemeAndHttpHost(), '/').'/api/mayar/'.$user->token_webhook : '';
+    }
+
+    /**
+     * Logo dan foto latar halaman Login berlaku untuk seluruh situs, jadi hanya pemilik toko utama yang boleh
+     * mengubahnya: akun dengan email TOKO_UTAMA_EMAIL, atau pemilik toko yang tampil di halaman depan.
+     * Bila belum ada toko yang aktif, akun admin (dapur) pertama.
+     */
+    private function pemilikSitus(User $user, Penjualan $jual): bool
+    {
+        if ($user->adalahToko()) {
+            return false;
+        }
+        $email = (string) config('goodrecipes.toko_utama_email');
+        if ($email !== '') {
+            return strcasecmp($email, (string) $user->email) === 0;
+        }
+        $id = $jual->idTokoUtama() ?? User::whereNull('id_pemilik')->orderBy('id')->value('id');
+
+        return (int) $id === (int) $user->id;
+    }
+
+    /** Ganti (data URL gambar) atau hapus (gambar kosong) logo / foto latar Login dari aplikasi. */
+    private function aturTampilanSitus(User $user, array $req, Situs $situs, Foto $foto, Penjualan $jual): array
+    {
+        if (! $this->pemilikSitus($user, $jual)) {
+            return ['ok' => false, 'galat' => 'Hanya pemilik toko utama yang bisa mengubah tampilan halaman Login.'];
+        }
+        $jenis = is_string($req['jenis'] ?? null) ? $req['jenis'] : '';
+        if (! isset(Situs::KUNCI[$jenis])) {
+            return ['ok' => false, 'galat' => 'Jenis gambar tidak dikenal.'];
+        }
+        $gambar = is_string($req['gambar'] ?? null) ? $req['gambar'] : '';
+        if ($gambar === '') {
+            $situs->atur($jenis, '');
+        } else {
+            if (! preg_match('/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+\/=]+)$/', $gambar, $m)) {
+                return ['ok' => false, 'galat' => 'Pilih gambar PNG, JPG, atau WebP.'];
+            }
+            $situs->atur($jenis, $foto->unggah(0, $m[1], $m[2], 'situs_'.$jenis));
+        }
+
+        return $situs->tampilan() + ['ok' => true, 'bolehUbah' => true];
     }
 
     private function infoMayar(Request $request, User $user): array

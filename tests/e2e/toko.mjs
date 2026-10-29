@@ -151,6 +151,14 @@ try {
   await page.locator('.qris-pilih input[type=file]').setInputFiles(path.join(AKAR, 'icons/icon-192.png'));
   await page.getByRole('button', { name: 'Simpan info pembayaran' }).click();
   await page.getByText('Info pembayaran disimpan.').waitFor();
+  // Tampilan halaman Login (logo + foto latar) diatur dari Pengaturan, bukan panel server.
+  const kartuLogin = page.getByRole('region', { name: 'Tampilan halaman Login' });
+  await kartuLogin.locator('input[type=file]').nth(1).setInputFiles(path.join(AKAR, 'gambar/latar-masuk.jpg'));
+  await kartuLogin.getByRole('button', { name: 'Simpan foto latar' }).click();
+  await page.getByText('Foto latar diganti.').waitFor();
+  const situs = await (await fetch(BASE + '/api', { method: 'POST', body: JSON.stringify({ aksi: 'infoSitus' }) })).json();
+  assert.match(situs.latarUrl, /\/foto\/situs_latar/, 'foto latar Login tersimpan di server untuk semua perangkat');
+  assert.match(await evalDb(page, 'return db.pengaturan.situs.latarUrl'), /\/foto\/situs_latar/);
   await page.getByLabel('WhatsApp toko').fill('0812 7777 8888');
   await page.getByRole('button', { name: 'Simpan data toko' }).click();
   await page.getByPlaceholder('Tempel kunci API di sini').fill('kunci-mayar-uji-yang-panjang-12345');

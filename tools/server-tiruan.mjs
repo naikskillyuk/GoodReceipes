@@ -383,6 +383,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         return statusPesanan(req);
       case 'kirimTestimoni':
         return kirimTestimoni(req);
+      case 'infoSitus':
+        return { ok: true, logoUrl: (keadaan.situs && keadaan.situs.logoUrl) || '', latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '' };
       case 'tiruanLunas': {
         // Pengganti pembeli membayar di Mayar + webhook (hanya di server uji).
         const t = keadaan.mayarTagihan && keadaan.mayarTagihan[req.idMayar];
@@ -404,7 +406,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     // Sisanya wajib login.
     const toko = req.kunci === kunciToko;
     if (req.kunci !== kunci && !toko) return GALAT_SESI;
-    const khususDapur = ['akunToko', 'buatAkunToko', 'ubahAkunToko', 'hapusAkunToko', 'infoMayar', 'aturMayar', 'unggahFoto'];
+    const khususDapur = ['akunToko', 'buatAkunToko', 'ubahAkunToko', 'hapusAkunToko', 'infoMayar', 'aturMayar', 'unggahFoto', 'infoTampilanSitus', 'aturTampilanSitus'];
     if (toko && khususDapur.includes(req.aksi)) return { ok: false, galat: 'Hanya akun dapur yang bisa melakukan ini.' };
     keadaan.akunToko ||= [];
     switch (req.aksi) {
@@ -466,6 +468,23 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       }
       case 'unggahFoto':
         return unggahFoto(req);
+      case 'infoTampilanSitus':
+        return { ok: true, bolehUbah: true, logoUrl: (keadaan.situs && keadaan.situs.logoUrl) || '', latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '' };
+      case 'aturTampilanSitus': {
+        const kunciSitus = { logo: 'logoUrl', latar: 'latarUrl' }[req.aksi === 'aturTampilanSitus' ? req.jenis : ''];
+        if (!kunciSitus) return { ok: false, galat: 'Jenis gambar tidak dikenal.' };
+        keadaan.situs ||= {};
+        if (!req.gambar) keadaan.situs[kunciSitus] = '';
+        else {
+          const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.gambar));
+          if (!m) return { ok: false, galat: 'Pilih gambar PNG, JPG, atau WebP.' };
+          const f = unggahFoto({ mime: m[1], base64: m[2], nama: 'situs_' + req.jenis });
+          if (!f.ok) return f;
+          keadaan.situs[kunciSitus] = f.url;
+        }
+        kabari();
+        return { ok: true, bolehUbah: true, logoUrl: keadaan.situs.logoUrl || '', latarUrl: keadaan.situs.latarUrl || '' };
+      }
       case 'ubahProfil':
         return { ok: true, pengguna: pengguna(req) };
       case 'gantiSandi':

@@ -219,6 +219,12 @@ class Penjualan
      * Toko dari token link pemesanan. Tanpa token = toko utama di halaman depan situs:
      * akun dengan email TOKO_UTAMA_EMAIL bila diisi, selain itu toko pertama yang sudah mengaktifkan toko online.
      */
+    /** Id akun admin pemilik toko utama (yang tampil di halaman depan), atau null bila belum ada. */
+    public function idTokoUtama(): ?int
+    {
+        return $this->tokoDariToken('')['idData'] ?? null;
+    }
+
     private function tokoDariToken(mixed $token): ?array
     {
         $t = is_string($token) ? $token : '';

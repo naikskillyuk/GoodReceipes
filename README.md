@@ -196,6 +196,10 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 
 **Ikon dan nama di layar utama HP tidak ikut berubah.** Keduanya dibaca browser dari berkas `manifest.webmanifest` dan folder `icons/` saat aplikasi dipasang, sehingga tidak bisa diganti dari dalam aplikasi. Untuk mengubahnya: ganti `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (latar penuh), `icon-180.png` (latar penuh), dan `logo.png` (tanpa kotak, untuk halaman Login) dengan logo Anda (ukuran sama), ubah `name` dan `short_name` di `manifest.webmanifest`, jalankan `npm run sw`, terbitkan ulang, lalu hapus dan pasang ulang aplikasinya di HP.
 
+## Logo dan foto halaman Login
+
+Di `/admin` → **Pengaturan → Tampilan halaman Login**: unggah logo dan foto latar, lalu simpan. Berlaku untuk semua perangkat. Hanya pemilik toko utama yang melihat kartu ini (akun dengan email `TOKO_UTAMA_EMAIL`, atau pemilik toko online yang aktif). Panel server lama (`/admin/tampilan` di alamat backend) tetap bisa dipakai.
+
 ## Pembayaran transfer & QRIS (tanpa Mayar)
 
 Bawaan aplikasi: pembayaran non-tunai memakai **rekening bank dan foto QRIS toko**.

@@ -5,8 +5,8 @@ import { Kerangka, Hero, LogoMerek, FotoInput } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { IkonKategori } from '../ui/ikon-kategori.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
-import { kompresLogo } from '../ui/gambar.js';
-import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
+import { kompres, kompresLogo } from '../ui/gambar.js';
+import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI, infoTampilanSitus, aturTampilanSitus } from '../lib/akun.js';
 import { daftarKategori, tambahKategori, pakaiKategori, WARNA_KATEGORI, ambilMerek, simpanMerek, NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
 import { peranAkun, tampilanToko } from '../lib/toko.js';
 import { KartuAkunToko, KartuMayar, KartuTokoOnline, KartuPembayaran } from './pengaturan-toko.js';
@@ -30,6 +30,54 @@ function BarisKategori({ db, kat }) {
 }
 
 /** Nama dan logo aplikasi. Disimpan ke server sehingga ikut tampil di perangkat lain dan di halaman penilai. */
+const kompresLatar = (file) => kompres(file, 1600, 0.82);
+
+/** Satu gambar halaman Login: pilih, simpan ke server, atau kembalikan ke bawaan. */
+function GambarLogin({ k, jenis, judul, bantu, sekarang, kompresFn, onBaru }) {
+  const [gambar, setGambar] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const jalankan = async (isi) => {
+    setSibuk(true);
+    try {
+      onBaru(await aturTampilanSitus(k.db, jenis, isi));
+      setGambar('');
+      tampilToast(isi ? `${judul} diganti.` : `${judul} kembali ke bawaan.`);
+    } catch (e) {
+      tampilToast(e.message || 'Gagal menyimpan gambar.');
+    } finally {
+      setSibuk(false);
+    }
+  };
+  const tampil = gambar || sekarang;
+  return html`<div class="bidang">
+    <span>${judul}</span>
+    ${tampil && html`<img class=${'pratinjau-login pl-' + jenis} src=${tampil} alt=${'Pratinjau ' + judul.toLowerCase()} />`}
+    <${FotoInput} nilai=${gambar} onUbah=${setGambar} judul=${sekarang ? 'Ganti ' + judul.toLowerCase() : 'Pilih ' + judul.toLowerCase()} bantu=${bantu} aksen="var(--hijau)" ikon="gambar" kompresFn=${kompresFn} kelas=${jenis === 'logo' ? 'logo' : ''} />
+    <div class="baris-btn">
+      ${gambar && html`<button class="btn solid" disabled=${sibuk} onClick=${() => jalankan(gambar)}>${sibuk ? 'Menyimpan…' : 'Simpan ' + judul.toLowerCase()}</button>`}
+      ${gambar && html`<button class="btn abu" disabled=${sibuk} onClick=${() => setGambar('')}>Batal</button>`}
+      ${!gambar && sekarang && html`<button class="btn" disabled=${sibuk} onClick=${() => jalankan('')}>Kembalikan bawaan</button>`}
+    </div>
+  </div>`;
+}
+
+/** Logo dan foto latar halaman Login (/admin). Dulu hanya bisa diatur dari panel server. */
+function KartuHalamanLogin({ k }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    infoTampilanSitus(k.db)
+      .then(setInfo)
+      .catch(() => setInfo({ bolehUbah: false }));
+  }, []);
+  if (!info || !info.bolehUbah) return null;
+  return html`<section class="kartu kolom" aria-labelledby="h-halaman-login">
+    <h2 class="judul-kecil" id="h-halaman-login">Tampilan halaman Login</h2>
+    <p class="bantu">Logo dan foto yang tampil di halaman Login admin & kasir (/admin). Logo ini juga dipakai di etalase bila logo di "Nama dan logo aplikasi" kosong.</p>
+    <${GambarLogin} k=${k} jenis="logo" judul="Logo" bantu="PNG persegi, latar transparan paling bagus." sekarang=${info.logoUrl} kompresFn=${kompresLogo} onBaru=${setInfo} />
+    <${GambarLogin} k=${k} jenis="latar" judul="Foto latar" bantu="Foto makanan mendatar (landscape) paling bagus." sekarang=${info.latarUrl} kompresFn=${kompresLatar} onBaru=${setInfo} />
+  </section>`;
+}
+
 function KartuTampilan({ k }) {
   const { db } = k;
   const merek = ambilMerek(db);
@@ -187,6 +235,8 @@ export function Pengaturan({ k }) {
           <${KartuAkun} k=${k} />
 
           <${KartuTampilan} k=${k} />
+
+          <${KartuHalamanLogin} k=${k} />
 
           <${KartuTokoOnline} k=${k} />
 
