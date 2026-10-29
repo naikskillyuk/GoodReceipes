@@ -207,6 +207,45 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     keadaan.mayarTagihan[id] = { jumlah, status: 'unpaid' };
     return { id, link: `/#/tiruan-mayar/${id}` };
   }
+  // Pembayaran manual (rekening + foto QRIS) dan Mayar, sama seperti Penjualan.php.
+  function bayarManual(s) {
+    let r = s.rekening;
+    if (typeof r === 'string') {
+      try {
+        r = JSON.parse(r);
+      } catch {
+        r = [];
+      }
+    }
+    const rekening = (Array.isArray(r) ? r : []).filter((x) => x && String(x.bank || '').trim() && String(x.nomor || '').trim()).slice(0, 5)
+      .map((x) => ({ bank: String(x.bank).trim(), nomor: String(x.nomor).trim(), atasNama: String(x.atasNama || '').trim() }));
+    const qris = String(s.qrisUrl || '');
+    return { rekening, qrisUrl: /^(https?:|\/foto\/)/.test(qris) ? qris : '' };
+  }
+  const adaBayarManual = (m) => m.rekening.length > 0 || !!m.qrisUrl;
+  const pakaiMayar = (s) => benar(s.pakaiMayar, false) && !!(keadaan.mayar && keadaan.mayar.aktif);
+  function testimoniTampil() {
+    return hidup('Testimoni', (t) => benar(t.tampil, false) && String(t.isi || '').trim())
+      .sort((a, b) => angka(b.waktu) - angka(a.waktu))
+      .slice(0, 30)
+      .map((t) => ({ nama: String(t.nama || ''), isi: String(t.isi || ''), bintang: Math.max(1, Math.min(5, angka(t.bintang) || 5)), waktu: angka(t.waktu) }));
+  }
+  function kirimTestimoni(req) {
+    const s = tokoDariToken(req.token);
+    const p = s && tabel('Pesanan')[req.idPesanan];
+    if (!p || benar(p.dihapus, false) || p.sumber !== 'online') return { ok: false, galat: 'Pesanan tidak ditemukan.' };
+    const lunas = hidup('Pembayaran', (b) => b.idPesanan === p.id && b.status === 'lunas').length > 0;
+    if (!lunas || p.status === 'batal') return { ok: false, galat: 'Testimoni bisa dikirim setelah pesanan dibayar.' };
+    const isi = bersihkan(req.isi, 500);
+    if (isi.length < 5) return { ok: false, galat: 'Tulis testimoni minimal beberapa kata.' };
+    const id = 'tst_' + String(p.id).toLowerCase().replace(/[^a-z0-9]/g, '').slice(-40);
+    const lama = tabel('Testimoni')[id];
+    if (lama && !benar(lama.dihapus, false) && benar(lama.tampil, false)) return { ok: false, galat: 'Testimoni untuk pesanan ini sudah tayang. Terima kasih!' };
+    const bintang = Math.max(1, Math.min(5, Math.floor(Number(req.bintang)) || 5));
+    simpanBaris('Testimoni', { id, nama: bersihkan(req.nama, 60) || p.nama, isi, bintang, idPesanan: p.id, tampil: false, sumber: 'pembeli', waktu: Date.now() });
+    kabari();
+    return { ok: true, pesan: 'Terima kasih! Testimoni Anda akan tampil setelah dicek toko.' };
+  }
   function infoToko(req) {
     const s = tokoDariToken(req.token);
     if (!s) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
@@ -217,17 +256,23 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       .map((m) => {
         const isi = Object.entries(isiMenu(m));
         const sisa = isi.length ? Math.min(...isi.map(([r, per]) => Math.floor(Math.max(0, stok[r] || 0) / per))) : null;
-        return { id: m.id, nama: String(m.nama || ''), harga: angka(m.harga), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa };
+        const r = m.jenis === 'paket' ? null : tabel('Resep')[m.idRef];
+        const kat = r && tabel('Kategori')[r.idKategori];
+        const kategori = m.jenis === 'paket' ? 'Paket' : (kat && kat.nama) || 'Lainnya';
+        return { id: m.id, nama: String(m.nama || ''), harga: angka(m.harga), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
       });
     return {
       ok: true,
-      namaToko: s.namaToko || (merek && merek.namaAplikasi) || 'Toko',
+      namaToko: s.namaToko || (merek && merek.namaAplikasi) || 'rasa.terasrumah',
       logoUrl: (merek && merek.logoUrl) || '',
       buka: benar(s.tokoBuka, false),
       alamat: String(s.alamatToko || ''),
       wa: String(s.waToko || ''),
       catatan: String(s.catatanToko || ''),
-      bayarOnline: !!(keadaan.mayar && keadaan.mayar.aktif),
+      bayarOnline: pakaiMayar(s) || adaBayarManual(bayarManual(s)),
+      mayar: pakaiMayar(s),
+      bayarManual: pakaiMayar(s) ? null : bayarManual(s),
+      testimoni: testimoniTampil(),
       menu,
     };
   }
@@ -257,7 +302,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     const s = tokoDariToken(req.token);
     if (!s) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
     if (!benar(s.tokoBuka, false)) return { ok: false, galat: 'Maaf, toko sedang tutup.' };
-    if (!(keadaan.mayar && keadaan.mayar.aktif)) return { ok: false, galat: 'Toko ini belum bisa menerima pembayaran online.' };
+    const mayar = pakaiMayar(s);
+    if (!mayar && !adaBayarManual(bayarManual(s))) return { ok: false, galat: 'Toko ini belum bisa menerima pembayaran online.' };
     const nama = bersihkan(req.nama, 60);
     let hp = String(req.hp || '').replace(/\D/g, '');
     if (hp.startsWith('0')) hp = '62' + hp.slice(1);
@@ -289,8 +335,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     const idPesanan = idAcak('psn');
     const nomor = nomorPesanan();
     simpanBaris('Pesanan', { id: idPesanan, nomor, sumber: 'online', idPelanggan, nama, hp, catatan: bersihkan(req.catatan, 300), item: JSON.stringify(item), subtotal, diskon: promo.diskon, kodePromo: promo.kode, total, status: 'menunggu', oleh: 'Link pemesanan', waktu: sekarang });
-    const link = buatLinkMayar(total);
-    simpanBaris('Pembayaran', { id: idAcak('byr'), idPesanan, metode: 'mayar', jumlah: total, status: 'menunggu', idMayar: link.id, linkMayar: link.link, waktu: sekarang });
+    const link = mayar ? buatLinkMayar(total) : { id: '', link: '' };
+    simpanBaris('Pembayaran', { id: idAcak('byr'), idPesanan, metode: mayar ? 'mayar' : 'transfer', jumlah: total, status: 'menunggu', idMayar: link.id, linkMayar: link.link, waktu: sekarang });
     kabari();
     return { ok: true, idPesanan, nomor, total, link: link.link };
   }
@@ -308,7 +354,15 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     const lunas = bayar().some((b) => b.status === 'lunas');
     const menunggu = bayar().find((b) => b.metode === 'mayar' && b.status === 'menunggu');
     kabari();
-    return { ok: true, nomor: kini.nomor, status: kini.status, lunas, total: angka(kini.total), item: bacaItem(kini.item), nama: kini.nama, link: lunas || !menunggu ? '' : menunggu.linkMayar };
+    const tungguTransfer = !lunas && kini.status === 'menunggu' && bayar().some((b) => b.metode === 'transfer' && b.status === 'menunggu');
+    const adaTesti = hidup('Testimoni', (t) => t.idPesanan === p.id).length > 0;
+    return {
+      ok: true, nomor: kini.nomor, status: kini.status, lunas, total: angka(kini.total), item: bacaItem(kini.item), nama: kini.nama,
+      link: lunas || !menunggu ? '' : menunggu.linkMayar,
+      bayarManual: tungguTransfer ? bayarManual(s) : null,
+      wa: String(s.waToko || ''),
+      bisaTestimoni: lunas && kini.status !== 'batal' && !adaTesti,
+    };
   }
 
   function jawab(req) {
@@ -323,6 +377,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         return pesanOnline(req);
       case 'statusPesanan':
         return statusPesanan(req);
+      case 'kirimTestimoni':
+        return kirimTestimoni(req);
       case 'tiruanLunas': {
         // Pengganti pembeli membayar di Mayar + webhook (hanya di server uji).
         const t = keadaan.mayarTagihan && keadaan.mayarTagihan[req.idMayar];

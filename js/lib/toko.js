@@ -573,7 +573,8 @@ export function pembayaranPesanan(db, idPesanan) {
 export function statusBayar(db, idPesanan) {
   const daftar = pembayaranPesanan(db, idPesanan);
   const lunas = daftar.find((b) => b.status === 'lunas') || null;
-  return { lunas: !!lunas, bayar: lunas, menunggu: lunas ? null : daftar.find((b) => b.metode === 'mayar' && b.status === 'menunggu') || null, daftar };
+  const tunggu = (metode) => (lunas ? null : daftar.find((b) => b.metode === metode && b.status === 'menunggu') || null);
+  return { lunas: !!lunas, bayar: lunas, menunggu: tunggu('mayar'), menungguTransfer: tunggu('transfer'), daftar };
 }
 
 /** Ubah status pesanan. Batal mengembalikan stok; keluar dari batal / menunggu memotong stok lagi. */
@@ -592,12 +593,26 @@ export function ubahStatusPesanan(db, idPesanan, status) {
   return baru;
 }
 
-export const LABEL_METODE = { tunai: 'Tunai', transfer: 'Transfer', mayar: 'Online' };
+export const LABEL_METODE = { tunai: 'Tunai', transfer: 'Transfer/QRIS', mayar: 'Online' };
 
-/** Catat pembayaran transfer langsung ke rekening toko (di luar Mayar). */
+/**
+ * Setelah lunas: tagihan lain yang masih menunggu ditutup, dan pesanan dari link pemesanan
+ * yang masih "menunggu" diterima (status baru) sehingga stoknya dipotong.
+ */
+function setelahLunas(db, pesanan, idLunas) {
+  pembayaranPesanan(db, pesanan.id)
+    .filter((b) => b.id !== idLunas && b.status === 'menunggu')
+    .forEach((b) => db.simpan('Pembayaran', { ...b, status: 'batal' }));
+  const kini = db.ambil('Pesanan', pesanan.id);
+  if (kini && kini.status === 'menunggu') ubahStatusPesanan(db, kini.id, 'baru');
+}
+
+/** Catat pembayaran transfer bank / QRIS langsung ke rekening toko (dicek manual). */
 export function bayarTransfer(db, pesanan) {
   const sekarang = Date.now();
-  return db.simpan('Pembayaran', {
+  const tunggu = statusBayar(db, pesanan.id).menungguTransfer;
+  const b = db.simpan('Pembayaran', {
+    ...(tunggu || {}),
     idPesanan: pesanan.id,
     metode: 'transfer',
     jumlah: pesanan.total,
@@ -606,9 +621,11 @@ export function bayarTransfer(db, pesanan) {
     status: 'lunas',
     idMayar: '',
     linkMayar: '',
-    waktu: sekarang,
+    waktu: tunggu ? tunggu.waktu : sekarang,
     lunasPada: sekarang,
   });
+  setelahLunas(db, pesanan, b.id);
+  return b;
 }
 
 /** Bayar tunai: lunas, dengan uang diterima dan kembalian. */
@@ -616,7 +633,7 @@ export function bayarTunai(db, pesanan, diterima) {
   const uang = Number(diterima) || 0;
   if (uang < pesanan.total) throw new Error('Uang yang diterima kurang dari total.');
   const sekarang = Date.now();
-  return db.simpan('Pembayaran', {
+  const b = db.simpan('Pembayaran', {
     idPesanan: pesanan.id,
     metode: 'tunai',
     jumlah: pesanan.total,
@@ -628,6 +645,8 @@ export function bayarTunai(db, pesanan, diterima) {
     waktu: sekarang,
     lunasPada: sekarang,
   });
+  setelahLunas(db, pesanan, b.id);
+  return b;
 }
 
 /** Saran uang pas untuk tombol cepat kasir. */
@@ -668,6 +687,41 @@ export function ringkasPenjualan(db, { sejak = awalHari() } = {}) {
 // ---------- Toko online (link pemesanan) ----------
 
 export const ID_TOKO = 'stl_toko';
+
+/** Rekening bank yang lengkap saja: [{bank, nomor, atasNama}]. */
+export function rekeningToko(db) {
+  const r = (ambilToko(db).rekening || []);
+  return (Array.isArray(r) ? r : [])
+    .map((x) => ({ bank: String((x && x.bank) || '').trim(), nomor: String((x && x.nomor) || '').trim(), atasNama: String((x && x.atasNama) || '').trim() }))
+    .filter((x) => x.bank && x.nomor);
+}
+
+/** Foto QRIS toko (data lokal sebelum terunggah, lalu tautan di server). */
+export function qrisToko(db) {
+  const t = ambilToko(db);
+  return t.qrisLokal || t.qrisUrl || '';
+}
+
+/** Mayar dipakai bila diaktifkan admin. Tanpa itu pembayaran non-tunai = transfer/QRIS manual. */
+export function pakaiMayar(db) {
+  return !!ambilToko(db).pakaiMayar;
+}
+
+/** Simpan rekening dan foto QRIS. qris: data URL baru, '' = hapus, undefined = tidak berubah. */
+export function simpanPembayaranManual(db, { rekening, qris }) {
+  const patch = {};
+  if (rekening !== undefined) {
+    patch.rekening = rekening
+      .map((x) => ({ bank: String(x.bank || '').trim().slice(0, 40), nomor: String(x.nomor || '').replace(/[^\d\- ]/g, '').trim().slice(0, 40), atasNama: String(x.atasNama || '').trim().slice(0, 60) }))
+      .filter((x) => x.bank && x.nomor)
+      .slice(0, 5);
+  }
+  if (qris !== undefined && qris !== qrisToko(db)) {
+    patch.qrisLokal = qris || '';
+    patch.qrisUrl = '';
+  }
+  return simpanToko(db, patch);
+}
 
 export function ambilToko(db) {
   return db.ambil('Setelan', ID_TOKO) || { id: ID_TOKO, namaToko: '', tokenToko: '', tokoBuka: false, alamatToko: '', waToko: '', catatanToko: '' };
@@ -732,3 +786,32 @@ export const pesanOnline = {
   kirim: (url, token, isi, opsi) => panggilApi(url, { aksi: 'pesanOnline', token, ...isi }, opsi),
   status: (url, token, idPesanan, opsi) => panggilApi(url, { aksi: 'statusPesanan', token, idPesanan }, opsi),
 };
+
+// ---------- Testimoni pembeli ----------
+
+/** Semua testimoni untuk admin: menunggu persetujuan dulu, lalu terbaru. */
+export function daftarTestimoni(db) {
+  return db.semua('Testimoni').sort((a, b) => Number(!!a.tampil) - Number(!!b.tampil) || (b.waktu || 0) - (a.waktu || 0));
+}
+
+/** Testimoni yang tayang di halaman pemesanan. */
+export function testimoniTampil(db) {
+  return db.semua('Testimoni', (t) => t.tampil && String(t.isi || '').trim()).sort((a, b) => (b.waktu || 0) - (a.waktu || 0));
+}
+
+/** Admin menulis atau mengubah testimoni (mis. dari chat WhatsApp pembeli). */
+export function simpanTestimoni(db, { id, nama, isi, bintang = 5, tampil = true }) {
+  const teks = String(isi || '').trim().slice(0, 500);
+  if (teks.length < 5) throw new Error('Tulis isi testimoni minimal beberapa kata.');
+  const lama = id ? db.ambil('Testimoni', id) : null;
+  return db.simpan('Testimoni', {
+    ...(lama || { idPesanan: '', sumber: 'admin', waktu: Date.now() }),
+    ...(id ? { id } : {}),
+    nama: String(nama || '').trim().slice(0, 60) || 'Pembeli',
+    isi: teks,
+    bintang: Math.max(1, Math.min(5, Math.round(Number(bintang) || 5))),
+    tampil: !!tampil,
+  });
+}
+
+export const kirimTestimoni = (url, token, isi, opsi) => panggilApi(url, { aksi: 'kirimTestimoni', token, ...isi }, opsi);

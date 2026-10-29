@@ -9,7 +9,7 @@ import { kompresLogo } from '../ui/gambar.js';
 import { ubahNamaAkun, gantiSandiAkun, keluarAkun, MIN_SANDI } from '../lib/akun.js';
 import { daftarKategori, tambahKategori, pakaiKategori, WARNA_KATEGORI, ambilMerek, simpanMerek, NAMA_APLIKASI_BAWAAN, LOGO_BAWAAN } from '../lib/repo.js';
 import { peranAkun, tampilanToko, ALAMAT_ADMIN } from '../lib/toko.js';
-import { KartuAkunToko, KartuMayar, KartuTokoOnline } from './pengaturan-toko.js';
+import { KartuAkunToko, KartuMayar, KartuTokoOnline, KartuPembayaran } from './pengaturan-toko.js';
 
 function BarisKategori({ db, kat }) {
   const [warnaBuka, setWarnaBuka] = useState(false);
@@ -202,6 +202,8 @@ export function Pengaturan({ k }) {
 
         <div class="kolom">
           <${KartuAkunToko} k=${k} />
+
+          <${KartuPembayaran} k=${k} />
 
           <${KartuMayar} k=${k} />
 

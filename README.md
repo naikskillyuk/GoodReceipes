@@ -33,7 +33,8 @@ Keduanya memakai data yang sama: harga dan menu yang diatur di admin langsung ta
 - **Menu jual**: resep dan **paket**, harga saran dari HPP Jual. Paket yang terjual memotong stok setiap isinya.
 - **Kasir dan pesanan**: keranjang, pembeli (nama + WhatsApp), kode promo, bayar **tunai** (dengan kembalian) atau **online lewat Mayar** (QR / link, lunas otomatis). Status pesanan Baru → Diproses → Siap → Selesai, atau Batal (stok kembali).
 - **Catat pesanan manual** (akun dapur dan toko): untuk pesanan dari WhatsApp, telepon, atau DM. Bisa memakai menu jual dan item di luar menu (mis. kue custom), jadwal ambil/antar, alamat + ongkir, lalu dicatat belum bayar, lunas tunai, lunas transfer, atau dikirimi link Mayar. Pesanan yang belum dibayar bisa diubah; stok dihitung ulang.
-- **Link pemesanan** untuk pembeli tanpa login: pilih menu, isi nama dan WhatsApp, bayar lewat Mayar; pesanan masuk setelah lunas.
+- **Etalase / link pemesanan** untuk pembeli tanpa login: beranda dengan banner, pilihan populer, kategori, detail produk, keranjang, status pesanan, dan **testimoni pembeli** di bagian bawah. Bayar lewat **transfer / QRIS toko** (toko menandai lunas) atau Mayar bila diaktifkan.
+- **Testimoni**: pembeli mengirim testimoni + bintang setelah pesanannya lunas; admin menayangkan, menyembunyikan, atau menulis testimoni sendiri di *Pelanggan, Promo & Testimoni → Testimoni*.
 - **Pelanggan dan promo**: pelanggan tercatat otomatis dari nomor WhatsApp (bisa diunduh CSV). Kode promo persen atau potongan, dengan minimal belanja, batas tanggal, kuota, dan khusus pelanggan baru/lama.
 - Bisa dipasang ke layar utama (PWA). Saat sinyal putus, aplikasi tetap terbuka dan perubahan menunggu lalu terkirim begitu tersambung lagi.
 
@@ -195,7 +196,15 @@ Di **Pengaturan > Nama dan logo aplikasi**, isi nama (maksimal 40 karakter) dan 
 
 **Ikon dan nama di layar utama HP tidak ikut berubah.** Keduanya dibaca browser dari berkas `manifest.webmanifest` dan folder `icons/` saat aplikasi dipasang, sehingga tidak bisa diganti dari dalam aplikasi. Untuk mengubahnya: ganti `icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` (latar penuh), `icon-180.png` (latar penuh), dan `logo.png` (tanpa kotak, untuk halaman Login) dengan logo Anda (ukuran sama), ubah `name` dan `short_name` di `manifest.webmanifest`, jalankan `npm run sw`, terbitkan ulang, lalu hapus dan pasang ulang aplikasinya di HP.
 
-## Pembayaran online (Mayar)
+## Pembayaran transfer & QRIS (tanpa Mayar)
+
+Bawaan aplikasi: pembayaran non-tunai memakai **rekening bank dan foto QRIS toko**.
+
+1. Di `/admin` → **Pengaturan → Pembayaran transfer & QRIS**: isi bank, nomor rekening, atas nama (boleh lebih dari satu), unggah foto/tangkapan layar QRIS, lalu **Simpan info pembayaran**.
+2. Kasir: saat bayar, pilih tab **Transfer / QRIS** untuk menunjukkan QRIS dan rekening ke pembeli, lalu **Tandai lunas** setelah uang masuk.
+3. Link pemesanan: pembeli memesan → melihat QRIS + rekening + tombol *Kirim bukti bayar via WhatsApp* (ke nomor WhatsApp toko). Pesanan masuk ke tab **Menunggu bayar**; buka pesanan → **Cek & tandai lunas**. Stok dipotong saat ditandai lunas.
+
+## Pembayaran otomatis Mayar (opsional)
 
 1. Daftar di [Mayar](https://mayar.id) (uji coba: web.mayar.club), lalu buat kunci API **Read & Write** di dashboard: Integrasi → API Key.
 2. Di aplikasi, masuk sebagai akun dapur → **Pengaturan → Pembayaran online (Mayar)** → tempel kunci, centang *mode uji* bila kuncinya dari sandbox, lalu **Simpan kunci**. Kunci disimpan terenkripsi di server (tidak pernah dikirim ke aplikasi) dan alamat webhook didaftarkan otomatis. Bila gagal, salin alamat webhook yang tampil ke dashboard Mayar: Integrasi → Webhook.

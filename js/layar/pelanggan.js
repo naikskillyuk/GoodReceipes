@@ -1,10 +1,10 @@
-// Pelanggan (tercatat otomatis dari nomor WhatsApp di setiap pesanan) dan kode promo.
+// Pelanggan (tercatat otomatis dari nomor WhatsApp di setiap pesanan), kode promo, dan testimoni pembeli.
 
 import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, Tab, InputRupiah, InputAngka, unduhBerkas } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
-import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, tampilanToko } from '../lib/toko.js';
+import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, tampilanToko, daftarTestimoni, simpanTestimoni } from '../lib/toko.js';
 import { rupiah, tanggal, tampilJumlah } from '../lib/util.js';
 
 const UNTUK = { semua: 'Semua pembeli', baru: 'Pelanggan baru (pesanan pertama)', lama: 'Pelanggan lama (pernah memesan)' };
@@ -141,17 +141,82 @@ function Promo({ db, bisaUbah }) {
   </div>`;
 }
 
+export function Bintang({ nilai, ukuran = 14 }) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(nilai) || 0)));
+  return html`<span class="bintang-baris" role="img" aria-label=${n + ' dari 5 bintang'}>${[1, 2, 3, 4, 5].map((i) => html`<span class=${i <= n ? 'nyala' : ''} style=${`font-size:${ukuran}px`} aria-hidden="true">★</span>`)}</span>`;
+}
+
+function FormTestimoni({ db, awal, onTutup }) {
+  const [nama, setNama] = useState(awal ? awal.nama : '');
+  const [isi, setIsi] = useState(awal ? awal.isi : '');
+  const [bintang, setBintang] = useState(awal ? Number(awal.bintang) || 5 : 5);
+  const [galat, setGalat] = useState('');
+  const simpan = () => {
+    try {
+      simpanTestimoni(db, { id: awal && awal.id, nama, isi, bintang, tampil: awal ? !!awal.tampil : true });
+      tampilToast('Testimoni disimpan.');
+      onTutup();
+    } catch (e) {
+      setGalat(e.message);
+    }
+  };
+  return html`<section class="kartu kolom" aria-label="Form testimoni">
+    <label class="bidang"><span>Nama pembeli</span><input class="input kecil" maxlength="60" value=${nama} onInput=${(e) => setNama(e.target.value)} placeholder="mis. Sari, Bekasi" /></label>
+    <label class="bidang"><span>Isi testimoni</span><textarea class="input kecil" rows="3" maxlength="500" value=${isi} onInput=${(e) => (setIsi(e.target.value), setGalat(''))} placeholder="Salin dari chat WhatsApp pembeli"></textarea></label>
+    <div class="bidang"><span>Bintang</span>
+      <div class="chips" role="group" aria-label="Bintang">${[5, 4, 3, 2, 1].map((n) => html`<button type="button" class=${'chip' + (bintang === n ? ' aktif' : '')} aria-pressed=${bintang === n} onClick=${() => setBintang(n)}>${n} ★</button>`)}</div>
+    </div>
+    ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
+    <div class="baris-btn"><button class="btn solid" onClick=${simpan}>Simpan testimoni</button><button class="btn abu" onClick=${onTutup}>Batal</button></div>
+  </section>`;
+}
+
+/** Testimoni: dari pembeli (perlu disetujui) atau ditulis admin. Yang tayang muncul di halaman pemesanan. */
+function Testimoni({ db }) {
+  const [form, setForm] = useState(null); // null | 'baru' | baris
+  const daftar = daftarTestimoni(db);
+  const menunggu = daftar.filter((t) => !t.tampil).length;
+  const hapus = async (t) => {
+    if (await tanya({ judul: 'Hapus testimoni?', teks: `Testimoni dari ${t.nama || 'pembeli'} dihapus.`, ya: 'Hapus', bahaya: true })) db.hapus('Testimoni', t.id);
+  };
+  return html`<div class="kolom">
+    <p class="bantu">Testimoni yang <b>tayang</b> muncul di bawah halaman pemesanan pembeli. Pembeli bisa mengirim testimoni setelah pesanannya lunas${menunggu ? `; ${menunggu} menunggu persetujuan` : ''}.</p>
+    ${form ? html`<${FormTestimoni} db=${db} awal=${form === 'baru' ? null : form} onTutup=${() => setForm(null)} />` : html`<button class="btn" style="align-self:flex-start" onClick=${() => setForm('baru')}><${Ikon} nama="plus" ukuran=${18} />Tulis testimoni</button>`}
+    ${daftar.length === 0 && !form && html`<${Kosong} judul="Belum ada testimoni" teks="Tulis testimoni dari chat pembeli, atau tunggu kiriman dari halaman pemesanan." />`}
+    <div class="daftar daftar-lebar">
+      ${daftar.map(
+        (t) => html`<div class=${'kartu-testi-admin' + (t.tampil ? '' : ' menunggu')} key=${t.id}>
+          <div class="baris-pisah">
+            <span class="kolom" style="gap:2px"><b>${t.nama || 'Pembeli'}</b><${Bintang} nilai=${t.bintang} /></span>
+            <span class=${'lencana-status ' + (t.tampil ? 'lunas' : 'tunggu')}>${t.tampil ? 'Tayang' : 'Menunggu'}</span>
+          </div>
+          <p class="isi-testi">${t.isi}</p>
+          <small class="teks-kecil">${tanggal(t.waktu)} · ${t.sumber === 'pembeli' ? 'dari pembeli' : 'ditulis admin'}</small>
+          <div class="baris-btn">
+            <button class=${'btn kecil' + (t.tampil ? '' : ' solid')} onClick=${() => db.simpan('Testimoni', { ...t, tampil: !t.tampil })}>${t.tampil ? 'Sembunyikan' : 'Tayangkan'}</button>
+            <button class="btn kecil" onClick=${() => setForm(t)}>Ubah</button>
+            <button class="btn kecil bahaya" onClick=${() => hapus(t)}>Hapus</button>
+          </div>
+        </div>`,
+      )}
+    </div>
+  </div>`;
+}
+
 export function PelangganPromo({ k }) {
   const { db, rute } = k;
-  const tab = rute.kueri.tab === 'promo' ? 'promo' : 'pelanggan';
+  const admin = !tampilanToko(db);
+  const tab = rute.kueri.tab === 'promo' ? 'promo' : rute.kueri.tab === 'testimoni' && admin ? 'testimoni' : 'pelanggan';
+  const tungguTesti = admin ? db.semua('Testimoni', (t) => !t.tampil).length : 0;
   return html`<${Kerangka} k=${k} aktif="pelanggan">
     <${Hero} warna="var(--navy)" label="Toko" judul="Pelanggan & promo" kembali="/" stat=${html`<${Stat} nilai=${db.semua('Pelanggan').length} label="pelanggan" />`} />
     <div class="isi">
       <${Tab} item=${[
         { label: 'Pelanggan', href: '/pelanggan', aktif: tab === 'pelanggan' },
         { label: 'Kode promo', href: '/pelanggan?tab=promo', aktif: tab === 'promo' },
+        ...(admin ? [{ label: tungguTesti ? `Testimoni (${tungguTesti})` : 'Testimoni', href: '/pelanggan?tab=testimoni', aktif: tab === 'testimoni' }] : []),
       ]} />
-      ${tab === 'pelanggan' ? html`<${Pelanggan} db=${db} />` : html`<${Promo} db=${db} bisaUbah=${!tampilanToko(db)} />`}
+      ${tab === 'pelanggan' ? html`<${Pelanggan} db=${db} />` : tab === 'promo' ? html`<${Promo} db=${db} bisaUbah=${admin} />` : html`<${Testimoni} db=${db} />`}
     </div>
   <//>`;
 }

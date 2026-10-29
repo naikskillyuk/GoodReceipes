@@ -168,6 +168,13 @@ return [
             'kolom' => [
                 'id' => 't', 'namaAplikasi' => 't', 'logoUrl' => 't',
                 'namaToko' => 't', 'tokenToko' => 't', 'tokoBuka' => 'b', 'alamatToko' => 't', 'waToko' => 't', 'catatanToko' => 't',
+                'rekening' => 'j', 'qrisUrl' => 't', 'pakaiMayar' => 'b',
+            ],
+        ],
+        'Testimoni' => [
+            'db' => 'testimoni',
+            'kolom' => [
+                'id' => 't', 'nama' => 't', 'isi' => 't', 'bintang' => 'n', 'idPesanan' => 't', 'tampil' => 'b', 'sumber' => 't', 'waktu' => 'n',
             ],
         ],
     ],

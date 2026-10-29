@@ -122,7 +122,7 @@ export const TABEL = {
       saluran: 't', jadwal: 'n', alamat: 't', ongkir: 'n',
     },
   },
-  // metode 'tunai' | 'transfer' | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.
+  // metode 'tunai' | 'transfer' (transfer/QRIS manual) | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.
   Pembayaran: {
     awalan: 'byr',
     kolom: {
@@ -144,14 +144,22 @@ export const TABEL = {
     },
   },
   // Satu baris saja (id tetap 'stl_merek'): nama dan logo aplikasi, ikut tersinkron dan tampil di halaman penilai.
+  // Testimoni pembeli: dikirim pembeli dari halaman status pesanan (tampil setelah disetujui admin),
+  // atau ditulis admin. Yang tampil = muncul di bawah halaman pemesanan.
+  Testimoni: {
+    awalan: 'tst',
+    kolom: { id: 't', nama: 't', isi: 't', bintang: 'n', idPesanan: 't', tampil: 'b', sumber: 't', waktu: 'n' },
+  },
   Setelan: {
     awalan: 'stl',
     // Baris 'stl_toko': nama toko, link pemesanan (tokenToko), buka/tutup, alamat, WhatsApp.
+    // Pembayaran manual: rekening = [{bank, nomor, atasNama}], foto QRIS (qrisUrl). pakaiMayar = pakai Mayar bila kuncinya diisi.
     kolom: {
       id: 't', namaAplikasi: 't', logoUrl: 't',
       namaToko: 't', tokenToko: 't', tokoBuka: 'b', alamatToko: 't', waToko: 't', catatanToko: 't',
+      rekening: 'j', qrisUrl: 't', pakaiMayar: 'b',
     },
-    lokal: ['logoLokal'],
+    lokal: ['logoLokal', 'qrisLokal'],
   },
 };
 
@@ -217,5 +225,5 @@ export const KOLOM_FOTO = {
   Resep: [['fotoAcuanLokal', 'fotoAcuanUrl']],
   Eksperimen: [['fotoHasilLokal', 'fotoHasilUrl']],
   Bahan: [['fotoLokal', 'fotoUrl']],
-  Setelan: [['logoLokal', 'logoUrl']],
+  Setelan: [['logoLokal', 'logoUrl'], ['qrisLokal', 'qrisUrl']],
 };

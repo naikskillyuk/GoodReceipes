@@ -97,7 +97,7 @@ try {
     return c.toDataURL('image/png').split(',')[1];
   });
   await page.getByLabel('Nama aplikasi').fill('Dapur Bu Sari');
-  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(dataBesar, 'base64') });
+  await page.getByRole('region', { name: 'Nama dan logo aplikasi' }).locator('input[type=file]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(dataBesar, 'base64') });
   await page.locator('.foto-terpasang.logo img').waitFor();
   await page.locator('.pratinjau-merek b', { hasText: 'Dapur Bu Sari' }).waitFor();
   await foto(page, '1-pengaturan-tampilan');

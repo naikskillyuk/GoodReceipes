@@ -8,7 +8,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { buatQR, salin } from './bagikan.js';
 import {
   daftarPesanan, statusBayar, ubahStatusPesanan, bayarTunai, bayarTransfer, saranUang, mintaBayarMayar, cekBayarMayar,
-  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, tampilHp, ringkasPenjualan, bisaDiubah,
+  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah, angka, tanggal } from '../lib/util.js';
 
@@ -32,14 +32,31 @@ export function LencanaBayar({ db, p }) {
   const s = statusBayar(db, p.id);
   if (s.lunas) return html`<span class="lencana-status lunas">Lunas · ${LABEL_METODE[s.bayar.metode] || 'Tunai'}</span>`;
   if (s.menunggu) return html`<span class="lencana-status tunggu">Menunggu bayar</span>`;
+  if (s.menungguTransfer) return html`<span class="lencana-status tunggu">Menunggu transfer</span>`;
   return html`<span class="lencana-status belum">Belum bayar</span>`;
 }
 
-/** Pembayaran satu pesanan: tunai (uang diterima + kembalian) atau online (QR / link Mayar, dicek otomatis). */
+/** Rekening dan foto QRIS toko untuk ditunjukkan ke pembeli. */
+export function InfoTransfer({ rekening, qris, total }) {
+  if (!rekening.length && !qris) return html`<p class="bantu">Rekening dan QRIS belum diatur. Admin bisa mengisinya di Pengaturan → Pembayaran transfer & QRIS.</p>`;
+  return html`<div class="kolom info-transfer">
+    ${qris && html`<img class="qris-gambar" src=${qris} alt="Kode QRIS toko" />`}
+    ${rekening.map(
+      (r) => html`<div class="baris-rekening" key=${r.bank + r.nomor}>
+        <span class="teks"><small>${r.bank}${r.atasNama ? ' · a.n. ' + r.atasNama : ''}</small><b>${r.nomor}</b></span>
+        <button type="button" class="btn kecil" onClick=${async () => tampilToast((await salin(r.nomor.replace(/\D/g, ''))) ? 'Nomor rekening disalin.' : 'Gagal menyalin.')}><${Ikon} nama="salin" ukuran=${16} />Salin</button>
+      </div>`,
+    )}
+    ${total > 0 && html`<p class="bantu" style="text-align:center">Transfer tepat ${rupiah(total)}.</p>`}
+  </div>`;
+}
+
+/** Pembayaran satu pesanan: tunai, transfer/QRIS manual (ditandai lunas), atau Mayar bila diaktifkan admin. */
 export function DialogBayar({ k, pesanan, onTutup }) {
   const { db } = k;
   const s = statusBayar(db, pesanan.id);
-  const [cara, setCara] = useState(s.menunggu ? 'online' : 'tunai');
+  const mayar = pakaiMayar(db) || !!s.menunggu;
+  const [cara, setCara] = useState(s.menunggu ? 'online' : s.menungguTransfer ? 'transfer' : 'tunai');
   const [diterima, setDiterima] = useState(0);
   const [galat, setGalat] = useState('');
   const [sibuk, setSibuk] = useState(false);
@@ -108,11 +125,12 @@ export function DialogBayar({ k, pesanan, onTutup }) {
       <div class="total-bayar"><small>Total</small><b>${rupiah(pesanan.total)}</b></div>
       <${Tab} item=${[
         { label: 'Tunai', aktif: cara === 'tunai', onKlik: () => setCara('tunai') },
-        { label: 'Transfer', aktif: cara === 'transfer', onKlik: () => setCara('transfer') },
-        { label: 'Online (QRIS / transfer)', aktif: cara === 'online', onKlik: () => setCara('online') },
+        { label: 'Transfer / QRIS', aktif: cara === 'transfer', onKlik: () => setCara('transfer') },
+        ...(mayar ? [{ label: 'Mayar', aktif: cara === 'online', onKlik: () => setCara('online') }] : []),
       ]} />
       ${cara === 'transfer' &&
-      html`<p class="bantu">Pembeli sudah transfer langsung ke rekening toko? Cek mutasi rekening dulu, lalu tandai lunas.</p>
+      html`<${InfoTransfer} rekening=${rekeningToko(db)} qris=${qrisToko(db)} total=${pesanan.total} />
+        <p class="bantu">Tunjukkan QRIS / rekening ke pembeli. Setelah uang masuk (cek mutasi atau bukti transfer), tandai lunas.</p>
         <button class="btn solid lebar" onClick=${() => bayarTransfer(db, pesanan)}><${Ikon} nama="centang" ukuran=${18} />Tandai lunas transfer ${rupiah(pesanan.total)}</button>`}
       ${cara === 'tunai' &&
       html`<label class="bidang"><span>Uang diterima</span><${InputRupiah} kelas="input input-besar" aria-label="Uang diterima" nilai=${diterima} onUbah=${(n) => (setDiterima(n), setGalat(''))} placeholder=${angka(pesanan.total)} /></label>
@@ -207,7 +225,7 @@ export function DetailPesanan({ k, id }) {
       if (!ya) return;
     }
     if (p.status === 'menunggu' && status === 'baru' && !s.lunas) {
-      const ya = await tanya({ judul: 'Terima tanpa pembayaran online?', teks: 'Pembayaran Mayar belum masuk. Terima pesanan ini bila pembeli membayar dengan cara lain.', ya: 'Terima pesanan' });
+      const ya = await tanya({ judul: 'Terima sebelum dibayar?', teks: 'Pembayaran belum tercatat. Terima pesanan ini bila pembeli akan membayar nanti (bayar di tempat). Bila sudah transfer, pakai "Cek & tandai lunas".', ya: 'Terima pesanan' });
       if (!ya) return;
     }
     ubahStatusPesanan(db, p.id, status);
@@ -226,7 +244,7 @@ export function DetailPesanan({ k, id }) {
             ${p.ongkir > 0 && html`<div class="hasil-baris"><span>Ongkir</span><b class="biasa">${rupiah(p.ongkir)}</b></div>`}
             <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(p.total)}</b></div>
             ${s.lunas && html`<p class="bantu">Dibayar ${s.bayar.metode === 'mayar' ? 'online (Mayar)' : (LABEL_METODE[s.bayar.metode] || 'Tunai').toLowerCase()}${s.bayar.metode === 'tunai' && s.bayar.diterima ? ` · diterima ${rupiah(s.bayar.diterima)}, kembalian ${rupiah(s.bayar.kembalian)}` : ''} · ${tanggal(s.bayar.lunasPada || s.bayar.waktu)} ${jam(s.bayar.lunasPada || s.bayar.waktu)}</p>`}
-            ${!s.lunas && p.status !== 'batal' && html`<button class="btn solid lebar" onClick=${() => setBayar(true)}><${Ikon} nama="dompet" ukuran=${18} />${s.menunggu ? 'Lihat QR pembayaran' : 'Terima pembayaran'}</button>`}
+            ${!s.lunas && p.status !== 'batal' && html`<button class="btn solid lebar" onClick=${() => setBayar(true)}><${Ikon} nama="dompet" ukuran=${18} />${s.menunggu ? 'Lihat QR pembayaran' : s.menungguTransfer ? 'Cek & tandai lunas' : 'Terima pembayaran'}</button>`}
           </section>
         </div>
         <div class="kolom">

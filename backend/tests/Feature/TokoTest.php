@@ -100,11 +100,11 @@ class TokoTest extends TestCase
                 $this->baris(['id' => 'mnu_x', 'jenis' => 'resep', 'idRef' => 'res_b', 'nama' => 'Rahasia', 'harga' => 1, 'aktif' => true, 'online' => false]),
             ],
             'Promo' => [$this->baris(['id' => 'prm_1', 'kode' => 'HEMAT10', 'jenis' => 'persen', 'nilai' => 10, 'untuk' => 'baru', 'aktif' => true, 'online' => true])],
-            'Setelan' => [$this->baris(['id' => 'stl_toko', 'namaToko' => 'Toko Uji', 'tokenToko' => 'token-toko-uji-123', 'tokoBuka' => true])],
+            'Setelan' => [$this->baris(['id' => 'stl_toko', 'namaToko' => 'Toko Uji', 'tokenToko' => 'token-toko-uji-123', 'tokoBuka' => true, 'pakaiMayar' => true])],
         ]]);
 
         $info = $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-uji-123']);
-        $this->assertTrue($info['ok'] && $info['buka'] && $info['bayarOnline']);
+        $this->assertTrue($info['ok'] && $info['buka'] && $info['bayarOnline'] && $info['mayar']);
         $this->assertSame(['mnu_a', 'mnu_p'], array_column($info['menu'], 'id'), 'menu tidak online disembunyikan');
         $this->assertEquals([10, 3], array_column($info['menu'], 'sisa'), 'paket: min(10/2, 3/1)');
 
@@ -146,5 +146,63 @@ class TokoTest extends TestCase
             'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1]]]);
         $this->assertFalse($lagi['ok']);
         $this->assertStringContainsString('pelanggan baru', $lagi['galat']);
+    }
+
+    public function test_pesanan_online_transfer_qris_manual_dan_testimoni(): void
+    {
+        [, $kunci] = $this->dapur();
+        $this->api(['aksi' => 'sinkron', 'kunci' => $kunci, 'sejak' => 0, 'baris' => [
+            'Resep' => [$this->baris(['id' => 'res_a', 'nama' => 'Brownies', 'idKategori' => 'kat_kue'])],
+            'Kategori' => [$this->baris(['id' => 'kat_kue', 'nama' => 'Kue'])],
+            'MutasiMakanan' => [$this->baris(['id' => 'mmk_p1', 'idResep' => 'res_a', 'jumlah' => 10, 'jenis' => 'produksi'])],
+            'Menu' => [$this->baris(['id' => 'mnu_a', 'jenis' => 'resep', 'idRef' => 'res_a', 'nama' => 'Brownies', 'harga' => 8000, 'aktif' => true, 'online' => true])],
+            'Setelan' => [$this->baris(['id' => 'stl_toko', 'namaToko' => 'Toko Uji', 'tokenToko' => 'token-toko-manual-1', 'tokoBuka' => true, 'waToko' => '0812 1111 2222',
+                'rekening' => [['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa'], ['bank' => '', 'nomor' => '']], 'qrisUrl' => 'https://contoh.test/qris.png'])],
+            'Testimoni' => [
+                $this->baris(['id' => 'tst_a', 'nama' => 'Sari', 'isi' => 'Enak sekali!', 'bintang' => 5, 'tampil' => true, 'sumber' => 'admin', 'waktu' => 1]),
+                $this->baris(['id' => 'tst_b', 'nama' => 'Rahasia', 'isi' => 'Belum disetujui', 'bintang' => 3, 'tampil' => false, 'sumber' => 'pembeli', 'waktu' => 2]),
+            ],
+        ]]);
+
+        // Tanpa Mayar: tetap bisa pesan, bayar lewat rekening / QRIS.
+        $info = $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-manual-1']);
+        $this->assertTrue($info['ok'] && $info['bayarOnline'], json_encode($info));
+        $this->assertFalse($info['mayar']);
+        $this->assertSame([['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa']], $info['bayarManual']['rekening']);
+        $this->assertSame('https://contoh.test/qris.png', $info['bayarManual']['qrisUrl']);
+        $this->assertSame('Kue', $info['menu'][0]['kategori']);
+        $this->assertSame(['Sari'], array_column($info['testimoni'], 'nama'), 'hanya testimoni yang tayang');
+
+        $pesan = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-manual-1', 'nama' => 'Budi', 'hp' => '0812345678', 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 2]]]);
+        $this->assertTrue($pesan['ok'], json_encode($pesan));
+        $this->assertSame('', $pesan['link']);
+        $this->assertSame('transfer', \DB::table('pembayaran')->where('id_pesanan', $pesan['idPesanan'])->value('metode'));
+        $st = $this->api(['aksi' => 'statusPesanan', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan']]);
+        $this->assertFalse($st['lunas']);
+        $this->assertSame('1234567890', $st['bayarManual']['rekening'][0]['nomor']);
+        $this->assertSame('0812 1111 2222', $st['wa']);
+        $this->assertFalse($st['bisaTestimoni']);
+        $belum = $this->api(['aksi' => 'kirimTestimoni', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan'], 'isi' => 'Mantap sekali']);
+        $this->assertFalse($belum['ok'], 'testimoni hanya setelah lunas');
+
+        // Toko menandai lunas (dari aplikasi, lewat sinkron).
+        $byr = \DB::table('pembayaran')->where('id_pesanan', $pesan['idPesanan'])->value('id');
+        $this->api(['aksi' => 'sinkron', 'kunci' => $kunci, 'sejak' => 0, 'baris' => [
+            'Pembayaran' => [$this->baris(['id' => $byr, 'idPesanan' => $pesan['idPesanan'], 'metode' => 'transfer', 'jumlah' => 16000, 'status' => 'lunas', 'lunasPada' => 5, 'diubah' => \App\Services\Penjualan::sekarang() + 1000])],
+        ]]);
+        $st = $this->api(['aksi' => 'statusPesanan', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan']]);
+        $this->assertTrue($st['lunas']);
+        $this->assertNull($st['bayarManual']);
+        $this->assertTrue($st['bisaTestimoni']);
+
+        $kirim = $this->api(['aksi' => 'kirimTestimoni', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan'], 'isi' => 'Browniesnya lembut!', 'bintang' => 9]);
+        $this->assertTrue($kirim['ok'], json_encode($kirim));
+        $t = \DB::table('testimoni')->where('id_pesanan', $pesan['idPesanan'])->first();
+        $this->assertSame('Budi', $t->nama);
+        $this->assertEquals(5, $t->bintang);
+        $this->assertFalse((bool) $t->tampil, 'menunggu persetujuan admin');
+        $this->api(['aksi' => 'kirimTestimoni', 'token' => 'token-toko-manual-1', 'idPesanan' => $pesan['idPesanan'], 'isi' => 'Diperbarui ya']);
+        $this->assertSame(1, \DB::table('testimoni')->where('id_pesanan', $pesan['idPesanan'])->count(), 'satu testimoni per pesanan');
+        $this->assertCount(1, $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-manual-1'])['testimoni']);
     }
 }

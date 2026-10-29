@@ -184,3 +184,47 @@ test('pesanan manual: item di luar menu, ongkir, jadwal, transfer, dan ubah pesa
   assert.equal(toko.ringkasPenjualan(db).perMetode.transfer, 50000);
   assert.equal(toko.ringkasPenjualan(db).omzet, 50000);
 });
+
+test('transfer/QRIS manual: info rekening + QRIS, pesanan online menunggu jadi baru saat ditandai lunas', async () => {
+  const { db, brownies } = await dbContoh();
+  const menu = toko.tambahMenu(db, 'resep', brownies);
+  db.simpan('Menu', { ...menu, harga: 10000 });
+  toko.ubahStokMakanan(db, brownies, { jenis: 'koreksi', nilai: 10 });
+
+  assert.equal(toko.pakaiMayar(db), false, 'Mayar mati bila belum diaktifkan');
+  toko.simpanPembayaranManual(db, {
+    rekening: [{ bank: ' BCA ', nomor: '123-456 789x', atasNama: 'Rasa Teras' }, { bank: '', nomor: '999' }],
+    qris: 'data:image/png;base64,AAAA',
+  });
+  assert.deepEqual(toko.rekeningToko(db), [{ bank: 'BCA', nomor: '123-456 789', atasNama: 'Rasa Teras' }]);
+  assert.equal(toko.qrisToko(db), 'data:image/png;base64,AAAA');
+  toko.simpanPembayaranManual(db, { qris: '' });
+  assert.equal(toko.qrisToko(db), '');
+
+  // Pesanan dari link pemesanan (dibuat server): menunggu + tagihan transfer menunggu, stok belum dipotong.
+  const p = db.simpan('Pesanan', { nomor: '2910-ABC', sumber: 'online', item: [{ idMenu: menu.id, nama: 'Brownies', harga: 10000, jumlah: 3 }], subtotal: 30000, diskon: 0, total: 30000, status: 'menunggu', waktu: Date.now() });
+  db.simpan('Pembayaran', { idPesanan: p.id, metode: 'transfer', jumlah: 30000, status: 'menunggu', waktu: Date.now() });
+  const s = toko.statusBayar(db, p.id);
+  assert.ok(s.menungguTransfer && !s.menunggu && !s.lunas);
+  assert.equal(toko.stokMakanan(db).get(brownies), 10);
+
+  toko.bayarTransfer(db, p);
+  const sesudah = toko.statusBayar(db, p.id);
+  assert.equal(sesudah.lunas, true);
+  assert.equal(sesudah.daftar.length, 1, 'tagihan yang menunggu dipakai, bukan baris baru');
+  assert.equal(db.ambil('Pesanan', p.id).status, 'baru');
+  assert.equal(toko.stokMakanan(db).get(brownies), 7, 'stok dipotong saat lunas');
+});
+
+test('testimoni: admin menulis, sembunyikan, dan hanya yang tayang ikut ditampilkan', async () => {
+  const { db } = await dbContoh();
+  assert.throws(() => toko.simpanTestimoni(db, { nama: 'A', isi: 'ok' }), /minimal/);
+  const a = toko.simpanTestimoni(db, { nama: 'Sari', isi: 'Browniesnya lembut banget!', bintang: 9 });
+  assert.equal(a.bintang, 5);
+  assert.equal(a.sumber, 'admin');
+  db.simpan('Testimoni', { nama: 'Budi', isi: 'Enak, pengiriman cepat', bintang: 4, tampil: false, sumber: 'pembeli', waktu: Date.now() + 1 });
+  assert.equal(toko.testimoniTampil(db).length, 1);
+  assert.equal(toko.daftarTestimoni(db)[0].nama, 'Budi', 'yang menunggu persetujuan tampil paling atas');
+  toko.simpanTestimoni(db, { id: a.id, nama: 'Sari', isi: 'Browniesnya lembut banget!', bintang: 5, tampil: false });
+  assert.equal(toko.testimoniTampil(db).length, 0);
+});

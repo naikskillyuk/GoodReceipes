@@ -23,7 +23,7 @@ use Throwable;
  * browser tidak mengirim preflight CORS.
  *
  * - Tanpa login : masuk, lupaSandi, aturSandi (akun), infoNilai, kirimNilai (penilai QR), infoSitus,
- *   dan infoToko, pesanOnline, statusPesanan (link pemesanan pembeli).
+ *   dan infoToko, pesanOnline, statusPesanan, kirimTestimoni (link pemesanan pembeli).
  *   Akun dibuat oleh admin di /admin; tidak ada pendaftaran sendiri.
  * - Dengan login: `kunci` berisi token sesi dari aksi `masuk`.
  */
@@ -62,17 +62,23 @@ class ApiController extends Controller
             if ($aksi === 'infoToko') {
                 return $this->keluar($jual->infoToko($req['token'] ?? null));
             }
-            if ($aksi === 'pesanOnline' || $aksi === 'statusPesanan') {
+            if (in_array($aksi, ['pesanOnline', 'statusPesanan', 'kirimTestimoni'], true)) {
                 $k = 'toko:'.$aksi.':'.$request->ip();
-                $maks = $aksi === 'pesanOnline' ? (int) config('goodrecipes.pesanan_online_per_jam_per_ip') : 120;
+                $maks = match ($aksi) {
+                    'pesanOnline' => (int) config('goodrecipes.pesanan_online_per_jam_per_ip'),
+                    'kirimTestimoni' => 10,
+                    default => 120,
+                };
                 if (RateLimiter::tooManyAttempts($k, $maks)) {
                     return $this->keluar(['ok' => false, 'galat' => 'Terlalu banyak permintaan. Coba lagi beberapa saat lagi.']);
                 }
                 RateLimiter::hit($k, 3600);
 
-                return $this->keluar($aksi === 'pesanOnline'
-                    ? $jual->pesanOnline($req)
-                    : $jual->statusPesanan($req['token'] ?? null, $req['idPesanan'] ?? null));
+                return $this->keluar(match ($aksi) {
+                    'pesanOnline' => $jual->pesanOnline($req),
+                    'kirimTestimoni' => $jual->kirimTestimoni($req),
+                    default => $jual->statusPesanan($req['token'] ?? null, $req['idPesanan'] ?? null),
+                });
             }
 
             // Akun tanpa login, dengan batas percobaan per alamat IP (dan per akun untuk masuk).

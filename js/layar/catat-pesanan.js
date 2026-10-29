@@ -9,7 +9,7 @@ import { tanya, tampilToast } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
 import {
   daftarMenu, itemKeranjang, cekPromo, buatPesanan, ubahPesanan, bisaDiubah, kurangStok, normalHp, idPelanggan,
-  bayarTunai, bayarTransfer, SALURAN_PESANAN,
+  bayarTunai, bayarTransfer, SALURAN_PESANAN, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
 
@@ -33,7 +33,7 @@ export function dariInputWaktu(teks) {
 const BAYAR = [
   { kunci: 'nanti', label: 'Belum bayar' },
   { kunci: 'tunai', label: 'Lunas tunai' },
-  { kunci: 'transfer', label: 'Lunas transfer' },
+  { kunci: 'transfer', label: 'Lunas transfer/QRIS' },
   { kunci: 'online', label: 'Kirim link online' },
 ];
 
@@ -210,7 +210,7 @@ export function CatatPesanan({ k }) {
             ${!lama &&
             html`<div class="bidang"><span>Pembayaran</span>
               <div class="chips" role="group" aria-label="Pembayaran">
-                ${BAYAR.map((b) => html`<button type="button" class=${'chip' + (bayar === b.kunci ? ' aktif' : '')} aria-pressed=${bayar === b.kunci} onClick=${() => setBayar(b.kunci)}>${b.label}</button>`)}
+                ${BAYAR.filter((b) => b.kunci !== 'online' || pakaiMayar(db)).map((b) => html`<button type="button" class=${'chip' + (bayar === b.kunci ? ' aktif' : '')} aria-pressed=${bayar === b.kunci} onClick=${() => setBayar(b.kunci)}>${b.label}</button>`)}
               </div>
               ${bayar === 'online' && html`<small class="bantu">Setelah disimpan, QR dan link Mayar dibuat untuk dikirim ke pembeli.</small>`}
             </div>`}

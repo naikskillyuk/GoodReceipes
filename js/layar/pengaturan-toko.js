@@ -1,10 +1,60 @@
-// Pengaturan khusus akun dapur: akun toko (kasir), pembayaran online Mayar, dan toko + link pemesanan.
+// Pengaturan khusus akun dapur: akun toko (kasir), pembayaran (rekening + QRIS, atau Mayar), dan toko + link pemesanan.
 
 import { html, useState, useEffect } from '../../vendor/preact-htm.js';
 import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { buatQR, salin } from './bagikan.js';
-import { akunToko, pengaturanMayar, ambilToko, simpanToko, aturTokenToko, tautanToko } from '../lib/toko.js';
+import { akunToko, pengaturanMayar, ambilToko, simpanToko, aturTokenToko, tautanToko, rekeningToko, qrisToko, simpanPembayaranManual, pakaiMayar } from '../lib/toko.js';
+import { FotoInput } from '../ui/komponen.js';
+import { kompres } from '../ui/gambar.js';
+
+// QRIS disimpan sebagai PNG tajam supaya tetap bisa dipindai.
+const kompresQris = (file) => kompres(file, 900, 1, { png: true });
+
+const barisKosong = () => ({ bank: '', nomor: '', atasNama: '' });
+
+/** Pembayaran tanpa Mayar: nomor rekening dan foto QRIS toko. Pembeli transfer, toko menandai lunas. */
+export function KartuPembayaran({ k }) {
+  const { db } = k;
+  const t = ambilToko(db);
+  const awal = () => {
+    const r = rekeningToko(db);
+    return r.length ? r : [barisKosong()];
+  };
+  const [rekening, setRekening] = useState(awal);
+  const [qris, setQris] = useState(() => qrisToko(db));
+  useEffect(() => {
+    setRekening(awal());
+    setQris(qrisToko(db));
+  }, [t.diubah]);
+  const lengkap = (r) => r.filter((x) => x.bank.trim() && x.nomor.trim());
+  const berubah = JSON.stringify(lengkap(rekening)) !== JSON.stringify(rekeningToko(db)) || qris !== qrisToko(db);
+  const ubahBaris = (i, patch) => setRekening(rekening.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const simpan = () => {
+    simpanPembayaranManual(db, { rekening, qris });
+    tampilToast('Info pembayaran disimpan.');
+  };
+  return html`<section class="kartu kolom" aria-labelledby="h-bayar-manual">
+    <h2 class="judul-kecil" id="h-bayar-manual">Pembayaran transfer & QRIS</h2>
+    <p class="bantu">Ditampilkan ke pembeli di kasir dan di link pemesanan${pakaiMayar(db) ? ' (saat Mayar dimatikan)' : ''}. Pembeli transfer atau scan QRIS, lalu toko mengecek mutasi dan menandai pesanan lunas.</p>
+    ${rekening.map(
+      (r, i) => html`<div class="baris-belanja" key=${i}>
+        <div class="dua-kolom">
+          <label class="bidang"><span>Bank / e-wallet</span><input class="input kecil" maxlength="40" placeholder="mis. BCA" aria-label=${'Bank rekening ' + (i + 1)} value=${r.bank} onInput=${(e) => ubahBaris(i, { bank: e.target.value })} /></label>
+          <label class="bidang"><span>Nomor rekening</span><input class="input kecil" inputmode="numeric" maxlength="40" aria-label=${'Nomor rekening ' + (i + 1)} value=${r.nomor} onInput=${(e) => ubahBaris(i, { nomor: e.target.value })} /></label>
+        </div>
+        <label class="bidang"><span>Atas nama</span><input class="input kecil" maxlength="60" aria-label=${'Atas nama rekening ' + (i + 1)} value=${r.atasNama} onInput=${(e) => ubahBaris(i, { atasNama: e.target.value })} /></label>
+        ${rekening.length > 1 && html`<button class="btn kecil bahaya" style="align-self:flex-start" onClick=${() => setRekening(rekening.filter((_, j) => j !== i))}>Hapus rekening ini</button>`}
+      </div>`,
+    )}
+    ${rekening.length < 5 && html`<button class="btn" onClick=${() => setRekening([...rekening, barisKosong()])}><${Ikon} nama="plus" ukuran=${18} />Tambah rekening</button>`}
+    <div class="bidang"><span>Foto QRIS</span>
+      <div class="qris-pilih"><${FotoInput} nilai=${qris} onUbah=${setQris} judul=${qris ? 'Ganti foto QRIS' : 'Unggah foto QRIS'} bantu="Foto / tangkapan layar QRIS toko Anda." aksen="var(--hijau)" ikon="qr" kompresFn=${kompresQris} kelas="qris" /></div>
+      ${qris && html`<button class="btn kecil" style="align-self:flex-start" onClick=${() => setQris('')}>Hapus foto QRIS</button>`}
+    </div>
+    ${berubah && html`<button class="btn solid" onClick=${simpan}>Simpan info pembayaran</button>`}
+  </section>`;
+}
 import { MIN_SANDI } from '../lib/akun.js';
 import { tanggal } from '../lib/util.js';
 
@@ -117,6 +167,7 @@ export function KartuMayar({ k }) {
     try {
       const i = await pengaturanMayar.simpan(db, { kunciApi: kunci.trim(), sandbox });
       setInfo(i);
+      simpanToko(db, { pakaiMayar: true });
       setKunci('');
       setPesan(i.pesan || '');
     } catch (e) {
@@ -126,16 +177,17 @@ export function KartuMayar({ k }) {
     }
   };
   const matikan = async () => {
-    if (!(await tanya({ judul: 'Matikan pembayaran online?', teks: 'Kasir tidak bisa membuat QR pembayaran dan link pemesanan tidak bisa menerima pesanan sampai kunci diisi lagi.', ya: 'Matikan', bahaya: true }))) return;
+    if (!(await tanya({ judul: 'Hapus kunci Mayar?', teks: 'Pembayaran non-tunai kembali memakai transfer & QRIS manual sampai kunci diisi lagi.', ya: 'Hapus kunci', bahaya: true }))) return;
     try {
       setInfo(await pengaturanMayar.matikan(db));
+      simpanToko(db, { pakaiMayar: false });
       setPesan('');
     } catch (e) {
       setGalat(e.message);
     }
   };
   return html`<section class="kartu kolom" aria-labelledby="h-mayar">
-    <h2 class="judul-kecil" id="h-mayar">Pembayaran online (Mayar)</h2>
+    <h2 class="judul-kecil" id="h-mayar">Pembayaran otomatis Mayar (opsional)</h2>
     ${info && html`<div class="hasil-baris"><span>Status</span><b class=${info.aktif ? 'baik' : 'biasa'}>${info.aktif ? `Aktif${info.sandbox ? ' · mode uji (sandbox)' : ''}` : 'Belum aktif'}</b></div>`}
     <p class="bantu">Pembeli membayar lewat QRIS, e-wallet, atau transfer bank; uang masuk ke akun Mayar Anda. Ambil kunci API (Read & Write) di dashboard Mayar: Integrasi → API Key.</p>
     <label class="bidang"><span>${info && info.aktif ? 'Ganti kunci API' : 'Kunci API Mayar'}</span><input class="input" type="password" autocomplete="off" value=${kunci} onInput=${(e) => setKunci(e.target.value)} placeholder="Tempel kunci API di sini" /></label>
@@ -143,6 +195,7 @@ export function KartuMayar({ k }) {
     ${info && info.webhook && html`<div class="bidang"><span>Alamat webhook</span>
       <div class="cari-baris"><input class="input kecil" readonly value=${info.webhook} aria-label="Alamat webhook" /><button class="btn" onClick=${async () => tampilToast((await salin(info.webhook)) ? 'Alamat disalin.' : 'Gagal menyalin.')}>Salin</button></div>
       <span class="bantu">Didaftarkan otomatis saat kunci disimpan. Bila gagal, tempel di dashboard Mayar: Integrasi → Webhook.</span></div>`}
+    ${info && info.aktif && html`<label class="saklar"><input type="checkbox" checked=${pakaiMayar(db)} onChange=${(e) => simpanToko(db, { pakaiMayar: e.target.checked })} /><span>Pakai Mayar untuk kasir dan link pemesanan (bila mati: transfer & QRIS manual)</span></label>`}
     ${pesan && html`<p class="bantu teks-baik" role="status">${pesan}</p>`}
     ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
     <div class="baris-btn">
@@ -190,6 +243,6 @@ export function KartuTokoOnline({ k }) {
           ${qr && html`<div class="qr-bayar" role="img" aria-label="Kode QR link pemesanan" dangerouslySetInnerHTML=${{ __html: buatQR(tautan, { cellSize: 4, margin: 2, scalable: true }) }}></div>`}
         </div>`
       : html`<button class="btn solid" onClick=${buatLink}><${Ikon} nama="tautan" ukuran=${18} />Buat link pemesanan</button>`}
-    <p class="bantu">Pembeli memesan dan langsung membayar lewat Mayar. Pesanan masuk ke menu Pesanan setelah lunas. Hanya menu yang ditandai "Tampil di link pemesanan" yang muncul.</p>
+    <p class="bantu">${pakaiMayar(db) ? 'Pembeli memesan dan langsung membayar lewat Mayar. Pesanan masuk setelah lunas.' : 'Pembeli memesan lalu transfer / scan QRIS toko. Pesanan masuk ke tab "Menunggu bayar"; tandai lunas setelah uang masuk.'} Hanya menu yang ditandai "Tampil di link pemesanan" yang muncul. Testimoni pembeli yang disetujui tampil di bawah halaman ini.</p>
   </section>`;
 }

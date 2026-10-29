@@ -231,6 +231,35 @@ class Penjualan
         return User::findOrFail($idData);
     }
 
+    /** Rekening bank dan foto QRIS untuk pembayaran manual. */
+    private function bayarManual(array $s): array
+    {
+        $rekening = [];
+        foreach (is_array($s['rekening'] ?? null) ? $s['rekening'] : [] as $r) {
+            if (is_array($r) && trim((string) ($r['bank'] ?? '')) !== '' && trim((string) ($r['nomor'] ?? '')) !== '') {
+                $rekening[] = [
+                    'bank' => mb_substr(trim((string) $r['bank']), 0, 40),
+                    'nomor' => mb_substr(trim((string) $r['nomor']), 0, 40),
+                    'atasNama' => mb_substr(trim((string) ($r['atasNama'] ?? '')), 0, 60),
+                ];
+            }
+        }
+        $qris = (string) ($s['qrisUrl'] ?? '');
+
+        return ['rekening' => array_slice($rekening, 0, 5), 'qrisUrl' => str_starts_with($qris, 'http') ? $qris : ''];
+    }
+
+    private function adaBayarManual(array $manual): bool
+    {
+        return $manual['rekening'] !== [] || $manual['qrisUrl'] !== '';
+    }
+
+    /** Mayar dipakai bila diaktifkan admin dan kuncinya sudah diisi. */
+    private function pakaiMayar(array $s, User $dapur): bool
+    {
+        return (bool) ($s['pakaiMayar'] ?? false) && $this->mayar->siap($dapur);
+    }
+
     public function infoToko(mixed $token): array
     {
         $toko = $this->tokoDariToken($token);
@@ -241,9 +270,19 @@ class Penjualan
         $s = $toko['setelan'];
         $stok = $this->stokMakanan($id);
         $isiPaket = $this->petaIsiPaket($id);
+        // Kategori etalase: paket = "Paket", resep = nama kategori resepnya.
+        $namaKat = [];
+        foreach ($this->semua($id, 'Kategori') as $kat) {
+            $namaKat[$kat['id']] = (string) $kat['nama'];
+        }
+        $katResep = [];
+        foreach ($this->semua($id, 'Resep') as $r) {
+            $katResep[$r['id']] = $namaKat[$r['idKategori']] ?? '';
+        }
         $menu = [];
         foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
             $menu[] = [
+                'kategori' => $m['jenis'] === 'paket' ? 'Paket' : (($katResep[$m['idRef']] ?? '') ?: 'Lainnya'),
                 'id' => $m['id'],
                 'nama' => (string) $m['nama'],
                 'harga' => (float) $m['harga'],
@@ -255,16 +294,21 @@ class Penjualan
         }
         usort($menu, fn ($a, $b) => $a['urutan'] <=> $b['urutan']);
         $merek = $this->ambil($id, 'Setelan', 'stl_merek');
+        $mayar = $this->pakaiMayar($s, $this->dapur($id));
+        $manual = $this->bayarManual($s);
 
         return [
             'ok' => true,
-            'namaToko' => (string) ($s['namaToko'] ?: ($merek['namaAplikasi'] ?? '') ?: 'Toko'),
+            'namaToko' => (string) ($s['namaToko'] ?: ($merek['namaAplikasi'] ?? '') ?: config('app.name', 'Toko')),
             'logoUrl' => (string) (($merek['logoUrl'] ?? '') ?: app(Situs::class)->tampilan()['logoUrl']),
             'buka' => (bool) $s['tokoBuka'],
             'alamat' => (string) $s['alamatToko'],
             'wa' => (string) $s['waToko'],
             'catatan' => mb_substr((string) $s['catatanToko'], 0, 500),
-            'bayarOnline' => $this->mayar->siap($this->dapur($id)),
+            'bayarOnline' => $mayar || $this->adaBayarManual($manual),
+            'mayar' => $mayar,
+            'bayarManual' => $mayar ? null : $manual,
+            'testimoni' => $this->testimoniTampil($id),
             'menu' => $menu,
         ];
     }
@@ -281,7 +325,8 @@ class Penjualan
             return ['ok' => false, 'galat' => 'Maaf, toko sedang tutup.'];
         }
         $dapur = $this->dapur($id);
-        if (! $this->mayar->siap($dapur)) {
+        $mayar = $this->pakaiMayar($toko['setelan'], $dapur);
+        if (! $mayar && ! $this->adaBayarManual($this->bayarManual($toko['setelan']))) {
             return ['ok' => false, 'galat' => 'Toko ini belum bisa menerima pembayaran online.'];
         }
         $nama = $this->teks($req['nama'] ?? '', 60);
@@ -336,13 +381,14 @@ class Penjualan
         $nomor = self::nomorPesanan();
         $s = $toko['setelan'];
         $kembaliKe = rtrim((string) config('goodrecipes.frontend_url'), '/');
-        $link = $this->mayar->buat($dapur, [
+        // Tanpa Mayar: pembeli transfer / scan QRIS toko, lalu toko menandai lunas secara manual.
+        $link = $mayar ? $this->mayar->buat($dapur, [
             'nama' => $nama,
             'jumlah' => (int) round($total),
             'hp' => $hp,
             'keterangan' => 'Pesanan #'.$nomor.' - '.($s['namaToko'] ?: 'Toko'),
             'kembaliKe' => $kembaliKe ? $kembaliKe.'/#/pesan/'.$s['tokenToko'].'?pesanan='.$idPesanan : '',
-        ]);
+        ]) : ['id' => '', 'link' => ''];
 
         return Sinkron::denganKunci($id, fn () => DB::transaction(function () use ($id, $idPesanan, $nomor, $nama, $hp, $idPelanggan, $item, $subtotal, $diskon, $promo, $total, $sekarang, $req, $link) {
             if (! $this->ambil($id, 'Pelanggan', $idPelanggan)) {
@@ -356,12 +402,66 @@ class Penjualan
             ]);
             $this->simpan($id, 'Pembayaran', [
                 'id' => 'byr_'.base_convert((string) $sekarang, 10, 36).Str::lower(Str::random(8)), 'idPesanan' => $idPesanan,
-                'metode' => 'mayar', 'jumlah' => $total, 'status' => 'menunggu', 'idMayar' => $link['id'], 'linkMayar' => $link['link'],
+                'metode' => $link['id'] ? 'mayar' : 'transfer', 'jumlah' => $total, 'status' => 'menunggu', 'idMayar' => $link['id'], 'linkMayar' => $link['link'],
                 'waktu' => $sekarang,
             ]);
 
             return ['ok' => true, 'idPesanan' => $idPesanan, 'nomor' => $nomor, 'total' => $total, 'link' => $link['link']];
         }));
+    }
+
+    /** Testimoni yang disetujui admin, terbaru dulu (untuk halaman pemesanan). */
+    private function testimoniTampil(int $id): array
+    {
+        $daftar = $this->semua($id, 'Testimoni', fn ($t) => (bool) $t['tampil'] && trim((string) $t['isi']) !== '');
+        usort($daftar, fn ($a, $b) => (int) $b['waktu'] <=> (int) $a['waktu']);
+
+        return array_map(fn ($t) => [
+            'nama' => mb_substr((string) $t['nama'], 0, 60),
+            'isi' => mb_substr((string) $t['isi'], 0, 500),
+            'bintang' => max(1, min(5, (int) ($t['bintang'] ?: 5))),
+            'waktu' => (int) $t['waktu'],
+        ], array_slice($daftar, 0, 30));
+    }
+
+    /**
+     * Pembeli mengirim testimoni dari halaman status pesanan (pesanan online yang sudah lunas, sekali per pesanan).
+     * Tidak langsung tampil: admin menyetujuinya dulu.
+     */
+    public function kirimTestimoni(array $req): array
+    {
+        $toko = $this->tokoDariToken($req['token'] ?? null);
+        $id = $toko['idData'] ?? 0;
+        $idPesanan = is_string($req['idPesanan'] ?? null) && strlen($req['idPesanan']) <= 100 ? $req['idPesanan'] : '';
+        $p = $toko && $idPesanan ? $this->ambil($id, 'Pesanan', $idPesanan) : null;
+        if (! $p || $p['dihapus'] || $p['sumber'] !== 'online') {
+            return ['ok' => false, 'galat' => 'Pesanan tidak ditemukan.'];
+        }
+        $lunas = (bool) $this->semua($id, 'Pembayaran', fn ($b) => $b['idPesanan'] === $p['id'] && $b['status'] === 'lunas');
+        if (! $lunas || $p['status'] === 'batal') {
+            return ['ok' => false, 'galat' => 'Testimoni bisa dikirim setelah pesanan dibayar.'];
+        }
+        $isi = $this->teks($req['isi'] ?? '', 500);
+        if (mb_strlen($isi) < 5) {
+            return ['ok' => false, 'galat' => 'Tulis testimoni minimal beberapa kata.'];
+        }
+        $bintang = is_numeric($req['bintang'] ?? null) ? max(1, min(5, (int) $req['bintang'])) : 5;
+        $nama = $this->teks($req['nama'] ?? '', 60) ?: $p['nama'];
+        // Id tetap per pesanan: kirim ulang hanya memperbarui, tidak menambah baris.
+        $idTesti = 'tst_'.substr(preg_replace('/[^a-z0-9]/', '', strtolower($p['id'])), -40);
+
+        return Sinkron::denganKunci($id, function () use ($id, $idTesti, $nama, $isi, $bintang, $p) {
+            $lama = $this->ambil($id, 'Testimoni', $idTesti);
+            if ($lama && ! $lama['dihapus'] && $lama['tampil']) {
+                return ['ok' => false, 'galat' => 'Testimoni untuk pesanan ini sudah tayang. Terima kasih!'];
+            }
+            $this->simpan($id, 'Testimoni', [
+                'id' => $idTesti, 'nama' => $nama, 'isi' => $isi, 'bintang' => $bintang, 'idPesanan' => $p['id'],
+                'tampil' => false, 'sumber' => 'pembeli', 'waktu' => self::sekarang(), 'dihapus' => false,
+            ]);
+
+            return ['ok' => true, 'pesan' => 'Terima kasih! Testimoni Anda akan tampil setelah dicek toko.'];
+        });
     }
 
     /** Status pesanan untuk pembeli (dibuka dari link setelah membayar). Menanyakan Mayar bila belum lunas. */
@@ -390,9 +490,15 @@ class Penjualan
             }
         }
 
+        $tungguTransfer = ! $lunas && $p['status'] === 'menunggu' && (bool) array_filter($bayar, fn ($b) => $b['metode'] === 'transfer' && $b['status'] === 'menunggu');
+        $testimoni = $this->semua($id, 'Testimoni', fn ($t) => $t['idPesanan'] === $p['id']);
+
         return [
             'ok' => true, 'nomor' => $p['nomor'], 'status' => $p['status'], 'lunas' => $lunas, 'total' => (float) $p['total'],
             'item' => $p['item'] ?: [], 'nama' => $p['nama'], 'link' => $lunas ? '' : $link,
+            'bayarManual' => $tungguTransfer ? $this->bayarManual($toko['setelan']) : null,
+            'wa' => (string) $toko['setelan']['waToko'],
+            'bisaTestimoni' => $lunas && $p['status'] !== 'batal' && ! $testimoni,
         ];
     }
 

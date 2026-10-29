@@ -50,7 +50,7 @@ const MENU_ADMIN = [
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
   { kunci: 'menu', jalur: '/menu', label: 'Menu & Harga Jual', ikon: 'tag' },
   { kunci: 'pesanan', jalur: '/pesanan', label: 'Laporan Pesanan', ikon: 'dompet', pil: true },
-  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan & Promo', ikon: 'pelanggan' },
+  { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan, Promo & Testimoni', ikon: 'pelanggan' },
   { kunci: 'ulasan', jalur: '/ulasan', label: 'Ulasan', ikon: 'obrolan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Pengaturan', ikon: 'gerigi', pil: true },
   { kunci: 'ke-toko', jalur: ALAMAT_TOKO, label: 'Buka Halaman Toko', ikon: 'toko', luar: true },
