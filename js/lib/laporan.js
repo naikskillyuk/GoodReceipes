@@ -248,6 +248,26 @@ export function buatLaporan(db, { dari, sampai }) {
   };
 }
 
+// ---------- Saring pesanan per status ----------
+
+/** Pilihan saring pesanan di laporan. 'belum-bayar' = belum lunas (tanpa yang batal). */
+export const SARING_STATUS = [
+  { kunci: '', label: 'Semua' },
+  { kunci: 'menunggu', label: 'Menunggu bayar' },
+  { kunci: 'baru', label: 'Baru' },
+  { kunci: 'diproses', label: 'Diproses' },
+  { kunci: 'siap', label: 'Siap diambil' },
+  { kunci: 'selesai', label: 'Selesai' },
+  { kunci: 'batal', label: 'Batal' },
+  { kunci: 'belum-bayar', label: 'Belum dibayar' },
+];
+
+export function saringPesanan(db, daftar, status = '') {
+  if (!status) return daftar;
+  if (status === 'belum-bayar') return daftar.filter((p) => p.status !== 'batal' && !statusBayar(db, p.id).lunas);
+  return daftar.filter((p) => p.status === status);
+}
+
 // ---------- CSV ----------
 
 /** Baris (array of array) -> CSV dengan pemisah titik koma (Excel Indonesia) dan BOM supaya huruf tetap benar. */
@@ -267,12 +287,12 @@ const jam = (ts) => {
 };
 const STATUS = { menunggu: 'Menunggu bayar', baru: 'Baru', diproses: 'Diproses', siap: 'Siap', selesai: 'Selesai', batal: 'Batal' };
 
-/** Tabel laporan siap ekspor CSV: { judul, kolom, baris }. */
-export function tabelCsv(db, lap, bagian) {
+/** Tabel laporan siap ekspor CSV (array baris). Pesanan bisa disaring per status. */
+export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
   if (bagian === 'pesanan') {
     return [
       ['Nomor', 'Tanggal', 'Jam', 'Pembeli', 'WhatsApp', 'Sumber', 'Status', 'Bayar', 'Item', 'Subtotal', 'Diskon', 'Ongkir', 'Total'],
-      ...lap.pesanan.map((p) => {
+      ...saringPesanan(db, lap.pesanan, status).map((p) => {
         const s = statusBayar(db, p.id);
         return [
           p.nomor, tgl(p.waktu), jam(p.waktu), p.nama || '', p.hp || '', p.sumber === 'online' ? 'Online' : p.sumber === 'manual' ? 'Manual' : 'Kasir', STATUS[p.status] || p.status,

@@ -466,6 +466,18 @@ try {
   await kasir.locator('#lap-pelanggan tbody tr', { hasText: 'Budi' }).waitFor();
   await kasir.locator('#lap-stok tbody tr', { hasText: 'Brownies Fudgy' }).waitFor();
   assert.ok((await kasir.locator('#lap-pesanan tbody tr').count()) >= 3, 'daftar pesanan');
+  assert.equal(await kasir.locator('#lap-pesanan input[type=checkbox]').count(), 0, 'kasir tidak bisa menghapus pesanan');
+  const semuaPesanan = await kasir.locator('#lap-pesanan tbody tr').count();
+  // Chip status yang ada isinya (chip berisi 0 disembunyikan); pilih status pertama selain "Semua".
+  const chipStatus = kasir.locator('.laporan-status a.chip').nth(1);
+  const labelStatus = (await chipStatus.innerText()).replace(/\s*\(\d+\)$/, '');
+  await chipStatus.click();
+  await kasir.waitForURL(/status=/);
+  await kasir.getByRole('heading', { name: 'Pesanan · ' + labelStatus }).waitFor();
+  const jumlahStatus = await kasir.locator('#lap-pesanan tbody tr').count();
+  assert.ok(jumlahStatus >= 1 && jumlahStatus < semuaPesanan, 'saring status ' + labelStatus);
+  for (const st of await kasir.locator('#lap-pesanan tbody .lencana-status').allInnerTexts()) assert.equal(st, labelStatus);
+  await kasir.locator('.laporan-status a.chip', { hasText: 'Semua' }).click();
   assert.ok((await sisaLebar(kasir)) <= 0, 'laporan tidak melebar di HP');
   await foto(kasir, '09b-laporan');
   const unduhan = kasir.waitForEvent('download');
@@ -533,6 +545,18 @@ try {
   await kasir.getByRole('button', { name: 'Masukkan ke keranjang' }).click();
   await kasir.getByText('+ Tambah keju').waitFor();
   assert.equal(await kasir.locator('.total-kasir').innerText(), 'Rp 8.000', '2 x (3.000 + keju 1.000)');
+
+  tahap('admin: hapus pesanan dari laporan (pilih lalu hapus)');
+  await page.goto(ADMIN + '#/laporan?preset=7-hari');
+  await page.locator('#lap-pesanan tbody tr').first().waitFor();
+  const sebelumHapus = await page.locator('#lap-pesanan tbody tr').count();
+  const nomorHapus = (await page.locator('#lap-pesanan tbody tr').first().locator('td').nth(1).innerText()).trim();
+  await page.locator('#lap-pesanan tbody input[type=checkbox]').first().check();
+  await page.locator('.laporan-pilih').getByRole('button', { name: 'Hapus 1 pesanan' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Hapus 1 pesanan' }).click();
+  await page.getByText('1 pesanan dihapus.').waitFor();
+  assert.equal(await page.locator('#lap-pesanan tbody tr').count(), sebelumHapus - 1);
+  assert.equal(await page.locator('#lap-pesanan tbody tr', { hasText: nomorHapus }).count(), 0, 'pesanan ' + nomorHapus + ' hilang');
 
   await kasir.setViewportSize({ width: 1280, height: 860 });
   await kasir.goto(BASE + '/#/kasir');

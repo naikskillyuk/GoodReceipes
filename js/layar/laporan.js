@@ -5,8 +5,9 @@ import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Kosong } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
-import { buatLaporan, rentangPreset, PRESET_RENTANG, keIsoTanggal, dariIsoTanggal, keCsv, tabelCsv, awalHari } from '../lib/laporan.js';
-import { statusBayar, STATUS_PESANAN, LABEL_METODE, namaItem, ambilToko, tampilHp } from '../lib/toko.js';
+import { buatLaporan, rentangPreset, PRESET_RENTANG, keIsoTanggal, dariIsoTanggal, keCsv, tabelCsv, awalHari, SARING_STATUS, saringPesanan } from '../lib/laporan.js';
+import { statusBayar, STATUS_PESANAN, LABEL_METODE, namaItem, ambilToko, tampilHp, hapusPesanan, peranAkun } from '../lib/toko.js';
+import { tanya, tampilToast } from '../ui/pesan.js';
 import { ambilMerek } from '../lib/repo.js';
 import { rupiah, angka, tanggal, tampilJumlah } from '../lib/util.js';
 import { GrafikPemasukan } from './beranda-kasir.js';
@@ -55,7 +56,7 @@ function Bagian({ kunci, judul, sub, onCsv, children }) {
 function Tabel({ kepala, children, kosong }) {
   if (kosong) return html`<p class="bantu">${kosong}</p>`;
   return html`<div class="tabel-gulir"><table class="tabel-data tabel-laporan">
-    <thead><tr>${kepala.map((k) => (typeof k === 'string' ? html`<th>${k}</th>` : html`<th class="angka">${k.angka}</th>`))}</tr></thead>
+    <thead><tr>${kepala.map((k) => (typeof k === 'string' ? html`<th>${k}</th>` : k && k.angka !== undefined ? html`<th class="angka">${k.angka}</th>` : html`<th class="tak-cetak">${k}</th>`))}</tr></thead>
     <tbody>${children}</tbody>
   </table></div>`;
 }
@@ -114,13 +115,58 @@ function Ringkasan({ lap }) {
     </div>`;
 }
 
-function TabelPesanan({ db, lap }) {
+/** Chip saring status pesanan (tersimpan di alamat, jadi ikut saat dicetak / dibagikan). */
+function SaringStatus({ db, lap, status, alamat }) {
+  return html`<div class="chips tak-cetak laporan-status" role="group" aria-label="Saring status pesanan">
+    ${SARING_STATUS.map((s) => {
+      const n = saringPesanan(db, lap.pesanan, s.kunci).length;
+      const aktif = s.kunci === status;
+      if (!n && !aktif && s.kunci) return null;
+      return html`<a key=${s.kunci || 'semua'} class=${'chip' + (aktif ? ' aktif' : '')} aria-current=${aktif ? 'true' : null} href=${tautan(alamat + (s.kunci ? '&status=' + s.kunci : ''))}>${s.label} (${angka(n)})</a>`;
+    })}
+  </div>`;
+}
+
+/** Daftar pesanan laporan. Admin bisa memilih lalu menghapus pesanan (mis. pesanan uji coba / salah catat). */
+function TabelPesanan({ db, pesanan, status }) {
   const [semua, setSemua] = useState(false);
-  const daftar = semua ? lap.pesanan : lap.pesanan.slice(0, BATAS_BARIS);
-  return html`<${Tabel} kepala=${['Nomor', 'Waktu', 'Pembeli', 'Isi', 'Status', 'Bayar', { angka: 'Total' }, '']} kosong=${lap.pesanan.length ? '' : 'Tidak ada pesanan di rentang ini.'}>
+  const [pilih, setPilih] = useState(() => new Set());
+  const admin = peranAkun(db) === 'dapur';
+  const daftar = semua ? pesanan : pesanan.slice(0, BATAS_BARIS);
+  const ada = pesanan.filter((p) => pilih.has(p.id));
+  const semuaDipilih = pesanan.length > 0 && ada.length === pesanan.length;
+  const balik = (id) => setPilih((x) => {
+    const baru = new Set(x);
+    if (baru.has(id)) baru.delete(id);
+    else baru.add(id);
+    return baru;
+  });
+  const hapus = async () => {
+    const lunas = ada.filter((p) => statusBayar(db, p.id).lunas);
+    const ya = await tanya({
+      judul: `Hapus ${ada.length} pesanan?`,
+      teks: `Pesanan dan pembayarannya dihapus dari semua perangkat dan laporan${lunas.length ? `, termasuk ${lunas.length} yang sudah lunas (${rupiah(lunas.reduce((j, p) => j + (Number(p.total) || 0), 0))})` : ''}. Stok yang terpotong dikembalikan. Tidak bisa dibatalkan.`,
+      ya: `Hapus ${ada.length} pesanan`,
+      bahaya: true,
+    });
+    if (!ya) return;
+    ada.forEach((p) => hapusPesanan(db, p.id));
+    setPilih(new Set());
+    tampilToast(`${ada.length} pesanan dihapus.`);
+  };
+  const kepala = [...(admin && pesanan.length ? [html`<input type="checkbox" aria-label="Pilih semua pesanan" checked=${semuaDipilih} onChange=${() => setPilih(semuaDipilih ? new Set() : new Set(pesanan.map((p) => p.id)))} />`] : []), 'Nomor', 'Waktu', 'Pembeli', 'Isi', 'Status', 'Bayar', { angka: 'Total' }, ''];
+  return html`${admin && ada.length > 0 && html`<div class="laporan-pilih tak-cetak" role="status">
+      <span><b>${ada.length}</b> pesanan dipilih</span>
+      <span class="baris-btn">
+        <button type="button" class="btn kecil abu" onClick=${() => setPilih(new Set())}>Batal pilih</button>
+        <button type="button" class="btn kecil bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${16} />Hapus ${ada.length} pesanan</button>
+      </span>
+    </div>`}
+    <${Tabel} kepala=${kepala} kosong=${pesanan.length ? '' : status ? 'Tidak ada pesanan dengan status ini di rentang ini.' : 'Tidak ada pesanan di rentang ini.'}>
       ${daftar.map((p) => {
         const s = statusBayar(db, p.id);
         return html`<tr key=${p.id} class=${p.status === 'batal' ? 'mati' : ''}>
+          ${admin && html`<td class="tak-cetak"><input type="checkbox" aria-label=${'Pilih pesanan #' + p.nomor} checked=${pilih.has(p.id)} onChange=${() => balik(p.id)} /></td>`}
           <td><a href=${tautan('/pesanan/' + p.id)}><b>#${p.nomor}</b></a></td>
           <td class="nowrap">${tanggal(p.waktu)}<br /><small class="teks-kecil">${jam(p.waktu)}</small></td>
           <td>${p.nama || html`<span class="teks-kecil">–</span>`}</td>
@@ -132,7 +178,7 @@ function TabelPesanan({ db, lap }) {
         </tr>`;
       })}
     <//>
-    <${Lebih} total=${lap.pesanan.length} semua=${semua} setSemua=${setSemua} />`;
+    <${Lebih} total=${pesanan.length} semua=${semua} setSemua=${setSemua} />`;
 }
 
 function TabelProduk({ lap }) {
@@ -202,12 +248,16 @@ export function Laporan({ k }) {
   });
   const namaToko = ambilToko(db).namaToko || ambilMerek(db).nama;
   const teksRentang = lap.dari === lap.sampai ? tanggal(lap.dari) : `${tanggal(lap.dari)} – ${tanggal(lap.sampai)}`;
-  const namaBerkas = (bagian) => `laporan-${bagian}-${keIsoTanggal(lap.dari)}_${keIsoTanggal(lap.sampai)}.csv`;
-  const csv = (bagian) => () => unduhCsv(namaBerkas(bagian), tabelCsv(db, lap, bagian));
+  const status = SARING_STATUS.some((s) => s.kunci === rute.kueri.status) ? rute.kueri.status : '';
+  const labelStatus = status ? SARING_STATUS.find((s) => s.kunci === status).label : '';
+  const pesanan = saringPesanan(db, lap.pesanan, status);
+  const nilaiPesanan = pesanan.reduce((j, p) => j + (Number(p.total) || 0), 0);
+  const namaBerkas = (bagian) => `laporan-${bagian}${bagian === 'pesanan' && status ? '-' + status : ''}-${keIsoTanggal(lap.dari)}_${keIsoTanggal(lap.sampai)}.csv`;
+  const csv = (bagian) => () => unduhCsv(namaBerkas(bagian), tabelCsv(db, lap, bagian, { status }));
   const ubahTanggal = (kunci, nilai) => {
     const t = dariIsoTanggal(nilai);
     if (!Number.isFinite(t)) return;
-    pergi(kunci === 'dari' ? alamatRentang(t, Math.max(t, lap.sampai)) : alamatRentang(Math.min(lap.dari, t), t), { ganti: true });
+    pergi((kunci === 'dari' ? alamatRentang(t, Math.max(t, lap.sampai)) : alamatRentang(Math.min(lap.dari, t), t)) + (status ? '&status=' + status : ''), { ganti: true });
   };
   const keBagian = (kunci) => {
     const el = document.getElementById('lap-' + kunci);
@@ -230,7 +280,7 @@ export function Laporan({ k }) {
           ${PRESET_RENTANG.map((p) => {
             const r = rentangPreset(p.kunci);
             const aktif = preset && preset.kunci === p.kunci;
-            return html`<a key=${p.kunci} class=${'chip' + (aktif ? ' aktif' : '')} aria-current=${aktif ? 'true' : null} href=${tautan(alamatRentang(r.dari, r.sampai))}>${p.label}</a>`;
+            return html`<a key=${p.kunci} class=${'chip' + (aktif ? ' aktif' : '')} aria-current=${aktif ? 'true' : null} href=${tautan(alamatRentang(r.dari, r.sampai) + (status ? '&status=' + status : ''))}>${p.label}</a>`;
           })}
         </div>
         <div class="laporan-tanggal">
@@ -253,8 +303,9 @@ export function Laporan({ k }) {
       <${Bagian} kunci="ringkasan" judul="Ringkasan">
         <${Ringkasan} lap=${lap} />
       <//>
-      <${Bagian} kunci="pesanan" judul="Pesanan" sub=${`${angka(lap.pesanan.length)} pesanan, terbaru di atas. Ikon struk untuk mencetak ulang.`} onCsv=${csv('pesanan')}>
-        <${TabelPesanan} db=${db} lap=${lap} />
+      <${Bagian} kunci="pesanan" judul=${status ? `Pesanan · ${labelStatus}` : 'Pesanan'} sub=${`${angka(pesanan.length)} pesanan · ${rupiah(nilaiPesanan)}, terbaru di atas. Ikon struk untuk mencetak ulang.`} onCsv=${csv('pesanan')}>
+        <${SaringStatus} db=${db} lap=${lap} status=${status} alamat=${alamatRentang(lap.dari, lap.sampai)} />
+        <${TabelPesanan} key=${status} db=${db} pesanan=${pesanan} status=${status} />
       <//>
       <${Bagian} kunci="produk" judul="Produk terlaris" sub="Urut dari jumlah terjual." onCsv=${csv('produk')}>
         <${TabelProduk} lap=${lap} />

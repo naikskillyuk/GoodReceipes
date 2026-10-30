@@ -7064,3 +7064,24 @@ a.chip {
     display: none !important;
   }
 }
+.laporan-status .chip {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.laporan-pilih {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: #fbe9e2;
+  color: var(--bahaya);
+}
+.tabel-laporan input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--hijau);
+}

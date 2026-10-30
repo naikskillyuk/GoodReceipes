@@ -5,7 +5,7 @@
 // diperbarui otomatis oleh `npm run sw` (juga dijalankan oleh workflow GitHub Pages).
 // Permintaan ke server API tidak pernah dicegat: itu lintas-asal.
 
-const VERSI = 'resep-eb990c6928';
+const VERSI = 'resep-642e236438';
 const FILE = [
   // <daftar-file>
   'config.js',

@@ -131,3 +131,40 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
   assert.equal(keCsv([['a;b', 'c"d']]), '﻿"a;b";"c""d"');
   for (const bagian of ['ringkasan', 'pesanan', 'pelanggan', 'stok']) assert.ok(tabelCsv(db, lap, bagian).length > 1, bagian);
 });
+
+test('saring pesanan per status (termasuk belum dibayar) dan CSV ikut tersaring', async () => {
+  const { db, menu } = await siapkan();
+  const { saringPesanan } = await import('../js/lib/laporan.js');
+  const buat = (nama, status, lunas) => {
+    const p = db.simpan('Pesanan', { nomor: nama, sumber: 'kasir', nama, status, item: [{ idMenu: menu.id, nama: 'Brownies', harga: 10000, jumlah: 1 }], total: 10000, waktu: Date.now() });
+    if (lunas) db.simpan('Pembayaran', { idPesanan: p.id, metode: 'tunai', jumlah: 10000, status: 'lunas', waktu: Date.now(), lunasPada: Date.now() });
+  };
+  buat('A', 'selesai', true);
+  buat('B', 'baru', false);
+  buat('C', 'batal', false);
+  buat('D', 'menunggu', false);
+  const lap = buatLaporan(db, rentangPreset('hari-ini'));
+  const nama = (st) => saringPesanan(db, lap.pesanan, st).map((p) => p.nama).sort();
+  assert.deepEqual(nama(''), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(nama('batal'), ['C']);
+  assert.deepEqual(nama('belum-bayar'), ['B', 'D'], 'batal tidak dihitung belum dibayar');
+  const csv = tabelCsv(db, lap, 'pesanan', { status: 'selesai' });
+  assert.equal(csv.length, 2);
+  assert.equal(csv[1][0], 'A');
+});
+
+test('hapus pesanan: pembayaran ikut terhapus, stok kembali, hanya admin', async () => {
+  const { db, brownies, menu } = await siapkan();
+  toko.ubahStokMakanan(db, brownies, { jenis: 'koreksi', nilai: 10 });
+  const p = toko.buatPesanan(db, { keranjang: [{ idMenu: menu.id, jumlah: 3 }], nama: 'Uji' });
+  toko.bayarTunai(db, p, 30000);
+  assert.equal(toko.stokMakanan(db).get(brownies), 7);
+  db.pengaturan.akun = { peran: 'toko' };
+  assert.throws(() => toko.hapusPesanan(db, p.id), /admin/);
+  db.pengaturan.akun = { peran: 'dapur' };
+  assert.equal(toko.hapusPesanan(db, p.id), true);
+  assert.equal(db.ambil('Pesanan', p.id), null);
+  assert.equal(toko.pembayaranPesanan(db, p.id).length, 0);
+  assert.equal(toko.stokMakanan(db).get(brownies), 10);
+  assert.equal(toko.hapusPesanan(db, p.id), false);
+});

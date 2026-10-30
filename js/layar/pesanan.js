@@ -8,7 +8,7 @@ import { tautan, pergi } from '../ui/router.js';
 import { buatQR, salin } from './bagikan.js';
 import {
   daftarPesanan, statusBayar, ubahStatusPesanan, bayarTunai, bayarTransfer, saranUang, mintaBayarMayar, cekBayarMayar,
-  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, LABEL_AMBIL, caraAmbil, aturKendala, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
+  STATUS_PESANAN, ALUR_STATUS, LABEL_METODE, LABEL_AMBIL, caraAmbil, aturKendala, hapusPesanan, peranAkun, namaItem, tampilHp, ringkasPenjualan, bisaDiubah, rekeningToko, qrisToko, pakaiMayar,
 } from '../lib/toko.js';
 import { rupiah, angka, tanggal } from '../lib/util.js';
 
@@ -260,6 +260,18 @@ export function DetailPesanan({ k, id }) {
     }
     ubahStatusPesanan(db, p.id, status);
   };
+  const hapus = async () => {
+    const ya = await tanya({
+      judul: `Hapus pesanan #${p.nomor}?`,
+      teks: `Pesanan dan pembayarannya${s.lunas ? ` (${rupiah(p.total)}, sudah lunas)` : ''} dihapus dari semua perangkat dan laporan. Stok yang terpotong dikembalikan. Tidak bisa dibatalkan.`,
+      ya: 'Hapus pesanan',
+      bahaya: true,
+    });
+    if (!ya) return;
+    hapusPesanan(db, p.id);
+    tampilToast(`Pesanan #${p.nomor} dihapus.`);
+    pergi('/pesanan', { ganti: true });
+  };
   const cara = caraAmbil(p);
   const kabarSiap = cara === 'ojol' ? 'sudah siap. Silakan pesan Gojek / Grab ke toko sekarang' : 'sudah siap diambil';
   const waPembeli = p.hp ? `https://wa.me/${p.hp}?text=${encodeURIComponent(`Halo ${p.nama || ''}, pesanan #${p.nomor} ${p.status === 'siap' ? kabarSiap : 'sedang kami proses'}. Terima kasih!`)}` : '';
@@ -298,6 +310,7 @@ export function DetailPesanan({ k, id }) {
               ${bisaDiubah(db, p) && html`<a class="btn" href=${tautan('/catat-pesanan?id=' + p.id)}><${Ikon} nama="ubah" ukuran=${18} />Ubah pesanan</a>`}
               ${p.status === 'batal' && html`<button class="btn" onClick=${() => ubah('baru')}>Buka lagi</button>`}
               ${p.status !== 'batal' && p.status !== 'selesai' && html`<button class="btn bahaya" onClick=${() => ubah('batal')}>Batalkan</button>`}
+              ${peranAkun(db) === 'dapur' && html`<button class="btn bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${18} />Hapus</button>`}
             </div>
           </section>
           ${p.status !== 'batal' && p.status !== 'selesai' && html`<${KartuKendala} key=${p.id + ':' + (p.kendala || '')} db=${db} p=${p} />`}

@@ -727,6 +727,20 @@ export function ubahStatusPesanan(db, idPesanan, status) {
   return baru;
 }
 
+/**
+ * Hapus pesanan beserta pembayarannya. Stok yang terpotong pesanan ini dikembalikan.
+ * Hanya admin (akun dapur) yang boleh; dipakai untuk pesanan uji coba / salah catat.
+ */
+export function hapusPesanan(db, idPesanan) {
+  const p = db.ambil('Pesanan', idPesanan);
+  if (!p) return false;
+  if (peranAkun(db) !== 'dapur') throw new Error('Hanya admin yang bisa menghapus pesanan.');
+  kembalikanStokPesanan(db, p);
+  pembayaranPesanan(db, idPesanan).forEach((b) => db.hapus('Pembayaran', b.id));
+  db.hapus('Pesanan', idPesanan);
+  return true;
+}
+
 /** Pesan kendala dari dapur untuk pembeli (mis. bahan habis, pesanan mundur). '' = kendala selesai. */
 export function aturKendala(db, idPesanan, teks) {
   const p = db.ambil('Pesanan', idPesanan);
