@@ -63,6 +63,26 @@ function ingatan(token) {
   return typeof v === 'string' ? v : '';
 }
 
+// Semua pesanan dari perangkat ini (terbaru dulu, maks. 20). Pesanan terakhir versi lama ikut terbaca.
+const kunciDaftarPesanan = (token) => 'pesanan-saya-' + token;
+const MAKS_PESANAN_SAYA = 20;
+function pesananSaya(token) {
+  const v = baca(kunciDaftarPesanan(token), []);
+  let ids = Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : [];
+  const lama = ingatan(token);
+  if (lama && !ids.includes(lama)) ids = [lama, ...ids];
+  return ids.slice(0, MAKS_PESANAN_SAYA);
+}
+function ingatPesanan(token, id) {
+  if (!id) return;
+  tulis(kunciDaftarPesanan(token), [id, ...pesananSaya(token).filter((x) => x !== id)].slice(0, MAKS_PESANAN_SAYA));
+  tulis(kunciPesanan(token), id);
+}
+function lupakanPesanan(token, id) {
+  tulis(kunciDaftarPesanan(token), pesananSaya(token).filter((x) => x !== id));
+  if (ingatan(token) === id) tulis(kunciPesanan(token), '');
+}
+
 /** Pindah layar etalase, tetap membawa ?u= (alamat server untuk server uji). */
 function keLayar(k, token, l, extra = {}) {
   const q = new URLSearchParams();
@@ -91,18 +111,23 @@ function TombolTambah({ m, n, atur }) {
   </span>`;
 }
 
-function KartuProduk({ m, n, atur, buka, lebar }) {
+/** Harga untuk pembeli; menu "Coming soon" tidak menampilkan harga. */
+const tampilHarga = (m, nilai) => (m.segera ? 'Coming soon' : rupiah(nilai));
+
+function KartuProduk({ m, n, atur, buka, lebar, terjual = false }) {
   const berpilihan = (m.opsi || []).length > 0;
   return html`<article class=${'et-kartu' + (lebar ? ' lebar' : '') + (m.sisa !== null && m.sisa <= 0 ? ' mati' : '')}>
     <button type="button" class="et-kartu-foto" onClick=${() => buka(m)} aria-label=${'Lihat ' + m.nama}>
       <${Foto} src=${m.fotoUrl} ikon="kue" ukuranIkon=${36} />
-      ${m.diskon > 0 && html`<span class="et-diskon">-${m.diskon}%</span>`}
+      ${m.diskon > 0 && !m.segera && html`<span class="et-diskon">-${m.diskon}%</span>`}
+      ${m.segera && html`<span class="et-segera">Coming soon</span>`}
       ${m.sisa !== null && m.sisa > 0 && m.sisa <= 5 && html`<span class="et-pita">Sisa ${m.sisa}</span>`}
     </button>
     <div class="et-kartu-isi">
       <button type="button" class="et-kartu-nama" onClick=${() => buka(m)}>${m.nama}</button>
-      <div class="et-kartu-bawah"><span class="et-harga-blok"><b class="et-harga">${rupiah(m.harga)}</b>${m.diskon > 0 && html`<s>${rupiah(m.hargaAsli)}</s>`}</span><${TombolTambah} m=${m} n=${berpilihan ? 0 : n} atur=${berpilihan ? () => buka(m) : atur} /></div>
+      <div class="et-kartu-bawah"><span class="et-harga-blok">${m.segera ? html`<b class="et-harga segera">Coming soon</b>` : html`<b class="et-harga">${rupiah(m.harga)}</b>${m.diskon > 0 && html`<s>${rupiah(m.hargaAsli)}</s>`}`}</span><${TombolTambah} m=${m} n=${berpilihan ? 0 : n} atur=${berpilihan ? () => buka(m) : atur} /></div>
       ${berpilihan && html`<small class="et-ada-pilihan">Ada pilihan tambahan</small>`}
+      ${terjual && m.terjual > 0 && html`<small class="et-terjual">${m.terjual} terjual</small>`}
     </div>
   </article>`;
 }
@@ -205,12 +230,12 @@ function HeaderEtalase({ info, logo, jumlahKeranjang, ke, cariMenu }) {
   return html`<header class="et-header">
     ${foto ? html`<img class="et-header-foto" src=${foto} alt="" aria-hidden="true" />` : ''}
     <div class="et-header-atas">
-      <span class="et-header-logo"><${LogoMerek} src=${logo} ukuran=${40} /></span>
       <button type="button" class="et-ikon-keranjang" aria-label=${`Keranjang (${jumlahKeranjang})`} onClick=${() => ke('keranjang')}>
         <${Ikon} nama="keranjang" ukuran=${22} />${jumlahKeranjang > 0 && html`<i>${jumlahKeranjang}</i>`}
       </button>
     </div>
     <div class="et-header-teks">
+      <span class="et-header-logo"><${LogoMerek} src=${logo} ukuran=${84} /></span>
       <small>Halo, selamat datang di</small>
       <h1>${info.namaToko}</h1>
     </div>
@@ -243,7 +268,6 @@ function BannerPromo({ info, pakaiKode, keMenu }) {
       foto: foto[i % Math.max(1, foto.length)] || '',
       aksi: html`<button type="button" class="et-banner-kode" onClick=${() => pakaiKode(p.kode)}>Pakai kode <b>${p.kode}</b></button>`,
     })),
-    ...(info.catatan ? [{ kunci: 'info', label: 'Info toko', judul: 'Pengumuman', teks: info.catatan, foto: foto[1] || foto[0] || '', aksi: null }] : []),
     { kunci: 'menu', label: info.namaToko, judul: 'Fresh dari dapur kami', teks: 'Pilih kue dan camilan favorit, ambil atau diantar.', foto: foto[0] || '', aksi: html`<button type="button" class="et-banner-kode" onClick=${() => keMenu('')}>Lihat menu</button>` },
   ];
   // Bila admin sudah membuat banner, slide "Fresh dari dapur kami" bawaan tidak perlu ditampilkan.
@@ -269,36 +293,42 @@ function BannerPromo({ info, pakaiKode, keMenu }) {
   </section>`;
 }
 
+/** Menu terlaris untuk beranda: paling banyak terjual dulu, lalu urutan menu. */
+export function topSelling(menu, jumlah = 6) {
+  return menu
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => (b.m.terjual || 0) - (a.m.terjual || 0) || a.i - b.i)
+    .slice(0, jumlah)
+    .map((x) => x.m);
+}
+
+const IKON_KAT = { Paket: 'kotak', Minuman: 'gelas', Kue: 'kue', Lauk: 'panci', Camilan: 'kue', Cemilan: 'kue', Roti: 'kue' };
+
 function Beranda({ info, jumlah, atur, buka, keMenu, ke, logo, jumlahKeranjang, cariMenu }) {
   const menu = info.menu || [];
   const kategori = [...new Set(menu.map((m) => m.kategori || 'Lainnya'))];
+  const top = topSelling(menu);
   const pakaiKode = (kode) => {
     tulis(kunciKode(info.token), kode);
     tampilToast(`Kode ${kode} dipasang di keranjang.`);
   };
-  const IKON_KAT = { Paket: 'kotak', Minuman: 'gelas', Kue: 'kue', Lauk: 'panci', Camilan: 'kue', Roti: 'kue' };
-  const pintas = [
-    { label: 'Semua menu', ikon: 'buku', klik: () => keMenu('') },
-    ...kategori.slice(0, 2).map((c) => ({ label: c, ikon: IKON_KAT[c] || 'kue', klik: () => keMenu(c) })),
-    { label: 'Pesanan saya', ikon: 'struk', klik: () => ke('pesanan') },
-    ...(info.wa ? [{ label: 'Chat toko', ikon: 'obrolan', href: waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.') }] : [{ label: 'Keranjang', ikon: 'keranjang', klik: () => ke('keranjang') }]),
-  ];
+  const waToko = info.wa ? waTautan(info.wa, 'Halo ' + info.namaToko + ', saya mau tanya.') : '';
   return html`
     <${HeaderEtalase} info=${info} logo=${logo} jumlahKeranjang=${jumlahKeranjang} ke=${ke} cariMenu=${cariMenu} />
     ${!info.buka && html`<div class="et-tutup" role="status"><${Ikon} nama="jam" ukuran=${18} />Toko sedang tutup. ${info.catatan ? '' : 'Anda tetap bisa melihat menu.'}</div>`}
     <${BannerPromo} info=${info} pakaiKode=${pakaiKode} keMenu=${keMenu} />
 
-    <nav class="et-pintas" aria-label="Pintasan">
-      ${pintas.map((p) =>
-        p.href
-          ? html`<a class="et-pintas-item" href=${p.href} target="_blank" rel="noopener"><span><${Ikon} nama=${p.ikon} ukuran=${24} /></span>${p.label}</a>`
-          : html`<button type="button" class="et-pintas-item" onClick=${p.klik}><span><${Ikon} nama=${p.ikon} ukuran=${24} /></span>${p.label}</button>`,
-      )}
-    </nav>
+    ${kategori.length > 0 &&
+    html`<section class="et-bagian" aria-labelledby="et-h-kategori">
+      <div class="et-judul-bagian"><h2 id="et-h-kategori">Kategori</h2></div>
+      <nav class="et-pintas et-kategori" aria-label="Kategori menu">
+        ${kategori.map((c) => html`<button type="button" key=${c} class="et-pintas-item" onClick=${() => keMenu(c)}><span><${Ikon} nama=${IKON_KAT[c] || 'kue'} ukuran=${24} /></span>${c}</button>`)}
+      </nav>
+    </section>`}
 
-    <section class="et-bagian" aria-labelledby="et-h-menu">
-      <div class="et-judul-bagian"><h2 id="et-h-menu">Menu kami</h2>${menu.length > 6 && html`<button type="button" class="et-lihat" onClick=${() => keMenu('')}>Lihat semua</button>`}</div>
-      ${menu.length === 0 ? html`<${Kosong} judul="Menu belum tersedia" teks="Silakan kembali lagi nanti." />` : html`<div class="et-grid">${menu.map((m) => html`<${KartuProduk} key=${m.id} m=${m} n=${jumlah[m.id] || 0} atur=${atur} buka=${buka} lebar />`)}</div>`}
+    <section class="et-bagian" aria-labelledby="et-h-top">
+      <div class="et-judul-bagian"><h2 id="et-h-top">Top Selling</h2>${menu.length > top.length && html`<button type="button" class="et-lihat" onClick=${() => keMenu('')}>Lihat semua</button>`}</div>
+      ${menu.length === 0 ? html`<${Kosong} judul="Menu belum tersedia" teks="Silakan kembali lagi nanti." />` : html`<div class="et-grid et-grid-top">${top.map((m) => html`<${KartuProduk} key=${m.id} m=${m} n=${jumlah[m.id] || 0} atur=${atur} buka=${buka} lebar terjual />`)}</div>`}
     </section>
 
     <${Testimoni} daftar=${info.testimoni} />
@@ -310,8 +340,8 @@ function Beranda({ info, jumlah, atur, buka, keMenu, ke, logo, jumlahKeranjang, 
         <span><${Ikon} nama="toko" ukuran=${20} />Ambil atau diantar</span>
       </div>
       ${info.alamat && html`<p><b>Alamat:</b> ${info.alamat}</p>`}
+      ${waToko && html`<a class="et-lihat" href=${waToko} target="_blank" rel="noopener">Chat toko via WhatsApp</a>`}
     </section>
-    <p class="et-kaki"><a href="/admin">Masuk admin & kasir</a></p>
   `;
 }
 
@@ -358,8 +388,8 @@ function DetailProduk({ info, m, diKeranjang, tambah: tambahKe, kembali, keKeran
       <span class="et-label-kat">${m.kategori}</span>
       <h1>${m.nama}</h1>
       <div class="et-detail-harga">
-        <b>${rupiah(m.harga)}</b>
-        ${m.diskon > 0 && html`<s class="et-harga-coret">${rupiah(m.hargaAsli)}</s><span class="et-diskon statis">Hemat ${m.diskon}%</span>`}
+        <b class=${m.segera ? 'segera' : ''}>${tampilHarga(m, m.harga)}</b>
+        ${m.diskon > 0 && !m.segera && html`<s class="et-harga-coret">${rupiah(m.hargaAsli)}</s><span class="et-diskon statis">Hemat ${m.diskon}%</span>`}
         ${rata > 0 && html`<span class="et-rata"><${Bintang} nilai=${rata} /> (${info.testimoni.length} ulasan toko)</span>`}
       </div>
       ${m.keterangan ? html`<p class="et-deskripsi">${m.keterangan}</p>` : html`<p class="et-deskripsi">Dibuat dari resep andalan ${info.namaToko}.</p>`}
@@ -370,7 +400,7 @@ function DetailProduk({ info, m, diKeranjang, tambah: tambahKe, kembali, keKeran
         ${opsi.map(
           (o) => html`<label class=${'et-opsi-item' + (dipilih.includes(o.nama) ? ' aktif' : '')} key=${o.nama}>
             <input type="checkbox" checked=${dipilih.includes(o.nama)} onChange=${() => balik(o.nama)} />
-            <span>${o.nama}</span><b>${o.harga ? '+' + rupiah(o.harga) : 'gratis'}</b>
+            <span>${o.nama}</span>${!m.segera && html`<b>${o.harga ? '+' + rupiah(o.harga) : 'gratis'}</b>`}
           </label>`,
         )}
       </section>`}
@@ -381,7 +411,7 @@ function DetailProduk({ info, m, diKeranjang, tambah: tambahKe, kembali, keKeran
           <output aria-label="Jumlah">${n}</output>
           <button type="button" aria-label="Tambah jumlah" onClick=${() => setN(Math.min(maks, n + 1))}><${Ikon} nama="plus" ukuran=${18} /></button>
         </span>
-        <button type="button" class="et-tombol lebar" aria-label=${'Tambah ke keranjang, ' + rupiah(harga * n)} onClick=${tambah}><${Ikon} nama="keranjang" ukuran=${18} />${rupiah(harga * n)}</button>
+        <button type="button" class="et-tombol lebar" aria-label=${m.segera ? 'Tambah ke keranjang' : 'Tambah ke keranjang, ' + rupiah(harga * n)} onClick=${tambah}><${Ikon} nama="keranjang" ukuran=${18} />${m.segera ? 'Tambah ke keranjang' : rupiah(harga * n)}</button>
       </div>`}
       ${diKeranjang > 0 && html`<button type="button" class="et-lihat" onClick=${keKeranjang}>Sudah ${diKeranjang} di keranjang · buka keranjang</button>`}
       <div class="et-ciri">
@@ -419,7 +449,7 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
     setGalat('');
     try {
       const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, caraAmbil: cara, jadwal, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
-      tulis(kunciPesanan(token), j.idPesanan);
+      ingatPesanan(token, j.idPesanan);
       tulis(kunciKode(token), '');
       kosongkan();
       if (j.link) location.href = j.link;
@@ -440,8 +470,8 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
       ${item.map(
         (b) => html`<div class="et-baris-keranjang" key=${b.kunci}>
           <span class="et-mini-foto"><${Foto} src=${b.m.fotoUrl} ikon="kue" ukuranIkon=${22} /></span>
-          <span class="et-baris-teks"><b>${b.m.nama}</b>${b.opsi.length ? html`<small class="et-opsi-teks">+ ${b.opsi.join(', ')}</small>` : ''}<small>${rupiah(b.harga)}</small></span>
-          <span class="et-baris-kanan"><b>${rupiah(b.harga * b.jumlah)}</b><${TombolTambah} m=${{ ...b.m, nama: namaItem({ nama: b.m.nama, opsi: b.opsi }) }} n=${b.jumlah} atur=${(_, n) => aturBaris(b.kunci, n)} /></span>
+          <span class="et-baris-teks"><b>${b.m.nama}</b>${b.opsi.length ? html`<small class="et-opsi-teks">+ ${b.opsi.join(', ')}</small>` : ''}<small>${tampilHarga(b.m, b.harga)}</small></span>
+          <span class="et-baris-kanan"><b>${b.m.segera ? '' : rupiah(b.harga * b.jumlah)}</b><${TombolTambah} m=${{ ...b.m, nama: namaItem({ nama: b.m.nama, opsi: b.opsi }) }} n=${b.jumlah} atur=${(_, n) => aturBaris(b.kunci, n)} /></span>
         </div>`,
       )}
       <button type="button" class="et-lihat" onClick=${() => keMenu('')}>+ Tambah menu lain</button>
@@ -553,7 +583,7 @@ function TimelinePesanan({ s }) {
     ${langkah.map((l, i) => {
       const kelas = l.selesai ? 'selesai' : i === iAktif ? 'aktif' : 'nanti';
       return html`<li class=${'et-langkah ' + kelas} key=${l.kunci} aria-current=${i === iAktif ? 'step' : null}>
-        <span class="et-titik" aria-hidden="true">${l.selesai ? html`<${Ikon} nama="centang" ukuran=${14} />` : ''}</span>
+        <span class="et-langkah-titik" aria-hidden="true">${l.selesai ? html`<${Ikon} nama="centang" ukuran=${14} />` : ''}</span>
         <div class="et-langkah-isi">
           <b>${l.judul}</b>
           ${l.selesai && l.waktu ? html`<small>${waktuSingkat(l.waktu)}</small>` : ''}
@@ -564,8 +594,28 @@ function TimelinePesanan({ s }) {
   </ol>`;
 }
 
-/** Status pesanan: timeline, kendala dari dapur, cara bayar (transfer/QRIS atau Mayar). Dicek berkala sampai selesai. */
-function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
+/** Status ringkas untuk baris daftar pesanan pembeli: [label, kelas warna]. */
+function labelStatus(s) {
+  const ojol = s.caraAmbil === 'ojol';
+  if (s.status === 'menunggu') return s.buktiPada ? ['Bukti terkirim', 'tunggu'] : ['Menunggu bayar', 'tunggu'];
+  return (
+    {
+      baru: ['Diterima', 'proses'],
+      diproses: ['Disiapkan', 'proses'],
+      siap: [ojol ? 'Siap dijemput' : 'Siap diambil', 'siap'],
+      selesai: ['Selesai', 'selesai'],
+      batal: ['Dibatalkan', 'batal'],
+    }[s.status] || [s.status, 'proses']
+  );
+}
+
+const CEK_TERTUTUP_MS = 60000;
+
+/**
+ * Ambil status satu pesanan dan perbarui berkala sampai selesai / batal.
+ * Terbuka: tiap 5 detik sebelum lunas, 30 detik sesudahnya. Tertutup: tiap menit.
+ */
+function useStatusPesanan(url, token, idPesanan, terbuka) {
   const [s, setS] = useState(null);
   const [galat, setGalat] = useState('');
   useEffect(() => {
@@ -586,20 +636,24 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
       } catch (e) {
         // Gagal sesaat (sinyal / batas permintaan) tidak menghapus tampilan yang sudah ada.
         if (!hidup) return;
-        if (!terakhir) return setGalat(e.message);
+        if (!terakhir) return setGalat(e.message || 'Pesanan tidak bisa dibuka.');
       }
       if (!hidup || terakhir.status === 'batal' || terakhir.status === 'selesai') return;
-      t = setTimeout(cek, terakhir.lunas ? CEK_SETELAH_LUNAS_MS : CEK_TIAP_MS);
+      t = setTimeout(cek, !terbuka ? CEK_TERTUTUP_MS : terakhir.lunas ? CEK_SETELAH_LUNAS_MS : CEK_TIAP_MS);
     };
     cek();
     return () => {
       hidup = false;
       clearTimeout(t);
     };
-  }, [idPesanan]);
-  if (galat) return html`<${Kosong} judul="Pesanan tidak ditemukan" teks=${galat}><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Pesan lagi</button><//>`;
-  if (!s) return html`<p role="status">Memeriksa pesanan…</p>`;
+  }, [idPesanan, terbuka]);
+  return [s, setS, galat];
+}
+
+/** Isi detail satu pesanan: kendala dari dapur, timeline, cara bayar, rincian, dan testimoni. */
+function DetailPesananSaya({ s, setS, url, token, idPesanan }) {
   const manual = !s.lunas && s.bayarManual;
+  const ojol = s.caraAmbil === 'ojol';
   const ambil = s.caraAmbil && LABEL_AMBIL[s.caraAmbil] ? `${LABEL_AMBIL[s.caraAmbil]}${s.jadwal > 0 ? ', ' + teksJadwal(s.jadwal) : ''}` : '';
   const waBukti = manual ? waTautan(s.wa, `Halo, saya sudah bayar pesanan #${s.nomor} sebesar ${rupiah(s.total)} atas nama ${s.nama}.${ambil ? ` Cara ambil: ${ambil}.` : ''} Berikut bukti transfernya.`) : '';
   const waToko = waTautan(s.wa, `Halo, saya mau tanya tentang pesanan #${s.nomor} atas nama ${s.nama}.`);
@@ -608,55 +662,74 @@ function StatusPesanan({ url, token, idPesanan, info, keMenu }) {
     if (!s.buktiPada) setS({ ...s, buktiPada: Date.now() });
     pesanOnline.bukti(url, token, idPesanan).catch(() => {});
   };
-  const ojol = s.caraAmbil === 'ojol';
-  const JUDUL = {
-    menunggu: s.buktiPada ? 'Bukti bayar terkirim' : 'Menunggu pembayaran',
-    baru: 'Pesanan diterima',
-    diproses: 'Pesanan sedang disiapkan',
-    siap: ojol ? 'Siap dijemput driver' : 'Pesanan siap diambil',
-    selesai: 'Pesanan selesai',
-    batal: 'Pesanan dibatalkan',
-  };
-  return html`<div class="kolom" style="gap:16px">
-    <h1 class="et-judul-layar">Pesanan Anda</h1>
-    <section class="et-panel kolom" aria-labelledby="h-status-pesanan">
-      <div class="et-status-kepala">
-        <div>
-          <small>Pesanan #${s.nomor}</small>
-          <h2 class="et-h2" id="h-status-pesanan">${JUDUL[s.status] || s.status}</h2>
-        </div>
-        <b>${rupiah(s.total)}</b>
-      </div>
-      ${s.kendala &&
-      html`<div class="et-kendala" role="alert">
-        <${Ikon} nama="info" ukuran=${20} />
-        <div><b>Info dari dapur</b><p>${s.kendala}</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Tanya toko via WhatsApp</a>`}</div>
-      </div>`}
-      ${s.status === 'batal'
-        ? html`<div class="et-kendala batal" role="alert">
-            <${Ikon} nama="info" ukuran=${20} />
-            <div><b>Pesanan dibatalkan</b><p>Hubungi toko bila ada pertanyaan${s.lunas ? ' atau untuk pengembalian dana' : ''}.</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Chat toko via WhatsApp</a>`}</div>
-          </div>`
-        : html`<${TimelinePesanan} s=${s} />`}
-    </section>
+  return html`<div class="et-pesanan-detail">
+    ${s.kendala &&
+    html`<div class="et-kendala" role="alert">
+      <${Ikon} nama="info" ukuran=${20} />
+      <div><b>Info dari dapur</b><p>${s.kendala}</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Tanya toko via WhatsApp</a>`}</div>
+    </div>`}
+    ${s.status === 'batal'
+      ? html`<div class="et-kendala batal" role="alert">
+          <${Ikon} nama="info" ukuran=${20} />
+          <div><b>Pesanan dibatalkan</b><p>Hubungi toko bila ada pertanyaan${s.lunas ? ' atau untuk pengembalian dana' : ''}.</p>${waToko && html`<a href=${waToko} target="_blank" rel="noopener">Chat toko via WhatsApp</a>`}</div>
+        </div>`
+      : html`<${TimelinePesanan} s=${s} />`}
     ${manual &&
-    html`<section class="et-panel kolom" aria-labelledby="h-cara-bayar">
-      <h2 class="et-h2" id="h-cara-bayar">Cara bayar</h2>
+    html`<section class="et-pesanan-bagian kolom" aria-labelledby=${'h-bayar-' + idPesanan}>
+      <h3 class="et-h3" id=${'h-bayar-' + idPesanan}>Cara bayar</h3>
       <div class="total-bayar"><small>Total yang dibayar</small><b>${rupiah(s.total)}</b></div>
       <${InfoTransfer} rekening=${s.bayarManual.rekening || []} qris=${s.bayarManual.qrisUrl || ''} total=${0} />
       <p class="bantu">Scan QRIS atau transfer ke rekening di atas, lalu kirim bukti bayar ke WhatsApp toko. Pesanan diproses setelah toko mengonfirmasi; halaman ini berubah otomatis.</p>
       ${waBukti && html`<a class="et-tombol lebar" href=${waBukti} target="_blank" rel="noopener" onClick=${catatBukti}><${Ikon} nama="kirim" ukuran=${18} />${s.buktiPada ? 'Kirim ulang bukti bayar via WhatsApp' : 'Kirim bukti bayar via WhatsApp'}</a>`}
     </section>`}
     ${s.link && html`<a class="et-tombol lebar" href=${s.link}>Bayar sekarang</a>`}
-    <section class="et-panel kolom" aria-labelledby="h-rincian">
-      <h2 class="et-h2" id="h-rincian">Rincian pesanan</h2>
+    <section class="et-pesanan-bagian kolom" aria-labelledby=${'h-rincian-' + idPesanan}>
+      <h3 class="et-h3" id=${'h-rincian-' + idPesanan}>Rincian pesanan</h3>
       ${(s.item || []).map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${namaItem(i)}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
       <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(s.total)}</b></div>
       ${ambil && html`<div class="hasil-baris"><span>Cara ambil</span><b class="biasa">${ambil}</b></div>`}
       ${ojol && s.status !== 'batal' && s.status !== 'selesai' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} sesuai jam di atas. Toko tidak memesankan ojek.</p>`}
     </section>
     ${s.bisaTestimoni && html`<${FormTestimoni} url=${url} token=${token} idPesanan=${idPesanan} nama=${s.nama} />`}
-    <button type="button" class="et-tombol garis" onClick=${() => keMenu('')}>Buat pesanan lain</button>
+  </div>`;
+}
+
+/** Satu baris daftar pesanan: nomor + isi pesanan (kiri), status + panah (kanan). Ditekan = buka detail. */
+function BarisPesananSaya({ url, token, idPesanan, terbuka, onBalik, onHilang }) {
+  const [s, setS, galat] = useStatusPesanan(url, token, idPesanan, terbuka);
+  useEffect(() => {
+    if (galat === 'Pesanan tidak ditemukan.') onHilang(idPesanan);
+  }, [galat]);
+  if (galat === 'Pesanan tidak ditemukan.') return null;
+  const [label, kelas] = s ? labelStatus(s) : ['Memeriksa…', 'tunggu'];
+  const ringkas = s ? (s.item || []).map((i) => `${i.jumlah}× ${namaItem(i)}`).join(', ') : '';
+  const idPanel = 'pesanan-' + idPesanan;
+  return html`<article class=${'et-pesanan-saya' + (terbuka ? ' terbuka' : '')}>
+    <button type="button" class="et-pesanan-kepala" aria-expanded=${terbuka} aria-controls=${idPanel} onClick=${onBalik}>
+      <span class="et-pesanan-kiri">
+        <b>${s ? '#' + s.nomor : 'Pesanan'}</b>
+        <small>${galat ? 'Belum bisa dimuat. Ketuk untuk coba lagi.' : ringkas || 'Memuat…'}</small>
+      </span>
+      <span class="et-pesanan-kanan">
+        <span class=${'et-status-pil ' + kelas}>${label}</span>
+        <span class="et-panah" aria-hidden="true"><${Ikon} nama="bawah" ukuran=${20} /></span>
+      </span>
+    </button>
+    ${terbuka && html`<div id=${idPanel}>${s ? html`<${DetailPesananSaya} s=${s} setS=${setS} url=${url} token=${token} idPesanan=${idPesanan} />` : html`<p class="bantu et-pesanan-detail" role="status">${galat || 'Memeriksa pesanan…'}</p>`}</div>`}
+  </article>`;
+}
+
+/** Semua pesanan yang dibuat dari perangkat ini, terbaru di atas. `buka` = id yang langsung dibuka (setelah memesan / membayar). */
+function DaftarPesananSaya({ url, token, ids, buka, info, keMenu, onHilang }) {
+  const [terbuka, setTerbuka] = useState(buka || '');
+  return html`<div class="kolom" style="gap:16px">
+    <h1 class="et-judul-layar">Pesanan saya</h1>
+    ${ids.length === 0
+      ? html`<${Kosong} judul="Belum ada pesanan" teks="Pesanan yang Anda buat dari perangkat ini muncul di sini."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`
+      : html`<div class="et-daftar-pesanan">
+          ${ids.map((id) => html`<${BarisPesananSaya} key=${id} url=${url} token=${token} idPesanan=${id} terbuka=${terbuka === id} onBalik=${() => setTerbuka((t) => (t === id ? '' : id))} onHilang=${onHilang} />`)}
+        </div>`}
+    ${ids.length > 0 && html`<button type="button" class="et-tombol garis" onClick=${() => keMenu('')}>Buat pesanan lain</button>`}
     <${Testimoni} daftar=${info && info.testimoni} />
   </div>`;
 }
@@ -677,7 +750,16 @@ export function PesanOnline({ k, token }) {
     return Object.fromEntries(Object.entries(lama).map(([kunci, v]) => [kunci, typeof v === 'number' ? { idMenu: kunci, opsi: [], jumlah: v } : v]));
   });
   const [disambut, setDisambut] = useState(() => sudahDisambut(token));
-  const terakhir = ingatan(token);
+  // Pesanan dari perangkat ini; ?pesanan= (kembali dari Mayar) / ?id= (baru dipesan) ikut diingat dan langsung dibuka.
+  const idBuka = q.pesanan || q.id || '';
+  const [idsPesanan, setIdsPesanan] = useState(() => {
+    if (idBuka) ingatPesanan(token, idBuka);
+    return pesananSaya(token);
+  });
+  const hilangkanPesanan = (id) => {
+    lupakanPesanan(token, id);
+    setIdsPesanan(pesananSaya(token));
+  };
 
   useEffect(() => {
     if (!url) return setGalat('Link ini tidak lengkap. Minta toko mengirim ulang link pemesanannya.');
@@ -730,7 +812,6 @@ export function PesanOnline({ k, token }) {
 
   // ?pesanan= dari Mayar (setelah membayar) juga membuka layar pesanan.
   const layar = q.pesanan ? 'pesanan' : q.l || '';
-  const idPesanan = q.pesanan || q.id || terakhir;
   const ke = (l, extra) => keLayar(k, token, l, extra);
   const keMenu = (kat) => ke('menu', { kat });
   const buka = (m) => ke('produk', { id: m.id });
@@ -739,9 +820,8 @@ export function PesanOnline({ k, token }) {
   let isiLayar;
   if (galat) isiLayar = html`<${Kosong} judul="Link tidak bisa dibuka" teks=${galat} />`;
   else if (layar === 'pesanan') {
-    isiLayar = idPesanan
-      ? html`<${StatusPesanan} key=${idPesanan} url=${url} token=${token} idPesanan=${idPesanan} info=${info} keMenu=${keMenu} />`
-      : html`<h1 class="et-judul-layar">Pesanan Anda</h1><${Kosong} judul="Belum ada pesanan" teks="Pesanan yang Anda buat dari perangkat ini muncul di sini."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
+    const ids = idBuka && !idsPesanan.includes(idBuka) ? [idBuka, ...idsPesanan] : idsPesanan;
+    isiLayar = html`<${DaftarPesananSaya} key=${'daftar' + idBuka} url=${url} token=${token} ids=${ids} buka=${idBuka} info=${info} keMenu=${keMenu} onHilang=${hilangkanPesanan} />`;
   } else if (!info) isiLayar = html`<div class="et-kerangka" role="status" aria-label="Membuka toko"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i><i class="b3"></i></div>`;
   else if (layar === 'menu') isiLayar = html`<${DaftarMenu} key=${'m' + (q.cari || '')} info=${info} jumlah=${isi} atur=${atur} buka=${buka} kat=${q.kat || ''} keMenu=${keMenu} cariAwal=${q.cari || ''} />`;
   else if (layar === 'produk') {
@@ -749,7 +829,7 @@ export function PesanOnline({ k, token }) {
       ? html`<${DetailProduk} key=${produk.id} info=${info} m=${produk} diKeranjang=${perMenu(produk.id)} tambah=${tambah} kembali=${() => history.back()} keKeranjang=${() => ke('keranjang')} />`
       : html`<${Kosong} judul="Menu tidak ditemukan" teks="Mungkin sudah tidak dijual."><button type="button" class="et-tombol" onClick=${() => keMenu('')}>Lihat menu</button><//>`;
   } else if (layar === 'keranjang') {
-    isiLayar = html`<${Keranjang} k=${k} info=${info} url=${url} token=${token} baris=${baris} aturBaris=${aturBaris} kosongkan=${() => (tulis(kunciKeranjang(token), {}), setJumlah({}))} keMenu=${keMenu} selesai=${(id) => ke('pesanan', { id })} />`;
+    isiLayar = html`<${Keranjang} k=${k} info=${info} url=${url} token=${token} baris=${baris} aturBaris=${aturBaris} kosongkan=${() => (tulis(kunciKeranjang(token), {}), setJumlah({}))} keMenu=${keMenu} selesai=${(id) => (setIdsPesanan(pesananSaya(token)), ke('pesanan', { id }))} />`;
   } else isiLayar = html`<${Beranda} info=${{ ...info, token }} jumlah=${isi} atur=${atur} buka=${buka} keMenu=${keMenu} ke=${ke} logo=${logo} jumlahKeranjang=${jumlahKeranjang} cariMenu=${(c) => ke('menu', { cari: c })} />`;
 
   // Sambutan sekali per kunjungan, hanya saat membuka beranda etalase.

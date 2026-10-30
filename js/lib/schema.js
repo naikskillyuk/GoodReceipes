@@ -116,7 +116,8 @@ export const TABEL = {
     awalan: 'mnu',
     // diskon = persen potongan harga produk (0 = tanpa diskon), diskonSampai = batas waktu (ms, 0 = tanpa batas).
     // opsi = pilihan tambahan berbayar [{nama, harga}], mis. "Digoreng" +2000, "Tambah keju" +3000 (boleh pilih beberapa).
-    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n', diskon: 'n', diskonSampai: 'n', opsi: 'j' },
+    // segera = "Coming soon": harga tidak ditampilkan di etalase, tetapi tetap bisa dipesan seperti biasa (untuk uji coba).
+    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n', diskon: 'n', diskonSampai: 'n', opsi: 'j', segera: 'b' },
   },
   // Pesanan. item = [{idMenu, nama, harga, jumlah, opsi?}] (idMenu kosong = item di luar menu; opsi = nama pilihan tambahan,
   // harga sudah termasuk pilihan tambahan). sumber 'kasir' | 'online' | 'manual'.

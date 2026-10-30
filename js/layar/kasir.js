@@ -126,7 +126,7 @@ export function Kasir({ k }) {
                     <span class="foto-ubin"><${Foto} src=${fotoTampilMenu(db, m)} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} />${diskonBerlaku(m) ? html`<i class="label-diskon">-${diskonBerlaku(m)}%</i>` : ''}${n > 0 && html`<i class="jumlah-ubin">${n}</i>`}</span>
                     <b>${m.nama}</b>
                     <span class="harga-ubin">${rupiah(hargaJual(m))}${diskonBerlaku(m) ? html` <s>${rupiah(m.harga)}</s>` : ''}</span>
-                    <small>${opsiMenu(m).length ? 'Ada pilihan · ' : ''}${sisa === null ? '' : sisa <= 0 ? 'Stok habis' : `Sisa ${sisa}`}</small>
+                    <small>${m.segera ? 'Coming soon · ' : ''}${opsiMenu(m).length ? 'Ada pilihan · ' : ''}${sisa === null ? '' : sisa <= 0 ? 'Stok habis' : `Sisa ${sisa}`}</small>
                   </button>`;
                 })}
               </div>

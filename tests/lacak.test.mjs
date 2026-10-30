@@ -121,3 +121,9 @@ test('banner gambar saja: judul dan teks kosong boleh bila ada gambar', async ()
   assert.equal(toko.bannerGambarSaja(b), true);
   assert.equal(toko.bannerGambarSaja({ judul: 'Promo' }), false);
 });
+
+test('top selling etalase: paling banyak terjual dulu, seri tetap urutan menu, maks. 6', async () => {
+  const { topSelling } = await import('../js/layar/pesan-online.js');
+  const menu = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id, i) => ({ id, terjual: [0, 5, 0, 9, 5, 0, 1][i] }));
+  assert.deepEqual(topSelling(menu).map((m) => m.id), ['d', 'b', 'e', 'g', 'a', 'c']);
+});

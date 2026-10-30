@@ -6285,7 +6285,7 @@ details.opsi-menu[open] {
 .et-langkah.selesai:not(:last-child)::before {
   background: var(--e-utama);
 }
-.et-titik {
+.et-langkah-titik {
   flex-shrink: 0;
   width: 24px;
   height: 24px;
@@ -6296,15 +6296,15 @@ details.opsi-menu[open] {
   background: #fff;
   color: #fff;
 }
-.et-langkah.selesai .et-titik {
+.et-langkah.selesai .et-langkah-titik {
   background: var(--e-utama);
   border-color: var(--e-utama);
 }
-.et-langkah.aktif .et-titik {
+.et-langkah.aktif .et-langkah-titik {
   border-color: var(--e-utama);
   box-shadow: 0 0 0 4px var(--e-muda);
 }
-.et-langkah.aktif .et-titik::after {
+.et-langkah.aktif .et-langkah-titik::after {
   content: '';
   width: 8px;
   height: 8px;
@@ -6617,4 +6617,182 @@ details.opsi-menu[open] {
 }
 .kolom-batang:nth-child(-n + 3) .label-batang {
   left: 0;
+}
+
+/* Header etalase: logo besar di atas sapaan */
+.et-header-atas {
+  justify-content: flex-end;
+}
+.et-header-teks {
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.et-header-teks .et-header-logo {
+  margin-bottom: 12px;
+  padding: 5px;
+  border-radius: 24px;
+  text-shadow: none;
+}
+
+/* Top selling: grid 2 x 3 (3 x 2 di layar lebar) */
+.et-grid-top {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  .et-grid-top {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.et-kategori {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  justify-items: center;
+}
+.et-terjual {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--e-muted);
+}
+
+/* Menu coming soon: harga disembunyikan */
+.et-segera {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #2b2200;
+  color: var(--e-kuning);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.et-harga.segera,
+.et-detail-harga b.segera {
+  color: #8a6500;
+  font-size: 14px;
+  font-weight: 800;
+}
+.et-detail-harga b.segera {
+  font-size: 20px;
+}
+.label-segera {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fff3cf;
+  color: #5c4300;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* Pesanan saya (pembeli): daftar yang bisa dibuka-tutup */
+.et-daftar-pesanan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.et-pesanan-saya {
+  border-radius: 20px;
+  background: var(--e-kartu);
+  border: 1px solid var(--e-garis);
+  overflow: hidden;
+}
+.et-pesanan-saya.terbuka {
+  border-color: var(--e-utama);
+}
+.et-pesanan-kepala {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--e-tinta);
+  text-align: left;
+  cursor: pointer;
+}
+.et-pesanan-kiri {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.et-pesanan-kiri b {
+  font-size: 16px;
+}
+.et-pesanan-kiri small {
+  font-size: 13px;
+  color: var(--e-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.et-pesanan-kanan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.et-status-pil {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.et-status-pil.tunggu {
+  background: var(--e-kuning-muda);
+  color: #6b4a00;
+}
+.et-status-pil.proses {
+  background: #e3effa;
+  color: #1d4f7a;
+}
+.et-status-pil.siap {
+  background: var(--e-utama);
+  color: #fff;
+}
+.et-status-pil.selesai {
+  background: var(--e-muda);
+  color: var(--e-utama-2);
+}
+.et-status-pil.batal {
+  background: #fbe9e2;
+  color: #8a2a17;
+}
+.et-panah {
+  display: inline-grid;
+  color: var(--e-muted);
+  transition: transform 0.2s;
+}
+.et-pesanan-saya.terbuka .et-panah {
+  transform: rotate(180deg);
+}
+.et-pesanan-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--e-garis);
+  padding-top: 14px;
+}
+.et-pesanan-bagian {
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--e-garis);
+}
+.et-h3 {
+  margin: 0;
+  font-size: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .et-panah {
+    transition: none;
+  }
 }

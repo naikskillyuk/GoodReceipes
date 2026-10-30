@@ -60,7 +60,7 @@ function EditorOpsi({ m, ubah }) {
   </div>`;
 }
 
-const KOSONG = { jenis: '', idRef: '', nama: '', harga: 0, keterangan: '', aktif: true, online: true, diskon: 0, diskonSampai: 0, opsi: [] };
+const KOSONG = { jenis: '', idRef: '', nama: '', harga: 0, keterangan: '', aktif: true, online: true, diskon: 0, diskonSampai: 0, opsi: [], segera: false };
 
 /** Formulir tambah / ubah menu: pilih dari daftar, harga jual, potensi keuntungan, diskon, varian, dan status. */
 function FormMenu({ db, awal, onTutup }) {
@@ -99,6 +99,7 @@ function FormMenu({ db, awal, onTutup }) {
       diskon: Math.max(0, Math.min(90, Math.round(Number(d.diskon) || 0))),
       diskonSampai: Number(d.diskonSampai) || 0,
       opsi: opsiMenu(d),
+      segera: !!d.segera,
     };
     if (baru) tambahMenu(db, d.jenis, d.idRef, isian);
     else db.simpan('Menu', { ...db.ambil('Menu', awal.id), ...isian });
@@ -148,7 +149,9 @@ function FormMenu({ db, awal, onTutup }) {
         <div class="baris-saklar">
           <label class="saklar"><input type="checkbox" checked=${!!d.aktif} onChange=${(e) => atur({ aktif: e.target.checked })} /><span>Dijual</span></label>
           <label class="saklar"><input type="checkbox" checked=${!!d.online} disabled=${!d.aktif} onChange=${(e) => atur({ online: e.target.checked })} /><span>Tampil di etalase</span></label>
-        </div>`}
+          <label class="saklar"><input type="checkbox" checked=${!!d.segera} onChange=${(e) => atur({ segera: e.target.checked })} /><span>Coming soon</span></label>
+        </div>
+        ${d.segera && html`<p class="bantu">Coming soon: harga tidak tampil di etalase, tetapi pembeli tetap bisa memesan seperti biasa (untuk uji coba). Total di keranjang tetap memakai harga jual di atas.</p>`}`}
       ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}
       <div class="baris-btn">
         <button class="btn solid" disabled=${!ada} onClick=${simpan}><${Ikon} nama="centang" ukuran=${18} />${baru ? 'Masukkan ke menu' : 'Simpan'}</button>
@@ -216,7 +219,7 @@ export function MenuJual({ k }) {
                     ${dapur && html`<td class=${'angka ' + (laba < 0 ? 'teks-buruk' : 'teks-baik')}>${Number.isFinite(laba) ? rupiah(laba) : '–'}</td>`}
                     ${dapur && html`<td class=${'angka' + (mg && mg.marginPersen < 0 ? ' teks-buruk' : '')}>${mg ? persen(mg.marginPersen) : '–'}</td>`}
                     <td class="angka"><${TeksSisa} db=${db} m=${m} sisa=${sisaMenu(db, m, stok) ?? sisa} /></td>
-                    <td><span class=${'lencana-status ' + (m.aktif ? 'lunas' : 'belum')}>${m.aktif ? 'Dijual' : 'Tidak dijual'}</span>${m.aktif && m.online ? html`<br /><small class="teks-kecil">+ etalase</small>` : ''}</td>
+                    <td><span class=${'lencana-status ' + (m.aktif ? 'lunas' : 'belum')}>${m.aktif ? 'Dijual' : 'Tidak dijual'}</span>${m.aktif && m.online ? html`<br /><small class="teks-kecil">+ etalase</small>` : ''}${m.segera ? html`<br /><span class="label-segera">Coming soon</span>` : ''}</td>
                     ${dapur &&
                     html`<td class="aksi">
                       <button class="btn kecil" aria-label=${'Ubah ' + m.nama} onClick=${() => setForm(m)}>Ubah</button>

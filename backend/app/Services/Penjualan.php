@@ -380,6 +380,16 @@ class Penjualan
             $isiPertama = $isiPaket[$p['id']][0]['idResep'] ?? '';
             $fotoPaket[$p['id']] = (string) (($p['fotoUrl'] ?? '') ?: ($fotoResep[$isiPertama] ?? ''));
         }
+        // Jumlah terjual per menu (pesanan yang sudah diterima) untuk "Top selling" di beranda etalase.
+        $terjual = [];
+        foreach ($this->semua($id, 'Pesanan', fn ($p) => ! in_array($p['status'], ['batal', 'menunggu'], true)) as $p) {
+            foreach (is_array($p['item']) ? $p['item'] : [] as $it) {
+                $idMenu = is_array($it) ? (string) ($it['idMenu'] ?? '') : '';
+                if ($idMenu !== '') {
+                    $terjual[$idMenu] = ($terjual[$idMenu] ?? 0) + (int) ($it['jumlah'] ?? 0);
+                }
+            }
+        }
         $menu = [];
         foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
             $menu[] = [
@@ -395,6 +405,9 @@ class Penjualan
                 'keterangan' => mb_substr((string) $m['keterangan'], 0, 300),
                 'sisa' => $this->sisaMenu($this->isiMenu($id, $m, $isiPaket), $stok),
                 'urutan' => (float) ($m['urutan'] ?? 0),
+                // Coming soon: etalase menyembunyikan harga, pesanan tetap memakai harga ini.
+                'segera' => (bool) $m['segera'],
+                'terjual' => $terjual[$m['id']] ?? 0,
             ];
         }
         usort($menu, fn ($a, $b) => $a['urutan'] <=> $b['urutan']);

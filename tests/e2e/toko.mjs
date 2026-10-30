@@ -263,7 +263,12 @@ try {
   await pembeli.waitForTimeout(900); // animasi masuk
   await foto(pembeli, '07-sambutan');
   await pembeli.getByRole('button', { name: 'Mulai pesan' }).click();
-  await pembeli.getByRole('heading', { name: 'Menu kami' }).waitFor();
+  await pembeli.getByRole('heading', { name: 'Top Selling' }).waitFor();
+  await pembeli.getByRole('heading', { name: 'Kategori' }).waitFor();
+  assert.ok((await pembeli.locator('.et-grid-top .et-kartu').count()) <= 6, 'top selling maks. 2 x 3');
+  assert.equal(await pembeli.getByText('Masuk admin & kasir').count(), 0, 'tanpa tautan admin di etalase');
+  assert.equal(await pembeli.getByText('Info toko', { exact: true }).count(), 0, 'tanpa banner info toko');
+  await pembeli.locator('.et-header-teks .et-header-logo').waitFor();
   await pembeli.getByRole('button', { name: 'Pakai kode HEMAT10' }).first().waitFor();
   await pembeli.getByText('Halo, selamat datang di').waitFor();
   await pembeli.locator('.et-header-foto[src*="/foto/"]').waitFor();
@@ -296,7 +301,12 @@ try {
   await pembeli.getByText(/berhasil/).waitFor();
   await pembeli.goBack();
   await pembeli.getByRole('button', { name: 'Pesanan', exact: true }).click();
-  await pembeli.getByText('Pembayaran diterima').waitFor();
+  // Daftar pesanan: tertutup dulu (nomor, isi, status), dibuka lewat panah.
+  const barisSari = pembeli.locator('.et-pesanan-saya', { hasText: 'Paket Hemat' });
+  await barisSari.locator('.et-status-pil', { hasText: 'Diterima' }).waitFor();
+  assert.equal(await barisSari.locator('.et-timeline').count(), 0, 'detail tertutup sebelum diketuk');
+  await barisSari.locator('.et-pesanan-kepala').click();
+  await barisSari.getByText('Pembayaran diterima').waitFor();
   await foto(pembeli, '08-status-pembeli');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 13 - 2, '2 paket = 2 brownies');
@@ -333,7 +343,8 @@ try {
   const [tabWa] = await Promise.all([pembeli.waitForEvent('popup'), pembeli.getByRole('link', { name: 'Kirim bukti bayar via WhatsApp' }).click()]);
   await tabWa.close();
   await pembeli.locator('.et-langkah.selesai', { hasText: 'Bukti bayar dikirim' }).waitFor();
-  await pembeli.getByRole('heading', { name: 'Bukti bayar terkirim' }).waitFor();
+  await pembeli.locator('.et-status-pil', { hasText: 'Bukti terkirim' }).waitFor();
+  assert.equal(await pembeli.locator('.et-pesanan-saya').count(), 2, 'kedua pesanan dari perangkat ini tampil');
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
   await page.goto(ADMIN + '#/pesanan?tab=menunggu');
   await page.locator('.kartu-pesanan', { hasText: 'Rudi' }).getByText(/Ojol dipesan pembeli/).waitFor();
@@ -350,7 +361,7 @@ try {
   await page.getByRole('button', { name: 'Simpan kendala' }).click();
   await page.getByRole('button', { name: 'Kendala selesai' }).waitFor();
   await page.evaluate(() => window.__app.penyinkron.sinkronkan());
-  await pembeli.getByRole('heading', { name: 'Pesanan diterima' }).waitFor({ timeout: 15000 });
+  await pembeli.locator('.et-pesanan-saya.terbuka .et-status-pil', { hasText: 'Diterima' }).waitFor({ timeout: 15000 });
   await pembeli.reload();
   await pembeli.getByText('Info dari dapur').waitFor();
   await pembeli.getByText('brownies baru siap jam 4 sore').waitFor();
@@ -374,6 +385,22 @@ try {
   await pembeli.getByText('Browniesnya lembut dan tidak terlalu manis!').waitFor();
   await pembeli.getByRole('heading', { name: 'Kata pembeli' }).scrollIntoViewIfNeeded();
   await foto(pembeli, '07e-testimoni');
+
+  // Coming soon: harga tidak tampil di etalase, tetap bisa dimasukkan keranjang.
+  await evalDb(page, 'const m = db.semua("Menu").find((x) => x.nama === "Brownies Fudgy"); db.simpan("Menu", { ...m, segera: true });');
+  await page.evaluate(() => window.__app.penyinkron.sinkronkan());
+  await pembeli.goto(link);
+  await pembeli.reload();
+  const kartuSegera = pembeli.locator('.et-kartu', { hasText: 'Brownies Fudgy' }).first();
+  await kartuSegera.locator('.et-harga.segera', { hasText: 'Coming soon' }).waitFor();
+  assert.equal(await kartuSegera.getByText(/Rp /).count(), 0, 'harga coming soon tidak tampil');
+  await kartuSegera.getByRole('button', { name: 'Lihat Brownies Fudgy' }).click();
+  await pembeli.getByRole('button', { name: 'Tambah ke keranjang', exact: true }).click();
+  await pembeli.getByRole('button', { name: /^Keranjang \(/ }).first().click();
+  await pembeli.locator('.et-baris-keranjang', { hasText: 'Brownies Fudgy' }).getByText('Coming soon').waitFor();
+  await foto(pembeli, '07f-coming-soon');
+  await evalDb(page, 'const m = db.semua("Menu").find((x) => x.nama === "Brownies Fudgy"); db.simpan("Menu", { ...m, segera: false });');
+  await page.evaluate(() => window.__app.penyinkron.sinkronkan());
 
   tahap('akun kasir: login di /admin ke beranda (follow-up + tren), katalog, tidak bisa membuka resep; halaman depan = etalase');
   const kasir = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -399,7 +426,7 @@ try {
   // Halaman depan = etalase pembeli (tanpa login), walau sedang masuk sebagai kasir.
   await kasir.goto(BASE + '/');
   await kasir.getByRole('button', { name: 'Mulai pesan' }).click();
-  await kasir.getByRole('heading', { name: 'Menu kami' }).waitFor();
+  await kasir.getByRole('heading', { name: 'Top Selling' }).waitFor();
   await kasir.goto(ADMIN);
   await kasir.getByRole('heading', { name: 'Beranda' }).waitFor();
   await kasir.goto(BASE + '/#/pesanan');

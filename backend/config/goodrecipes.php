@@ -138,6 +138,7 @@ return [
             'kolom' => [
                 'id' => 't', 'jenis' => 't', 'idRef' => 't', 'nama' => 't', 'harga' => 'n', 'fotoUrl' => 't', 'keterangan' => 't',
                 'aktif' => 'b', 'online' => 'b', 'urutan' => 'n', 'diskon' => 'n', 'diskonSampai' => 'n', 'opsi' => 'j',
+                'segera' => 'b',
             ],
         ],
         'Pesanan' => [

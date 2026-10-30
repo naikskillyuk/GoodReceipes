@@ -288,7 +288,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         const fotoResep = (id) => (tabel('Resep')[id] || {}).fotoAcuanUrl;
         const fotoCadangan = m.jenis === 'paket' ? (tabel('Paket')[m.idRef] || {}).fotoUrl || (isiPertama && fotoResep(isiPertama.idResep)) : fotoResep(m.idRef);
         m = { ...m, fotoUrl: m.fotoUrl || fotoCadangan || '' };
-        return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori };
+        const terjual = hidup('Pesanan', (p) => !['batal', 'menunggu'].includes(p.status)).reduce((j, p) => j + bacaItem(p.item).filter((i) => i.idMenu === m.id).reduce((a, i) => a + angka(i.jumlah), 0), 0);
+        return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori, segera: benar(m.segera, false), terjual };
       });
     return {
       ok: true,
