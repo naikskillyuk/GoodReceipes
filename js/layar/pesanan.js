@@ -294,6 +294,7 @@ export function DetailPesanan({ k, id }) {
             <div class="baris-btn">
               ${berikut && html`<button class="btn solid" onClick=${() => ubah(berikut)}>${LABEL_BERIKUT[berikut]}</button>`}
               ${waPembeli && html`<a class="btn" href=${waPembeli} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />Kabari pembeli</a>`}
+              <a class="btn" href=${tautan('/pesanan/' + p.id + '/struk')}><${Ikon} nama="struk" ukuran=${18} />Struk</a>
               ${bisaDiubah(db, p) && html`<a class="btn" href=${tautan('/catat-pesanan?id=' + p.id)}><${Ikon} nama="ubah" ukuran=${18} />Ubah pesanan</a>`}
               ${p.status === 'batal' && html`<button class="btn" onClick=${() => ubah('baru')}>Buka lagi</button>`}
               ${p.status !== 'batal' && p.status !== 'selesai' && html`<button class="btn bahaya" onClick=${() => ubah('batal')}>Batalkan</button>`}

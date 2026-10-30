@@ -6802,3 +6802,265 @@ details.opsi-menu[open] {
   font-weight: 600;
   color: var(--e-muted);
 }
+
+/* ---------- Struk pesanan (layar + cetak printer kasir 58 / 80 mm atau A4) ---------- */
+.struk-halaman {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 16px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.struk-alat {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.struk-kertas {
+  width: 100%;
+  max-width: 58mm;
+  min-width: 0;
+  box-sizing: content-box;
+  padding: 14px 12px 18px;
+  background: #fff;
+  color: #000;
+  border-radius: 6px;
+  box-shadow: var(--bayang);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.struk-kertas.k-80 {
+  max-width: 80mm;
+  font-size: 12.5px;
+}
+.struk-kertas.k-a4 {
+  max-width: 100mm;
+  font-size: 13px;
+}
+.struk-kertas hr {
+  border: 0;
+  border-top: 1px dashed #000;
+  margin: 8px 0;
+}
+.struk-kepala {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+.struk-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  margin-bottom: 4px;
+  filter: grayscale(1);
+}
+.struk-toko {
+  font-size: 1.2em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.struk-kepala small,
+.struk-item small {
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
+.struk-baris {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.struk-baris > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.struk-baris > span:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+.struk-baris > span:last-child:not(:only-child) {
+  max-width: 62%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.struk-item {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.struk-item small {
+  display: block;
+  padding-left: 1ch;
+}
+.struk-total {
+  font-size: 1.15em;
+  margin-top: 2px;
+}
+.struk-status {
+  margin: 6px 0 0;
+  text-align: center;
+  font-weight: 700;
+}
+.struk-status.belum {
+  border: 1px solid #000;
+  padding: 2px 0;
+}
+.struk-kaki {
+  margin: 10px 0 0;
+  text-align: center;
+}
+.struk-terakhir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: var(--hijau-muda);
+  border: 1px solid var(--hijau-garis);
+  color: var(--hijau-2);
+}
+.struk-terakhir > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media print {
+  .struk-halaman {
+    min-height: 0;
+    padding: 0;
+    display: block;
+    background: #fff !important;
+  }
+  .struk-alat {
+    display: none !important;
+  }
+  .struk-kertas {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 2mm 3mm 6mm;
+    margin: 0;
+  }
+  .struk-halaman.k-58 .struk-kertas {
+    width: 52mm;
+    max-width: none;
+  }
+  .struk-halaman.k-80 .struk-kertas {
+    width: 72mm;
+    max-width: none;
+  }
+  .struk-halaman.k-a4 .struk-kertas {
+    padding: 0;
+  }
+}
+
+/* ---------- Laporan ---------- */
+a.chip {
+  text-decoration: none;
+}
+.laporan {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.laporan-filter {
+  gap: 14px;
+}
+.laporan-tanggal {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.laporan-loncat .chip {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.laporan-bagian {
+  scroll-margin-top: 16px;
+  gap: 12px;
+}
+.laporan-bagian .baris-pisah {
+  align-items: flex-start;
+}
+@media (min-width: 720px) {
+  .ubin-laporan {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.laporan-dua {
+  gap: 16px;
+}
+.tabel-laporan td {
+  vertical-align: top;
+}
+.tabel-laporan .nowrap {
+  white-space: nowrap;
+}
+.tabel-laporan .sel-isi {
+  min-width: 160px;
+  max-width: 280px;
+  color: var(--ink2);
+}
+.tabel-laporan .batang-favorit {
+  margin-top: 6px;
+  max-width: 220px;
+}
+.tabel-laporan a {
+  color: inherit;
+}
+.tanda.baru {
+  background: var(--juara-bg);
+  color: var(--kuning-tua);
+}
+.laporan-kepala-cetak {
+  display: none;
+}
+@media print {
+  .tak-cetak,
+  .laporan .kosong {
+    display: none !important;
+  }
+  .laporan-kepala-cetak {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .laporan-kepala-cetak h1 {
+    margin: 2px 0;
+    font-size: 22px;
+  }
+  .laporan-kepala-cetak p {
+    margin: 0;
+    color: #444;
+  }
+  .hero:has(+ .laporan) {
+    display: none !important;
+  }
+  .laporan-bagian {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    break-inside: auto;
+  }
+  .laporan-bagian h2 {
+    break-after: avoid;
+  }
+  .tabel-laporan tr {
+    break-inside: avoid;
+  }
+  .tabel-laporan th,
+  .tabel-laporan td {
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+  .tip-batang {
+    display: none !important;
+  }
+}

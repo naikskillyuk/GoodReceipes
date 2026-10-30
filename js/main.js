@@ -32,6 +32,8 @@ import { BerandaKasir } from './layar/beranda-kasir.js';
 import { CatatPesanan } from './layar/catat-pesanan.js';
 import { BannerHeader } from './layar/banner.js';
 import { DaftarPesanan, DetailPesanan } from './layar/pesanan.js';
+import { LayarStruk } from './layar/struk.js';
+import { Laporan } from './layar/laporan.js';
 import { PelangganPromo } from './layar/pelanggan.js';
 import { PesanOnline, TiruanMayar } from './layar/pesan-online.js';
 import { peranAkun, RUTE_TOKO, halamanAdmin, ALAMAT_ADMIN } from './lib/toko.js';
@@ -75,7 +77,11 @@ function Layar({ k }) {
   if (a === 'menu') return html`<${MenuJual} k=${k} />`;
   if (a === 'kasir') return html`<${Kasir} k=${k} />`;
   if (a === 'catat-pesanan') return html`<${CatatPesanan} key=${k.rute.kueri.id || 'baru'} k=${k} />`;
-  if (a === 'pesanan') return b ? html`<${DetailPesanan} key=${b} k=${k} id=${b} />` : html`<${DaftarPesanan} k=${k} />`;
+  if (a === 'pesanan') {
+    if (b && c === 'struk') return html`<${LayarStruk} key=${b} k=${k} id=${b} />`;
+    return b ? html`<${DetailPesanan} key=${b} k=${k} id=${b} />` : html`<${DaftarPesanan} k=${k} />`;
+  }
+  if (a === 'laporan') return html`<${Laporan} k=${k} />`;
   if (a === 'pelanggan') return html`<${PelangganPromo} k=${k} />`;
   if (a === 'banner') return html`<${BannerHeader} k=${k} />`;
   if (a === 'resep') {

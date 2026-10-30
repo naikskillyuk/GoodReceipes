@@ -165,6 +165,24 @@ try {
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 14);
   assert.equal(await evalDb(page, 'return toko.daftarPelanggan(db)[0].pelanggan.hp'), '6281234567890');
 
+  tahap('struk: pintasan setelah lunas, cetak 58/80 mm, kirim WhatsApp pembeli, kembali ke kasir');
+  await page.locator('.struk-terakhir').getByRole('link', { name: 'Struk' }).click();
+  await page.locator('.struk-kertas').waitFor();
+  const isiStruk = await page.locator('.struk-kertas').innerText();
+  assert.match(isiStruk, /TOTAL\s+Rp 14\.400/);
+  assert.match(isiStruk, /Kembali\s+5\.600/);
+  assert.match(isiStruk, /Budi/);
+  assert.match(isiStruk, /LUNAS/);
+  const waStruk = decodeURIComponent(await page.getByRole('link', { name: 'Kirim ke WhatsApp pembeli' }).getAttribute('href'));
+  assert.ok(waStruk.startsWith('https://wa.me/6281234567890?text=Halo Budi, berikut struk pesanan'), waStruk);
+  assert.ok(waStruk.includes('```'), 'struk WhatsApp dalam blok monospace');
+  assert.ok((await sisaLebar(page)) <= 0, 'struk tidak melebar di HP');
+  await foto(page, '04b-struk-58');
+  await page.getByRole('button', { name: '80 mm' }).click();
+  assert.ok((await page.locator('.struk-kertas.k-80').count()) === 1);
+  await page.getByRole('link', { name: 'Kembali' }).click();
+  await page.waitForURL(/#\/kasir$/);
+
   tahap('bayar non-tunai tanpa Mayar: tab Transfer / QRIS, rekening belum diatur, tidak ada tab Mayar');
   await tambahBrownies.click();
   await page.getByRole('button', { name: 'Buat pesanan & bayar' }).click();
@@ -437,6 +455,33 @@ try {
   await kasir.locator('.kartu-pesanan').first().click();
   await kasir.getByRole('button', { name: 'Mulai proses' }).click();
   await kasir.getByRole('button', { name: 'Tandai siap' }).waitFor();
+
+  tahap('akun kasir: laporan per rentang tanggal (ringkasan, pesanan, top produk, top pelanggan, stok) dan unduh CSV');
+  await kasir.goto(ADMIN + '#/');
+  await kasir.getByRole('link', { name: 'Laporan lengkap' }).click();
+  await kasir.getByRole('heading', { name: 'Laporan', exact: true }).waitFor();
+  assert.ok(await kasir.locator('a.chip.aktif', { hasText: '7 hari' }).count(), 'rentang dari beranda (7 hari)');
+  await kasir.getByRole('heading', { name: 'Produk terlaris' }).waitFor();
+  await kasir.locator('#lap-produk tbody tr', { hasText: 'Brownies Fudgy' }).first().waitFor();
+  await kasir.locator('#lap-pelanggan tbody tr', { hasText: 'Budi' }).waitFor();
+  await kasir.locator('#lap-stok tbody tr', { hasText: 'Brownies Fudgy' }).waitFor();
+  assert.ok((await kasir.locator('#lap-pesanan tbody tr').count()) >= 3, 'daftar pesanan');
+  assert.ok((await sisaLebar(kasir)) <= 0, 'laporan tidak melebar di HP');
+  await foto(kasir, '09b-laporan');
+  const unduhan = kasir.waitForEvent('download');
+  await kasir.locator('#lap-produk').getByRole('button', { name: 'CSV' }).click();
+  const berkas = await unduhan;
+  assert.match(berkas.suggestedFilename(), /^laporan-produk-\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}\.csv$/);
+  const csvProduk = fs.readFileSync(await berkas.path(), 'utf8');
+  assert.match(csvProduk, /^\ufeffPeringkat;Produk;Terjual/);
+  assert.match(csvProduk, /Brownies Fudgy/);
+  await kasir.getByRole('link', { name: 'Kemarin' }).click();
+  await kasir.waitForURL(/laporan\?dari=/);
+  await kasir.getByText('Belum ada transaksi').waitFor();
+  await kasir.getByLabel('Dari tanggal').fill('2020-01-01');
+  await kasir.getByLabel('Sampai tanggal').fill(jamNanti(0).slice(0, 10));
+  await kasir.locator('#lap-produk tbody tr', { hasText: 'Brownies Fudgy' }).first().waitFor();
+  assert.equal(await kasir.locator('.grafik-batang').getAttribute('aria-label'), 'Pemasukan per bulan', 'rentang panjang per bulan');
 
   tahap('akun toko: catat pesanan manual (WhatsApp, item di luar menu, antar + ongkir), ubah, lalu lunas transfer');
   await kasir.goto(BASE + '/#/kasir');

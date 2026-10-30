@@ -26,7 +26,7 @@ const PERIODE = [
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 /** Rp 1,2 jt / Rp 350 rb untuk label sumbu yang ringkas. */
-function rupiahRingkas(n) {
+export function rupiahRingkas(n) {
   if (n >= 1e6) return 'Rp ' + (n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' jt';
   if (n >= 1e3) return 'Rp ' + Math.round(n / 1e3).toLocaleString('id-ID') + ' rb';
   return rupiah(n);
@@ -96,21 +96,26 @@ function Perubahan({ kini, lalu, hari }) {
   return html`<small class=${'perubahan ' + (naik ? 'naik' : 'turun')}>${naik ? '▲' : '▼'} ${Math.abs(persen)}% dari ${hari} hari sebelumnya</small>`;
 }
 
-/** Grafik batang pemasukan per hari (satu seri, satu warna). Arahkan / sentuh batang untuk melihat angkanya. */
-function GrafikPemasukan({ perHari }) {
+/**
+ * Grafik batang pemasukan per hari (satu seri, satu warna). Arahkan / sentuh batang untuk melihat angkanya.
+ * satuan 'bulan' = satu batang per bulan (laporan rentang panjang).
+ */
+export function GrafikPemasukan({ perHari, satuan = 'hari' }) {
   const maks = Math.max(...perHari.map((h) => h.pemasukan), 0);
   const iMaks = perHari.findIndex((h) => h.pemasukan === maks && maks > 0);
   const banyak = perHari.length > 10;
+  const bulanan = satuan === 'bulan';
   const label = (h, i) => {
     const d = new Date(h.mulai);
+    if (bulanan) return !banyak || i % 3 === 0 ? d.toLocaleDateString('id-ID', { month: 'short' }) : '';
     if (!banyak) return HARI[d.getDay()];
     return i % 5 === 0 || i === perHari.length - 1 ? `${d.getDate()}/${d.getMonth() + 1}` : '';
   };
-  return html`<figure class="grafik-batang" aria-label="Pemasukan per hari">
+  return html`<figure class="grafik-batang" aria-label=${bulanan ? 'Pemasukan per bulan' : 'Pemasukan per hari'}>
     <div class="grafik-area">
       ${perHari.map((h, i) => {
         const d = new Date(h.mulai);
-        const tanggal = d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+        const tanggal = bulanan ? d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
         const teks = `${tanggal}: ${rupiah(h.pemasukan)} · ${h.pesanan} pesanan`;
         return html`<div class="kolom-batang" key=${h.mulai} tabindex="0" aria-label=${teks}>
           ${i === iMaks && html`<span class="label-batang">${rupiahRingkas(h.pemasukan)}</span>`}
@@ -120,7 +125,7 @@ function GrafikPemasukan({ perHari }) {
       })}
     </div>
     <div class="grafik-sumbu" aria-hidden="true">${perHari.map((h, i) => html`<span key=${h.mulai}>${label(h, i)}</span>`)}</div>
-    <figcaption class="teks-kecil">${maks ? 'Arahkan atau sentuh batang untuk melihat rincian per hari.' : 'Belum ada pemasukan di periode ini.'}</figcaption>
+    <figcaption class="teks-kecil">${maks ? `Arahkan atau sentuh batang untuk melihat rincian per ${bulanan ? 'bulan' : 'hari'}.` : 'Belum ada pemasukan di periode ini.'}</figcaption>
   </figure>`;
 }
 
@@ -161,6 +166,7 @@ function Tren({ db }) {
     <${GrafikPemasukan} perHari=${t.perHari} />
     <h3 class="judul-sub">Menu favorit</h3>
     <${MenuFavorit} favorit=${t.favorit} />
+    <a class="btn lebar" href=${tautan(`/laporan?preset=${hari === 7 ? '7-hari' : '30-hari'}`)}><${Ikon} nama="daftar" ukuran=${18} />Laporan lengkap</a>
   </section>`;
 }
 

@@ -10,6 +10,23 @@ import { KartuBanner } from '../ui/banner.js';
 import { rupiah } from '../lib/util.js';
 import { ambilMerek } from '../lib/repo.js';
 
+const STRUK_TERAKHIR_MS = 15 * 60 * 1000;
+
+/** Pesanan kasir yang baru saja lunas (15 menit terakhir): pintasan cetak / kirim struk. */
+function StrukTerakhir({ db }) {
+  const batas = Date.now() - STRUK_TERAKHIR_MS;
+  const bayar = db
+    .semua('Pembayaran', (b) => b.status === 'lunas' && (b.lunasPada || b.waktu || 0) >= batas)
+    .sort((a, b) => (b.lunasPada || b.waktu || 0) - (a.lunasPada || a.waktu || 0))
+    .map((b) => db.ambil('Pesanan', b.idPesanan))
+    .find((p) => p && p.sumber === 'kasir');
+  if (!bayar) return null;
+  return html`<div class="struk-terakhir" role="status">
+    <span><${Ikon} nama="centang" ukuran=${18} />Pesanan <b>#${bayar.nomor}</b> lunas · ${rupiah(bayar.total)}</span>
+    <a class="btn solid kecil" href=${tautan('/pesanan/' + bayar.id + '/struk?dari=kasir')}><${Ikon} nama="struk" ukuran=${16} />Struk</a>
+  </div>`;
+}
+
 /** Pilih pilihan tambahan (varian) dan jumlah sebelum masuk keranjang. */
 export function DialogOpsi({ m, onTutup, onTambah }) {
   const opsi = opsiMenu(m);
@@ -109,6 +126,7 @@ export function Kasir({ k }) {
       )}
     </div>`}
     <div class="isi">
+      <${StrukTerakhir} db=${db} />
       ${kosong
         ? html`<${Kosong} judul="Menu masih kosong" teks=${peranAkun(db) === 'dapur' ? 'Masukkan resep atau paket ke menu jual dulu.' : 'Minta admin memasukkan produk ke menu jual.'}>
             ${peranAkun(db) === 'dapur' && html`<a class="btn solid" href=${tautan('/menu')}>Atur menu jual</a>`}

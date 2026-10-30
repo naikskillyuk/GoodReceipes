@@ -22,7 +22,7 @@ export function peranAkun(db) {
 }
 
 /** Halaman yang boleh dibuka akun toko / kasir (bagian pertama alamat, di /admin). */
-export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'stok-makanan', 'pelanggan', 'pengaturan'];
+export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'laporan', 'stok-makanan', 'pelanggan', 'pengaturan'];
 
 // Situs punya dua pintu: "/" = etalase toko untuk pembeli (tanpa login), "/admin" = login admin dan kasir.
 export const ALAMAT_TOKO = '/';
