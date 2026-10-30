@@ -7077,8 +7077,18 @@ a.chip {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 14px;
-  background: #fbe9e2;
-  color: var(--bahaya);
+  background: var(--hijau-muda);
+  border: 1px solid var(--hijau-garis);
+  color: var(--ink);
+}
+.laporan-pilih > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.laporan-pilih select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .tabel-laporan input[type='checkbox'] {
   width: 18px;

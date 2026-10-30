@@ -168,3 +168,21 @@ test('hapus pesanan: pembayaran ikut terhapus, stok kembali, hanya admin', async
   assert.equal(toko.stokMakanan(db).get(brownies), 10);
   assert.equal(toko.hapusPesanan(db, p.id), false);
 });
+
+test('aksi massal: ubah status dan tandai lunas banyak pesanan, yang tidak perlu dilewati', async () => {
+  const { db, brownies, menu } = await siapkan();
+  toko.ubahStokMakanan(db, brownies, { jenis: 'koreksi', nilai: 20 });
+  const a = toko.buatPesanan(db, { keranjang: [{ idMenu: menu.id, jumlah: 1 }], nama: 'A' });
+  const b = toko.buatPesanan(db, { keranjang: [{ idMenu: menu.id, jumlah: 2 }], nama: 'B' });
+  const c = toko.buatPesanan(db, { keranjang: [{ idMenu: menu.id, jumlah: 1 }], nama: 'C' });
+  toko.ubahStatusPesanan(db, c.id, 'siap');
+  assert.equal(toko.prosesMassal(db, [a.id, b.id, c.id], 'siap'), 2, 'C sudah siap');
+  assert.deepEqual([a, b, c].map((p) => db.ambil('Pesanan', p.id).status), ['siap', 'siap', 'siap']);
+  toko.bayarTunai(db, db.ambil('Pesanan', a.id), 10000);
+  assert.equal(toko.prosesMassal(db, [a.id, b.id], 'lunas-transfer'), 1, 'A sudah lunas');
+  assert.equal(toko.statusBayar(db, b.id).bayar.metode, 'transfer');
+  assert.equal(toko.prosesMassal(db, [c.id], 'batal'), 1);
+  assert.equal(toko.prosesMassal(db, [c.id], 'lunas-tunai'), 0, 'pesanan batal tidak ditandai lunas');
+  assert.equal(toko.stokMakanan(db).get(brownies), 17, 'stok C kembali');
+  assert.equal(toko.prosesMassal(db, [a.id, 'tidak-ada'], 'menunggu'), 0, 'menunggu bukan aksi');
+});

@@ -466,7 +466,6 @@ try {
   await kasir.locator('#lap-pelanggan tbody tr', { hasText: 'Budi' }).waitFor();
   await kasir.locator('#lap-stok tbody tr', { hasText: 'Brownies Fudgy' }).waitFor();
   assert.ok((await kasir.locator('#lap-pesanan tbody tr').count()) >= 3, 'daftar pesanan');
-  assert.equal(await kasir.locator('#lap-pesanan input[type=checkbox]').count(), 0, 'kasir tidak bisa menghapus pesanan');
   const semuaPesanan = await kasir.locator('#lap-pesanan tbody tr').count();
   // Chip status yang ada isinya (chip berisi 0 disembunyikan); pilih status pertama selain "Semua".
   const chipStatus = kasir.locator('.laporan-status a.chip').nth(1);
@@ -478,6 +477,18 @@ try {
   assert.ok(jumlahStatus >= 1 && jumlahStatus < semuaPesanan, 'saring status ' + labelStatus);
   for (const st of await kasir.locator('#lap-pesanan tbody .lencana-status').allInnerTexts()) assert.equal(st, labelStatus);
   await kasir.locator('.laporan-status a.chip', { hasText: 'Semua' }).click();
+  // Centang pesanan lalu ubah statusnya sekaligus (kasir bisa; tombol hapus hanya untuk admin).
+  await kasir.waitForURL(/laporan\?dari=[^&]+&sampai=[^&]+$/);
+  const barisUbah = kasir.locator('#lap-pesanan tbody tr').filter({ hasNotText: 'Selesai' }).filter({ hasNotText: 'Batal' }).first();
+  const nomorUbah = (await barisUbah.locator('td').nth(1).innerText()).trim();
+  await barisUbah.locator('input[type=checkbox]').check();
+  await kasir.locator('.laporan-pilih').waitFor();
+  assert.equal(await kasir.locator('.laporan-pilih').getByRole('button', { name: /^Hapus/ }).count(), 0, 'kasir tidak bisa menghapus pesanan');
+  await kasir.getByLabel('Ubah pesanan terpilih').selectOption('selesai');
+  await kasir.locator('.laporan-pilih').getByRole('button', { name: 'Terapkan' }).click();
+  await kasir.getByRole('dialog').getByRole('button', { name: 'Selesai' }).click();
+  await kasir.getByText('1 pesanan diperbarui: selesai.').waitFor();
+  await kasir.locator('#lap-pesanan tbody tr', { hasText: nomorUbah }).locator('.lencana-status', { hasText: 'Selesai' }).waitFor();
   assert.ok((await sisaLebar(kasir)) <= 0, 'laporan tidak melebar di HP');
   await foto(kasir, '09b-laporan');
   const unduhan = kasir.waitForEvent('download');

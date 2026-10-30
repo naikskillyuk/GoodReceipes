@@ -741,6 +741,39 @@ export function hapusPesanan(db, idPesanan) {
   return true;
 }
 
+/** Aksi untuk banyak pesanan sekaligus (laporan): ubah status atau tandai lunas. */
+export const AKSI_MASSAL = [
+  { kunci: 'baru', label: 'Terima (Baru)' },
+  { kunci: 'diproses', label: 'Diproses' },
+  { kunci: 'siap', label: 'Siap diambil' },
+  { kunci: 'selesai', label: 'Selesai' },
+  { kunci: 'lunas-tunai', label: 'Tandai lunas · Tunai' },
+  { kunci: 'lunas-transfer', label: 'Tandai lunas · Transfer/QRIS' },
+  { kunci: 'batal', label: 'Batalkan' },
+];
+
+/**
+ * Jalankan satu aksi untuk banyak pesanan. Pesanan yang sudah berstatus itu, sudah lunas,
+ * atau batal (untuk tandai lunas) dilewati. Mengembalikan jumlah pesanan yang berubah.
+ */
+export function prosesMassal(db, ids, aksi) {
+  let berubah = 0;
+  for (const id of ids) {
+    const p = db.ambil('Pesanan', id);
+    if (!p) continue;
+    if (aksi === 'lunas-tunai' || aksi === 'lunas-transfer') {
+      if (p.status === 'batal' || statusBayar(db, id).lunas) continue;
+      if (aksi === 'lunas-tunai') bayarTunai(db, p, p.total);
+      else bayarTransfer(db, p);
+      berubah += 1;
+    } else if (STATUS_PESANAN[aksi] && aksi !== 'menunggu' && p.status !== aksi) {
+      ubahStatusPesanan(db, id, aksi);
+      berubah += 1;
+    }
+  }
+  return berubah;
+}
+
 /** Pesan kendala dari dapur untuk pembeli (mis. bahan habis, pesanan mundur). '' = kendala selesai. */
 export function aturKendala(db, idPesanan, teks) {
   const p = db.ambil('Pesanan', idPesanan);

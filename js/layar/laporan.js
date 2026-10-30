@@ -6,7 +6,7 @@ import { Kerangka, Hero, Kosong } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
 import { buatLaporan, rentangPreset, PRESET_RENTANG, keIsoTanggal, dariIsoTanggal, keCsv, tabelCsv, awalHari, SARING_STATUS, saringPesanan } from '../lib/laporan.js';
-import { statusBayar, STATUS_PESANAN, LABEL_METODE, namaItem, ambilToko, tampilHp, hapusPesanan, peranAkun } from '../lib/toko.js';
+import { statusBayar, STATUS_PESANAN, LABEL_METODE, namaItem, ambilToko, tampilHp, hapusPesanan, peranAkun, AKSI_MASSAL, prosesMassal } from '../lib/toko.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { ambilMerek } from '../lib/repo.js';
 import { rupiah, angka, tanggal, tampilJumlah } from '../lib/util.js';
@@ -127,10 +127,14 @@ function SaringStatus({ db, lap, status, alamat }) {
   </div>`;
 }
 
-/** Daftar pesanan laporan. Admin bisa memilih lalu menghapus pesanan (mis. pesanan uji coba / salah catat). */
+/**
+ * Daftar pesanan laporan. Pesanan yang dicentang bisa diubah statusnya / ditandai lunas sekaligus;
+ * admin juga bisa menghapusnya (mis. pesanan uji coba / salah catat).
+ */
 function TabelPesanan({ db, pesanan, status }) {
   const [semua, setSemua] = useState(false);
   const [pilih, setPilih] = useState(() => new Set());
+  const [aksi, setAksi] = useState('');
   const admin = peranAkun(db) === 'dapur';
   const daftar = semua ? pesanan : pesanan.slice(0, BATAS_BARIS);
   const ada = pesanan.filter((p) => pilih.has(p.id));
@@ -154,19 +158,44 @@ function TabelPesanan({ db, pesanan, status }) {
     setPilih(new Set());
     tampilToast(`${ada.length} pesanan dihapus.`);
   };
-  const kepala = [...(admin && pesanan.length ? [html`<input type="checkbox" aria-label="Pilih semua pesanan" checked=${semuaDipilih} onChange=${() => setPilih(semuaDipilih ? new Set() : new Set(pesanan.map((p) => p.id)))} />`] : []), 'Nomor', 'Waktu', 'Pembeli', 'Isi', 'Status', 'Bayar', { angka: 'Total' }, ''];
-  return html`${admin && ada.length > 0 && html`<div class="laporan-pilih tak-cetak" role="status">
-      <span><b>${ada.length}</b> pesanan dipilih</span>
+  const terapkan = async () => {
+    const a = AKSI_MASSAL.find((x) => x.kunci === aksi);
+    if (!a) return;
+    const lunas = aksi.startsWith('lunas');
+    const ya = await tanya({
+      judul: `${a.label}: ${ada.length} pesanan?`,
+      teks: aksi === 'batal'
+        ? 'Stok produk dikembalikan. Pesanan yang sudah dibayar perlu dikembalikan uangnya secara manual.'
+        : lunas
+          ? 'Pembayaran dicatat lunas sebesar total tiap pesanan. Pesanan yang sudah lunas atau batal dilewati.'
+          : 'Pesanan yang sudah berstatus ini dilewati.',
+      ya: a.label,
+      bahaya: aksi === 'batal',
+    });
+    if (!ya) return;
+    const n = prosesMassal(db, ada.map((p) => p.id), aksi);
+    setPilih(new Set());
+    setAksi('');
+    tampilToast(n ? `${n} pesanan diperbarui: ${a.label.toLowerCase()}.` : 'Tidak ada pesanan yang perlu diubah.');
+  };
+  const kepala = [...(pesanan.length ? [html`<input type="checkbox" aria-label="Pilih semua pesanan" checked=${semuaDipilih} onChange=${() => setPilih(semuaDipilih ? new Set() : new Set(pesanan.map((p) => p.id)))} />`] : []), 'Nomor', 'Waktu', 'Pembeli', 'Isi', 'Status', 'Bayar', { angka: 'Total' }, ''];
+  return html`${ada.length > 0 && html`<div class="laporan-pilih tak-cetak" role="group" aria-label="Aksi pesanan terpilih">
+      <span><b>${ada.length}</b> pesanan dipilih: ${ada.slice(0, 3).map((p) => p.nama || '#' + p.nomor).join(', ')}${ada.length > 3 ? ` +${ada.length - 3}` : ''}</span>
       <span class="baris-btn">
+        <select class="input kecil" aria-label="Ubah pesanan terpilih" value=${aksi} onChange=${(e) => setAksi(e.target.value)}>
+          <option value="">Ubah jadi…</option>
+          ${AKSI_MASSAL.map((x) => html`<option key=${x.kunci} value=${x.kunci}>${x.label}</option>`)}
+        </select>
+        <button type="button" class="btn kecil solid" disabled=${!aksi} onClick=${terapkan}>Terapkan</button>
         <button type="button" class="btn kecil abu" onClick=${() => setPilih(new Set())}>Batal pilih</button>
-        <button type="button" class="btn kecil bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${16} />Hapus ${ada.length} pesanan</button>
+        ${admin && html`<button type="button" class="btn kecil bahaya" onClick=${hapus}><${Ikon} nama="sampah" ukuran=${16} />Hapus ${ada.length} pesanan</button>`}
       </span>
     </div>`}
     <${Tabel} kepala=${kepala} kosong=${pesanan.length ? '' : status ? 'Tidak ada pesanan dengan status ini di rentang ini.' : 'Tidak ada pesanan di rentang ini.'}>
       ${daftar.map((p) => {
         const s = statusBayar(db, p.id);
         return html`<tr key=${p.id} class=${p.status === 'batal' ? 'mati' : ''}>
-          ${admin && html`<td class="tak-cetak"><input type="checkbox" aria-label=${'Pilih pesanan #' + p.nomor} checked=${pilih.has(p.id)} onChange=${() => balik(p.id)} /></td>`}
+          ${html`<td class="tak-cetak"><input type="checkbox" aria-label=${'Pilih pesanan #' + p.nomor} checked=${pilih.has(p.id)} onChange=${() => balik(p.id)} /></td>`}
           <td><a href=${tautan('/pesanan/' + p.id)}><b>#${p.nomor}</b></a></td>
           <td class="nowrap">${tanggal(p.waktu)}<br /><small class="teks-kecil">${jam(p.waktu)}</small></td>
           <td>${p.nama || html`<span class="teks-kecil">–</span>`}</td>
