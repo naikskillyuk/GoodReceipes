@@ -265,6 +265,9 @@ try {
   await pembeli.getByRole('button', { name: 'Mulai pesan' }).click();
   await pembeli.getByRole('heading', { name: 'Top Selling' }).waitFor();
   await pembeli.getByRole('heading', { name: 'Kategori' }).waitFor();
+  // Deretan kategori tidak mengulang isi navigasi bawah (Menu, Pesanan) dan menyebut jumlah produknya.
+  await pembeli.locator('.et-kategori .et-pintas-item', { hasText: 'produk' }).first().waitFor();
+  assert.equal(await pembeli.locator('.et-kategori').getByText(/Semua menu|Pesanan saya/).count(), 0);
   assert.ok((await pembeli.locator('.et-grid-top .et-kartu').count()) <= 6, 'top selling maks. 2 x 3');
   assert.equal(await pembeli.getByText('Masuk admin & kasir').count(), 0, 'tanpa tautan admin di etalase');
   assert.equal(await pembeli.getByText('Info toko', { exact: true }).count(), 0, 'tanpa banner info toko');

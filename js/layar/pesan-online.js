@@ -322,7 +322,12 @@ function Beranda({ info, jumlah, atur, buka, keMenu, ke, logo, jumlahKeranjang, 
     html`<section class="et-bagian" aria-labelledby="et-h-kategori">
       <div class="et-judul-bagian"><h2 id="et-h-kategori">Kategori</h2></div>
       <nav class="et-pintas et-kategori" aria-label="Kategori menu">
-        ${kategori.map((c) => html`<button type="button" key=${c} class="et-pintas-item" onClick=${() => keMenu(c)}><span><${Ikon} nama=${IKON_KAT[c] || 'kue'} ukuran=${24} /></span>${c}</button>`)}
+        ${kategori.map((c) => {
+          const n = menu.filter((m) => (m.kategori || 'Lainnya') === c).length;
+          return html`<button type="button" key=${c} class="et-pintas-item" aria-label=${`${c}, ${n} produk`} onClick=${() => keMenu(c)}>
+            <span><${Ikon} nama=${IKON_KAT[c] || 'kue'} ukuran=${24} /></span>${c}<small class="et-jumlah-kat">${n} produk</small>
+          </button>`;
+        })}
       </nav>
     </section>`}
 
@@ -357,8 +362,8 @@ function DaftarMenu({ info, jumlah, atur, buka, kat, keMenu, cariAwal = '' }) {
     <label class="et-cari"><${Ikon} nama="cari" ukuran=${18} /><input type="search" placeholder="Cari kue, camilan…" aria-label="Cari menu" value=${cari} onInput=${(e) => setCari(e.target.value)} /></label>
     ${kategori.length > 1 &&
     html`<div class="et-chips" role="group" aria-label="Kategori">
-      <button type="button" class=${!kat ? 'aktif' : ''} aria-pressed=${!kat} onClick=${() => keMenu('')}>Semua</button>
-      ${kategori.map((c) => html`<button type="button" key=${c} class=${kat === c ? 'aktif' : ''} aria-pressed=${kat === c} onClick=${() => keMenu(c)}>${c}</button>`)}
+      <button type="button" class=${!kat ? 'aktif' : ''} aria-pressed=${!kat} onClick=${() => keMenu('')}>Semua (${menu.length})</button>
+      ${kategori.map((c) => html`<button type="button" key=${c} class=${kat === c ? 'aktif' : ''} aria-pressed=${kat === c} onClick=${() => keMenu(c)}>${c} (${menu.filter((m) => (m.kategori || 'Lainnya') === c).length})</button>`)}
     </div>`}
     ${tampil.length === 0 && html`<${Kosong} judul="Tidak ada menu" teks=${q ? 'Coba kata lain.' : 'Belum ada menu di kategori ini.'} />`}
     <div class="et-grid">${tampil.map((m) => html`<${KartuProduk} key=${m.id} m=${m} n=${jumlah[m.id] || 0} atur=${atur} buka=${buka} lebar />`)}</div>
