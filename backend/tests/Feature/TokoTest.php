@@ -166,8 +166,13 @@ class TokoTest extends TestCase
         $this->assertTrue($promo['ok'], json_encode($promo));
         $this->assertEquals(40000 - 2 * 3000, $promo['total'], 'beli 5 = 2 kelipatan');
         $sekali = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888', 'kodePromo' => 'SEKALI',
-            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 4]]]);
+            'caraAmbil' => 'ambil', 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 4]]]);
+        $this->assertTrue($sekali['ok'], 'jam ambil opsional: '.json_encode($sekali));
         $this->assertEquals(32000 - 8000, $sekali['total'], '50% dari 2 Brownies saja, sekali per pesanan');
+        $this->assertEquals(['ambil', 0], array_values((array) \DB::table('pesanan')->where('id', $sekali['idPesanan'])->first(['cara_ambil', 'jadwal'])));
+        $lewat = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888',
+            'caraAmbil' => 'ambil', 'jadwal' => 1000, 'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1]]]);
+        $this->assertStringContainsString('belum lewat', $lewat['galat'], 'jam yang diisi tetap dicek');
     }
 
     public function test_pesanan_online_transfer_qris_manual_dan_testimoni(): void

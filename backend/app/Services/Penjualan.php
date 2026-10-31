@@ -527,10 +527,10 @@ class Penjualan
             return ['ok' => false, 'galat' => 'Isi nomor WhatsApp yang benar, mis. 0812xxxxxxx.'];
         }
         // Cara ambil: diambil sendiri atau ojek online yang dipesan pembeli sendiri, beserta jam ambilnya.
-        // Boleh kosong untuk halaman lama yang belum punya pilihan ini.
+        // Cara ambil boleh kosong untuk halaman lama; jam ambil opsional (0 = diambil saat pesanan siap).
         $caraAmbil = in_array($req['caraAmbil'] ?? '', ['ambil', 'ojol'], true) ? $req['caraAmbil'] : '';
-        $jadwal = is_numeric($req['jadwal'] ?? null) ? (int) $req['jadwal'] : 0;
-        if ($caraAmbil !== '') {
+        $jadwal = is_numeric($req['jadwal'] ?? null) ? max(0, (int) $req['jadwal']) : 0;
+        if ($caraAmbil !== '' && $jadwal > 0) {
             $kini = self::sekarang();
             if ($jadwal < $kini - 15 * 60 * 1000) {
                 return ['ok' => false, 'galat' => 'Pilih jam ambil yang belum lewat.'];

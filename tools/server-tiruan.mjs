@@ -371,10 +371,10 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     else if (hp.startsWith('8')) hp = '62' + hp;
     if (nama.length < 2) return { ok: false, galat: 'Isi nama Anda.' };
     if (!/^62\d{8,13}$/.test(hp)) return { ok: false, galat: 'Isi nomor WhatsApp yang benar, mis. 0812xxxxxxx.' };
-    // Sama dengan Penjualan::pesanOnline: cara ambil + jam ambil (boleh kosong untuk halaman lama).
+    // Sama dengan Penjualan::pesanOnline: cara ambil + jam ambil (jam opsional; 0 = diambil saat pesanan siap).
     const caraAmbil = ['ambil', 'ojol'].includes(req.caraAmbil) ? req.caraAmbil : '';
-    let jadwal = Math.floor(Number(req.jadwal)) || 0;
-    if (caraAmbil) {
+    let jadwal = Math.max(0, Math.floor(Number(req.jadwal)) || 0);
+    if (caraAmbil && jadwal) {
       if (jadwal < Date.now() - 15 * 60 * 1000) return { ok: false, galat: 'Pilih jam ambil yang belum lewat.' };
       if (jadwal > Date.now() + 60 * 24 * 60 * 60 * 1000) return { ok: false, galat: 'Jam ambil paling lambat 60 hari dari sekarang.' };
     } else jadwal = 0;

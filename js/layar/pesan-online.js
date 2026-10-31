@@ -447,9 +447,9 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
     if (nama.trim().length < 2) return setGalat('Isi nama Anda.');
     if (!hp.trim()) return setGalat('Isi nomor WhatsApp untuk kabar pesanan.');
     if (!cara) return setGalat('Pilih cara ambil pesanan: ambil sendiri atau ojek online.');
-    const jadwal = dariInputWaktu(jam);
-    if (!jadwal) return setGalat('Isi jam pesanan akan diambil.');
-    if (jadwal < Date.now() - 5 * 60 * 1000) return setGalat('Jam ambil sudah lewat. Pilih jam lain.');
+    // Jam ambil opsional: kosong = diambil saat pesanan siap (toko mengabari lewat WhatsApp).
+    const jadwal = jam ? dariInputWaktu(jam) || 0 : 0;
+    if (jadwal && jadwal < Date.now() - 5 * 60 * 1000) return setGalat('Jam ambil sudah lewat. Pilih jam lain, atau kosongkan.');
     setMengirim(true);
     setGalat('');
     try {
@@ -499,8 +499,8 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
           )}
         </div>
       </fieldset>
-      ${cara && html`<label class="bidang"><span>${cara === 'ojol' ? 'Jam driver ojek datang ke toko' : 'Jam Anda datang mengambil'}</span><input class="input" type="datetime-local" min=${keInputWaktu(Date.now())} value=${jam} onInput=${(e) => (setJam(e.target.value), setGalat(''))} /></label>`}
-      ${cara === 'ojol' && html`<div class="info">Pesan ojeknya sendiri lewat aplikasi Gojek / Grab sesuai jam di atas${info.alamat ? html`, dengan titik jemput <b>${info.alamat}</b>` : ' ke alamat toko'}. Ongkir dibayar langsung ke driver dan tidak termasuk total di bawah.</div>`}
+      ${cara && html`<label class="bidang"><span>${cara === 'ojol' ? 'Jam driver ojek datang ke toko' : 'Jam Anda datang mengambil'} (opsional)</span><input class="input" type="datetime-local" min=${keInputWaktu(Date.now())} value=${jam} onInput=${(e) => (setJam(e.target.value), setGalat(''))} /><span class="bantu">Kosongkan bila belum pasti. Toko akan mengabari lewat WhatsApp saat pesanan siap.</span></label>`}
+      ${cara === 'ojol' && html`<div class="info">Pesan ojeknya sendiri lewat aplikasi Gojek / Grab ${jam ? 'sesuai jam di atas' : 'setelah toko mengabari pesanan siap'}${info.alamat ? html`, dengan titik jemput <b>${info.alamat}</b>` : ' ke alamat toko'}. Ongkir dibayar langsung ke driver dan tidak termasuk total di bawah.</div>`}
       <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="300" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. tanpa kacang" /></label>
       <label class="bidang"><span>Kode promo (opsional)</span><input class="input" maxlength="30" style="text-transform:uppercase" value=${kode} onInput=${(e) => setKode(e.target.value)} /></label>
       <div class="hasil-baris"><span><b class="biasa">Total</b>${kode.trim() ? html`<br /><small class="teks-kecil">Diskon promo dihitung saat dipesan</small>` : ''}</span><b class="et-total">${rupiah(total)}</b></div>
@@ -693,7 +693,7 @@ function DetailPesananSaya({ s, setS, url, token, idPesanan }) {
       ${(s.item || []).map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${namaItem(i)}</span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
       <div class="hasil-baris"><span><b class="biasa">Total</b></span><b>${rupiah(s.total)}</b></div>
       ${ambil && html`<div class="hasil-baris"><span>Cara ambil</span><b class="biasa">${ambil}</b></div>`}
-      ${ojol && s.status !== 'batal' && s.status !== 'selesai' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} sesuai jam di atas. Toko tidak memesankan ojek.</p>`}
+      ${ojol && s.status !== 'batal' && s.status !== 'selesai' && html`<p class="bantu">Jangan lupa pesan Gojek / Grab sendiri ke ${s.alamatToko || 'alamat toko'} ${s.jadwal > 0 ? 'sesuai jam di atas' : 'setelah pesanan siap'}. Toko tidak memesankan ojek.</p>`}
     </section>
     ${s.bisaTestimoni && html`<${FormTestimoni} url=${url} token=${token} idPesanan=${idPesanan} nama=${s.nama} />`}
   </div>`;
