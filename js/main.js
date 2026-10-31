@@ -153,7 +153,10 @@ function App({ db, penyinkron, peringatan, pasangan }) {
         tampilToast(e.message);
       } else if (db.jumlahKotor() > 0 && Date.now() - gagalTerakhir.waktu > JEDA_PESAN_GAGAL_MS) {
         gagalTerakhir.waktu = Date.now();
-        tampilToast('Belum tersimpan ke server (periksa internet). Akan dicoba lagi otomatis.');
+        // Sinyal putus: cukup minta periksa internet. Ditolak server: sebutkan alasannya supaya bisa diperbaiki.
+        tampilToast(e.kode === 'JARINGAN' || !e.message
+          ? 'Belum tersimpan ke server (periksa internet). Akan dicoba lagi otomatis.'
+          : `Belum tersimpan ke server: ${e.message} Akan dicoba lagi otomatis.`);
       }
       throw e;
     }

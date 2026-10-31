@@ -28,8 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
             if (! $request->is('api', 'api/*')) {
                 return null;
             }
+            // Kolom / tabel tidak ada (pgsql 42703, 42P01; mysql 42S22, 42S02): migrasi belum dijalankan ke database server.
+            $kodeSql = $e instanceof \Illuminate\Database\QueryException ? (string) ($e->errorInfo[0] ?? $e->getCode()) : '';
             $galat = match (true) {
                 $e instanceof \Illuminate\Http\Exceptions\ThrottleRequestsException => 'Terlalu banyak permintaan. Coba lagi sebentar lagi.',
+                in_array($kodeSql, ['42703', '42P01', '42S22', '42S02'], true) => 'Database server belum diperbarui. Admin perlu menjalankan "php artisan migrate" ke database server.',
                 $e instanceof \Illuminate\Database\QueryException, $e instanceof PDOException => 'Server tidak bisa menghubungi database.',
                 default => 'Terjadi kesalahan di server.',
             };

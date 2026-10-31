@@ -26,7 +26,9 @@ export async function panggilApi(scriptUrl, isi, { fetchFn = globalThis.fetch, b
       signal: kendali?.signal,
     });
   } catch (e) {
-    throw new GalatSinkron(e?.name === 'AbortError' ? 'Server tidak menjawab (waktu habis).' : 'Tidak bisa terhubung. Periksa internet dan alamat server.');
+    const galat = new GalatSinkron(e?.name === 'AbortError' ? 'Server tidak menjawab (waktu habis).' : 'Tidak bisa terhubung. Periksa internet dan alamat server.');
+    galat.kode = 'JARINGAN';
+    throw galat;
   } finally {
     if (timer) clearTimeout(timer);
   }
