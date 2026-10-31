@@ -251,8 +251,9 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     return { ok: true, pesan: 'Terima kasih! Testimoni Anda akan tampil setelah dicek toko.' };
   }
   // Diskon produk, sama seperti Penjualan::hargaJual.
+  const nominal = (m) => m.diskonJenis === 'nominal';
   function diskonMenu(m) {
-    const d = Math.max(0, Math.min(90, angka(m.diskon)));
+    const d = nominal(m) ? Math.max(0, Math.min(angka(m.harga), Math.round(angka(m.diskon)))) : Math.max(0, Math.min(90, angka(m.diskon)));
     return d && (!angka(m.diskonSampai) || Date.now() <= angka(m.diskonSampai)) ? d : 0;
   }
   function opsiMenu(m) {
@@ -270,7 +271,11 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       .filter((x) => x.nama && !lihat.has(x.nama.toLowerCase()) && lihat.add(x.nama.toLowerCase()))
       .slice(0, 12);
   }
-  const hargaMenu = (m) => (diskonMenu(m) ? Math.max(0, Math.round((angka(m.harga) * (100 - diskonMenu(m))) / 100 / 100) * 100) : angka(m.harga));
+  const hargaMenu = (m) => {
+    const d = diskonMenu(m);
+    if (!d) return angka(m.harga);
+    return nominal(m) ? Math.max(0, angka(m.harga) - d) : Math.max(0, Math.round((angka(m.harga) * (100 - d)) / 100 / 100) * 100);
+  };
   function infoToko(req) {
     const s = tokoDariToken(req.token);
     if (!s) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
@@ -289,7 +294,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         const fotoCadangan = m.jenis === 'paket' ? (tabel('Paket')[m.idRef] || {}).fotoUrl || (isiPertama && fotoResep(isiPertama.idResep)) : fotoResep(m.idRef);
         m = { ...m, fotoUrl: m.fotoUrl || fotoCadangan || '' };
         const terjual = hidup('Pesanan', (p) => !['batal', 'menunggu'].includes(p.status)).reduce((j, p) => j + bacaItem(p.item).filter((i) => i.idMenu === m.id).reduce((a, i) => a + angka(i.jumlah), 0), 0);
-        return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori, segera: benar(m.segera, false), terjual };
+        return { id: m.id, nama: String(m.nama || ''), harga: hargaMenu(m), hargaAsli: angka(m.harga), diskon: diskonMenu(m), diskonJenis: nominal(m) ? 'nominal' : 'persen', opsi: opsiMenu(m), fotoUrl: String(m.fotoUrl || ''), keterangan: String(m.keterangan || ''), sisa, kategori, segera: benar(m.segera, false), terjual };
       });
     return {
       ok: true,

@@ -138,7 +138,7 @@ return [
             'kolom' => [
                 'id' => 't', 'jenis' => 't', 'idRef' => 't', 'nama' => 't', 'harga' => 'n', 'fotoUrl' => 't', 'keterangan' => 't',
                 'aktif' => 'b', 'online' => 'b', 'urutan' => 'n', 'diskon' => 'n', 'diskonSampai' => 'n', 'opsi' => 'j',
-                'segera' => 'b',
+                'segera' => 'b', 'diskonJenis' => 't',
             ],
         ],
         'Pesanan' => [
@@ -181,6 +181,13 @@ return [
             'kolom' => [
                 'id' => 't', 'judul' => 't', 'teks' => 't', 'fotoUrl' => 't', 'warna' => 't', 'tombol' => 't', 'aksi' => 't', 'nilai' => 't',
                 'tampilDi' => 't', 'aktif' => 'b', 'urutan' => 'n',
+            ],
+        ],
+        'LogResep' => [
+            'db' => 'log_resep',
+            'kolom' => [
+                'id' => 't', 'idResep' => 't', 'idEksperimen' => 't', 'nomorEksperimen' => 'n', 'waktu' => 'n', 'sebab' => 't',
+                'hppLama' => 'n', 'hppBaru' => 'n', 'bahan' => 'j', 'perubahan' => 'j',
             ],
         ],
         'Testimoni' => [

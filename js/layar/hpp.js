@@ -15,7 +15,7 @@ import { tautan } from '../ui/router.js';
 import { tampilToast } from '../ui/pesan.js';
 import { KartuHarga } from '../ui/harga.js';
 import {
-  dataHPP, eksperimenResep, targetResep, biayaLainResep, pilihanResepTambahan, tambahResepTambahan, simpanHPPResep,
+  dataHPP, eksperimenResep, targetResep, biayaLainResep, pilihanResepTambahan, tambahResepTambahan, simpanHPPResep, denganLogResep,
 } from '../lib/repo.js';
 import { analisisPenjualan, marginDariHarga } from '../lib/hpp.js';
 import { rupiah, angka, persen, tanggal } from '../lib/util.js';
@@ -112,7 +112,7 @@ export function PanelHPPResep({ k, resep }) {
       hasil=${hpp.alur.bahan} rumus=${`${rupiah(hpp.biayaBahan)} ÷ ${jumlahPorsi}`}>
       <label class="bidang">
         <span>Eksperimen yang dihitung</span>
-        <select class="pilih" value=${dipakai ? dipakai.id : ''} onChange=${(e) => aturTargetResep(db, resep.id, { idEksperimenHitung: e.target.value })}>
+        <select class="pilih" value=${dipakai ? dipakai.id : ''} onChange=${(e) => { const pilih = eksperimen.find((x) => x.id === e.target.value); denganLogResep(db, resep.id, `HPP dihitung dari Eksperimen ${pilih ? pilih.nomor : ''}`, () => aturTargetResep(db, resep.id, { idEksperimenHitung: e.target.value })); }}>
           ${eksperimen.map((e) => html`<option value=${e.id} selected=${dipakai && dipakai.id === e.id}>Eksperimen ${e.nomor}${resep.idJuara === e.id ? ' (juara)' : ''} · ${angka(Number(e.porsi) || 0)} ${e.satuanPorsi || 'porsi'}</option>`)}
         </select>
       </label>

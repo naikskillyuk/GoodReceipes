@@ -14,7 +14,7 @@ import { InfoTransfer, teksJadwal } from './pesanan.js';
 import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
 import { KartuBanner } from '../ui/banner.js';
 import { Bintang } from './pelanggan.js';
-import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris, LABEL_AMBIL } from '../lib/toko.js';
+import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris, LABEL_AMBIL, teksDiskon } from '../lib/toko.js';
 import { panggilApi } from '../lib/sync.js';
 import { LOGO_BAWAAN, ambilMerek } from '../lib/repo.js';
 import { rupiah, tanggal } from '../lib/util.js';
@@ -119,7 +119,7 @@ function KartuProduk({ m, n, atur, buka, lebar, terjual = false }) {
   return html`<article class=${'et-kartu' + (lebar ? ' lebar' : '') + (m.sisa !== null && m.sisa <= 0 ? ' mati' : '')}>
     <button type="button" class="et-kartu-foto" onClick=${() => buka(m)} aria-label=${'Lihat ' + m.nama}>
       <${Foto} src=${m.fotoUrl} ikon="kue" ukuranIkon=${36} />
-      ${m.diskon > 0 && !m.segera && html`<span class="et-diskon">-${m.diskon}%</span>`}
+      ${m.diskon > 0 && !m.segera && html`<span class="et-diskon">${teksDiskon(m.diskonJenis, m.diskon)}</span>`}
       ${m.segera && html`<span class="et-segera">Coming soon</span>`}
       ${m.sisa !== null && m.sisa > 0 && m.sisa <= 5 && html`<span class="et-pita">Sisa ${m.sisa}</span>`}
     </button>
@@ -394,7 +394,7 @@ function DetailProduk({ info, m, diKeranjang, tambah: tambahKe, kembali, keKeran
       <h1>${m.nama}</h1>
       <div class="et-detail-harga">
         <b class=${m.segera ? 'segera' : ''}>${tampilHarga(m, m.harga)}</b>
-        ${m.diskon > 0 && !m.segera && html`<s class="et-harga-coret">${rupiah(m.hargaAsli)}</s><span class="et-diskon statis">Hemat ${m.diskon}%</span>`}
+        ${m.diskon > 0 && !m.segera && html`<s class="et-harga-coret">${rupiah(m.hargaAsli)}</s><span class="et-diskon statis">Hemat ${m.diskonJenis === 'nominal' ? rupiah(m.diskon) : m.diskon + '%'}</span>`}
         ${rata > 0 && html`<span class="et-rata"><${Bintang} nilai=${rata} /> (${info.testimoni.length} ulasan toko)</span>`}
       </div>
       ${m.keterangan ? html`<p class="et-deskripsi">${m.keterangan}</p>` : html`<p class="et-deskripsi">Dibuat dari resep andalan ${info.namaToko}.</p>`}

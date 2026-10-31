@@ -9,7 +9,7 @@ import { tanya, tampilToast } from '../ui/pesan.js';
 import { tautan, pergi } from '../ui/router.js';
 import {
   daftarMenu, itemKeranjang, cekPromo, buatPesanan, ubahPesanan, bisaDiubah, kurangStok, normalHp, idPelanggan,
-  bayarTunai, bayarTransfer, SALURAN_PESANAN, pakaiMayar, hargaJual, diskonBerlaku, opsiMenu,
+  bayarTunai, bayarTransfer, SALURAN_PESANAN, pakaiMayar, hargaJual, labelDiskon, opsiMenu,
 } from '../lib/toko.js';
 import { rupiah } from '../lib/util.js';
 
@@ -191,7 +191,7 @@ export function CatatPesanan({ k }) {
             <div class="kolom" style="gap:8px">
               <select class="input kecil" aria-label="Tambah dari menu" value=${pilihMenu} onChange=${(e) => tambahMenu(e.target.value)} disabled=${!menu.length}>
                 <option value="">${menu.length ? '+ Tambah dari menu…' : 'Menu jual masih kosong'}</option>
-                ${menu.map(({ menu: m, sisa }) => html`<option value=${m.id}>${m.nama} · ${rupiah(hargaJual(m))}${diskonBerlaku(m) ? ` (diskon ${diskonBerlaku(m)}%)` : ''}${sisa === null ? '' : sisa <= 0 ? ' · stok habis' : ` · sisa ${sisa}`}</option>`)}
+                ${menu.map(({ menu: m, sisa }) => html`<option value=${m.id}>${m.nama} · ${rupiah(hargaJual(m))}${labelDiskon(m) ? ` (diskon ${labelDiskon(m).slice(1)})` : ''}${sisa === null ? '' : sisa <= 0 ? ' · stok habis' : ` · sisa ${sisa}`}</option>`)}
               </select>
               <button class="btn" onClick=${tambahLain}><${Ikon} nama="plus" ukuran=${18} />Item di luar menu</button>
             </div>

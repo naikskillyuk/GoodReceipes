@@ -195,6 +195,16 @@ try {
   assert.match(await teks(page, '.kartu-juara'), /Eksperimen 2/);
   assert.equal(await page.locator('.banner-kembang', { hasText: 'Kue Uji' }).count(), 0, 'tidak lagi di banner dikembangkan');
 
+  tahap('Log resep: hanya bahan yang berubah dari Eksperimen 1 ke 2, dengan HPP sebelum dan sesudah');
+  await page.goto(ADMIN + `#/resep/${idResep}/log`);
+  const kartuLog = page.locator('.kartu', { hasText: 'Eksperimen 2 dibuat' });
+  await kartuLog.waitFor();
+  const isiLog = await kartuLog.innerText();
+  assert.match(isiLog, /Takaran\s+Tepung terigu/);
+  assert.match(isiLog, /Ditambah\s+Cokelat bubuk/);
+  assert.doesNotMatch(isiLog, /Telur ayam/, 'bahan yang tidak berubah tidak tampil');
+  await page.getByText(/Catatan awal/).waitFor();
+
   tahap('HPP Resep: packing per porsi, lalu Simpan HPP');
   await page.goto(ADMIN + `#/resep/${idResep}/hpp`);
   await page.getByRole('button', { name: /^Packing$/ }).click();

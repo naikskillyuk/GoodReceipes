@@ -251,6 +251,19 @@ test('diskon produk: harga jual dibulatkan, kedaluwarsa, dan dipakai di keranjan
   assert.equal(toko.diskonBerlaku(lewat), 0);
   assert.equal(toko.hargaJual(lewat), 12500);
   assert.equal(toko.hargaJual({ ...m, diskon: 0 }), 12500);
+  assert.equal(toko.labelDiskon(m), '-15%');
+});
+
+test('diskon produk potongan Rupiah: dikurangkan langsung, tidak melebihi harga', async () => {
+  const { db, brownies } = await dbContoh();
+  const menu = toko.tambahMenu(db, 'resep', brownies);
+  const m = db.simpan('Menu', { ...menu, harga: 12500, diskon: 2050, diskonJenis: 'nominal' });
+  assert.equal(toko.diskonBerlaku(m), 2050);
+  assert.equal(toko.hargaJual(m), 10450, 'tanpa pembulatan');
+  assert.equal(toko.labelDiskon(m), '-Rp 2.050');
+  assert.equal(toko.itemKeranjang(db, [{ idMenu: m.id, jumlah: 2 }]).subtotal, 20900);
+  assert.equal(toko.hargaJual({ ...m, diskon: 99999 }), 0, 'potongan dibatasi harga');
+  assert.equal(toko.hargaJual({ ...m, diskonSampai: Date.now() - 1000 }), 12500, 'kedaluwarsa');
 });
 
 test('pilihan tambahan (varian): harga ditambahkan, hanya pilihan yang ada, nama item lengkap', async () => {

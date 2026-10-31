@@ -6,13 +6,13 @@
 // - mutasi penjualan memakai id tetap "mmk_{idPesanan}_{idResep}" sehingga tidak pernah terpotong dua kali
 // - pelanggan memakai id tetap "plg_{nomor WhatsApp}"
 
-import { buatId } from './util.js';
+import { buatId, rupiah } from './util.js';
 import { panggilApi } from './sync.js';
 import { dariBaris } from './schema.js';
 import { alamatServer } from './akun.js';
 import { keDasar, hargaPerDasar, labelDasar, infoSatuanBeli } from './units.js';
 import { hargaMinimum, bulatkanHarga } from './hpp.js';
-import { bahanEksperimen, konversiBahan, eksperimenUntukHitung, targetResep, hppResep, dataHPP, dataPaket, fotoSrc, isiPaket } from './repo.js';
+import { bahanEksperimen, konversiBahan, eksperimenUntukHitung, targetResep, hppResep, dataHPP, dataPaket, fotoSrc, isiPaket, denganLogResep, resepPemakaiBahan } from './repo.js';
 
 // ---------- Peran akun ----------
 
@@ -103,12 +103,14 @@ export function catatBelanja(db, baris, { tempat = '', catatan = '', sekarang = 
     );
     if (b.perbaruiHarga && harga > 0) {
       const perKemasan = Math.round(harga / kemasan);
-      db.simpan('Bahan', {
-        ...bahan,
-        hargaBeli: perKemasan,
-        beliDi: tempat.trim() || bahan.beliDi,
-        hargaDiperbarui: perKemasan !== bahan.hargaBeli ? sekarang : bahan.hargaDiperbarui || sekarang,
-      });
+      denganLogResep(db, resepPemakaiBahan(db, bahan.id), `Harga ${bahan.nama} diperbarui dari belanja`, () =>
+        db.simpan('Bahan', {
+          ...bahan,
+          hargaBeli: perKemasan,
+          beliDi: tempat.trim() || bahan.beliDi,
+          hargaDiperbarui: perKemasan !== bahan.hargaBeli ? sekarang : bahan.hargaDiperbarui || sekarang,
+        }),
+      );
     }
   }
   return hasil;
@@ -299,13 +301,25 @@ export function riwayatMakanan(db, idResep) {
 
 // ---------- Menu jual ----------
 
-/** Diskon produk yang sedang berlaku (persen, 0 bila tidak ada / sudah lewat batas). */
+/**
+ * Diskon produk yang sedang berlaku, 0 bila tidak ada / sudah lewat batas.
+ * diskonJenis 'nominal' = potongan Rupiah (maks. harga), selain itu persen (maks. 90%).
+ */
 export function diskonBerlaku(menu, sekarang = Date.now()) {
-  const d = Math.max(0, Math.min(90, Number(menu && menu.diskon) || 0));
+  const nilai = Number(menu && menu.diskon) || 0;
+  const d = menu && menu.diskonJenis === 'nominal'
+    ? Math.max(0, Math.min(Number(menu.harga) || 0, Math.round(nilai)))
+    : Math.max(0, Math.min(90, nilai));
   if (!d) return 0;
   const sampai = Number(menu.diskonSampai) || 0;
   return sampai && sekarang > sampai ? 0 : d;
 }
+
+/** Label diskon untuk ditampilkan: "-20%" atau "-Rp 2.000". */
+export const teksDiskon = (jenis, nilai) => (!(nilai > 0) ? '' : jenis === 'nominal' ? '-' + rupiah(nilai) : `-${nilai}%`);
+
+/** Label diskon produk yang sedang berlaku ('' bila tidak ada). */
+export const labelDiskon = (menu, sekarang = Date.now()) => teksDiskon(menu && menu.diskonJenis, diskonBerlaku(menu, sekarang));
 
 /** Pilihan tambahan berbayar sebuah menu: [{nama, harga}] (maks. 12, nama unik). */
 export function opsiMenu(menu) {
@@ -334,11 +348,16 @@ export const namaItem = (i) => (i ? i.nama + (Array.isArray(i.opsi) && i.opsi.le
 /** Kunci baris keranjang: menu yang sama dengan pilihan berbeda = baris berbeda. */
 export const kunciBaris = (idMenu, opsi = []) => idMenu + (opsi.length ? '|' + [...opsi].map((x) => String(x).toLowerCase()).sort().join('|') : '');
 
-/** Harga jual setelah diskon produk, dibulatkan ke Rp 100. Sama dengan Penjualan::hargaJual. */
+/**
+ * Harga jual setelah diskon produk. Sama dengan Penjualan::hargaJual.
+ * Diskon persen dibulatkan ke Rp 100; potongan Rupiah dikurangkan apa adanya.
+ */
 export function hargaJual(menu, sekarang = Date.now()) {
   const harga = Number(menu && menu.harga) || 0;
   const d = diskonBerlaku(menu, sekarang);
-  return d ? Math.max(0, Math.round((harga * (100 - d)) / 100 / 100) * 100) : harga;
+  if (!d) return harga;
+  if (menu.diskonJenis === 'nominal') return Math.max(0, harga - d);
+  return Math.max(0, Math.round((harga * (100 - d)) / 100 / 100) * 100);
 }
 
 /** Resep yang terpakai untuk 1 menu: {idResep: jumlah}. Paket = isi paketnya. */

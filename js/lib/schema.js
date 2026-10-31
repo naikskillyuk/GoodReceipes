@@ -70,6 +70,16 @@ export const TABEL = {
       hppSimpan: 'n', packingSimpan: 'n', hppSimpanPada: 'n',
     },
   },
+  // Log perubahan bahan resep (dibuat otomatis). bahan = keadaan bahan saat itu [{idBahan, nama, jumlah, satuan, biaya}],
+  // perubahan = hanya bahan yang berubah [{jenis: 'tambah'|'hapus'|'takaran'|'harga', nama, lama, baru}].
+  // hppLama/hppBaru = HPP resep per porsi (eksperimen yang dihitung) sebelum dan sesudah.
+  LogResep: {
+    awalan: 'lgr',
+    kolom: {
+      id: 't', idResep: 't', idEksperimen: 't', nomorEksperimen: 'n', waktu: 'n', sebab: 't',
+      hppLama: 'n', hppBaru: 'n', bahan: 'j', perubahan: 'j',
+    },
+  },
   // Paket: beberapa resep dijual bersama dalam satu kemasan. Biaya paket (kotak, label) dihitung sekali.
   // hppSimpan: HPP paket yang disimpan dengan tombol "Simpan HPP paket" (dipakai di menu jual), seperti HPP resep.
   Paket: {
@@ -114,10 +124,11 @@ export const TABEL = {
   // Menu yang dijual toko. jenis 'resep' | 'paket'; idRef = id resep/paket. online = tampil di link pemesanan.
   Menu: {
     awalan: 'mnu',
-    // diskon = persen potongan harga produk (0 = tanpa diskon), diskonSampai = batas waktu (ms, 0 = tanpa batas).
+    // diskon = potongan harga produk (0 = tanpa diskon): persen, atau Rupiah bila diskonJenis 'nominal'.
+    // diskonJenis 'persen' (bawaan, juga bila kosong) | 'nominal'. diskonSampai = batas waktu (ms, 0 = tanpa batas).
     // opsi = pilihan tambahan berbayar [{nama, harga}], mis. "Digoreng" +2000, "Tambah keju" +3000 (boleh pilih beberapa).
     // segera = "Coming soon": harga tidak ditampilkan di etalase, tetapi tetap bisa dipesan seperti biasa (untuk uji coba).
-    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n', diskon: 'n', diskonSampai: 'n', opsi: 'j', segera: 'b' },
+    kolom: { id: 't', jenis: 't', idRef: 't', nama: 't', harga: 'n', fotoUrl: 't', keterangan: 't', aktif: 'b', online: 'b', urutan: 'n', diskon: 'n', diskonJenis: 't', diskonSampai: 'n', opsi: 'j', segera: 'b' },
   },
   // Pesanan. item = [{idMenu, nama, harga, jumlah, opsi?}] (idMenu kosong = item di luar menu; opsi = nama pilihan tambahan,
   // harga sudah termasuk pilihan tambahan). sumber 'kasir' | 'online' | 'manual'.

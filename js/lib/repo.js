@@ -63,8 +63,8 @@ export function buatResep(db, { nama, idKategori, targetDicapai = '', fotoAcuanL
 }
 
 export function hapusResep(db, idResep) {
-  for (const e of eksperimenResep(db, idResep)) hapusEksperimen(db, e.id, { jagaJuara: false });
-  for (const t of ['BiayaLain', 'Target', 'Marketing', 'ResepTambahan']) {
+  for (const e of eksperimenResep(db, idResep)) hapusEksperimen(db, e.id, { jagaJuara: false, log: false });
+  for (const t of ['BiayaLain', 'Target', 'Marketing', 'ResepTambahan', 'LogResep']) {
     db.semua(t, (r) => r.idResep === idResep).forEach((r) => db.hapus(t, r.id));
   }
   // Resep ini juga dilepas dari HPP resep lain yang memakainya.
@@ -203,6 +203,11 @@ export function draftEksperimen(db, idResep, dariId = '') {
 
 /** Simpan eksperimen beserta daftar bahannya. `baris` = [{idBahan, jumlah, satuan}]. */
 export function simpanEksperimen(db, { eksperimen, baris }) {
+  const sebab = eksperimen.id ? `Eksperimen ${eksperimen.nomor} diubah` : `Eksperimen ${eksperimen.nomor} dibuat`;
+  return denganLogResep(db, eksperimen.idResep, sebab, () => simpanEksperimenSaja(db, { eksperimen, baris }));
+}
+
+function simpanEksperimenSaja(db, { eksperimen, baris }) {
   const baru = !eksperimen.id;
   const tersimpan = db.simpan('Eksperimen', {
     ...eksperimen,
@@ -230,9 +235,10 @@ export function simpanEksperimen(db, { eksperimen, baris }) {
   return tersimpan;
 }
 
-export function hapusEksperimen(db, idEksperimen, { jagaJuara = true } = {}) {
+export function hapusEksperimen(db, idEksperimen, { jagaJuara = true, log = true } = {}) {
   const e = db.ambil('Eksperimen', idEksperimen);
   if (!e) return;
+  if (log) return denganLogResep(db, e.idResep, `Eksperimen ${e.nomor} dihapus`, () => hapusEksperimen(db, idEksperimen, { jagaJuara, log: false }));
   bahanEksperimen(db, idEksperimen).forEach((b) => db.hapus('BahanEksperimen', b.id));
   penilaianEksperimen(db, idEksperimen).forEach((p) => db.hapus('Penilaian', p.id));
   const resep = db.ambil('Resep', e.idResep);
@@ -246,7 +252,9 @@ export function ubahJuara(db, idEksperimen) {
   const resep = e && db.ambil('Resep', e.idResep);
   if (!resep) return false;
   const jadi = resep.idJuara !== idEksperimen;
-  db.simpan('Resep', { ...resep, idJuara: jadi ? idEksperimen : '' });
+  denganLogResep(db, resep.id, jadi ? `Eksperimen ${e.nomor} jadi juara` : `Juara Eksperimen ${e.nomor} dilepas`, () =>
+    db.simpan('Resep', { ...resep, idJuara: jadi ? idEksperimen : '' }),
+  );
   return jadi;
 }
 
@@ -288,6 +296,14 @@ export function semuaUlasan(db) {
 export function simpanBahan(db, bahan, konversi = []) {
   const lama = db.ambil('Bahan', bahan.id);
   const hargaBerubah = !lama || lama.hargaBeli !== bahan.hargaBeli || lama.isiKemasan !== bahan.isiKemasan || lama.satuanBeli !== bahan.satuanBeli;
+  if (lama) {
+    const sebab = hargaBerubah ? `Harga ${lama.nama} diperbarui` : `Data bahan ${lama.nama} diubah`;
+    return denganLogResep(db, resepPemakaiBahan(db, lama.id), sebab, () => simpanBahanSaja(db, bahan, konversi, hargaBerubah));
+  }
+  return simpanBahanSaja(db, bahan, konversi, hargaBerubah);
+}
+
+function simpanBahanSaja(db, bahan, konversi, hargaBerubah) {
   const tersimpan = db.simpan('Bahan', {
     ...bahan,
     nama: bahan.nama.trim(),
@@ -315,6 +331,12 @@ export function pemakaianBahan(db, idBahan) {
 }
 
 export function hapusBahan(db, idBahan) {
+  const bahan = db.ambil('Bahan', idBahan);
+  if (bahan) return denganLogResep(db, resepPemakaiBahan(db, idBahan), `Bahan ${bahan.nama} dihapus`, () => hapusBahanSaja(db, idBahan));
+  return hapusBahanSaja(db, idBahan);
+}
+
+function hapusBahanSaja(db, idBahan) {
   konversiBahan(db, idBahan).forEach((k) => db.hapus('KonversiSatuan', k.id));
   db.semua('BahanEksperimen', (b) => b.idBahan === idBahan).forEach((b) => db.hapus('BahanEksperimen', b.id));
   db.hapus('Bahan', idBahan);
@@ -401,6 +423,100 @@ export function hppResep(db, idResep) {
     packingPorsi,
     tanpaPacking: hppPorsi - (Number.isFinite(packingPorsi) ? packingPorsi : 0),
   };
+}
+
+// ---------- Log perubahan bahan resep ----------
+//
+// Setiap kali bahan eksperimen yang dihitung HPP-nya berubah (takaran, bahan ditambah/dihapus, harga bahan,
+// atau eksperimen yang dihitung diganti), dicatat satu baris LogResep: hanya bahan yang berubah, plus HPP
+// per porsi sebelum dan sesudahnya. Baris pertama ("Catatan awal") menjadi patokan dan dibuat tepat sebelum
+// perubahan pertama, jadi resep lama pun langsung punya pembanding.
+
+export function logResep(db, idResep) {
+  return db
+    .semua('LogResep', (l) => l.idResep === idResep)
+    .sort((a, b) => (b.waktu || 0) - (a.waktu || 0) || (b.diubah || 0) - (a.diubah || 0));
+}
+
+/** Keadaan bahan resep saat ini (eksperimen yang dihitung HPP-nya). */
+function potretResep(db, idResep) {
+  const resep = db.ambil('Resep', idResep);
+  const eks = resep && eksperimenUntukHitung(db, resep, targetResep(db, idResep));
+  if (!eks) return null;
+  const { biaya, hpp } = hppEksperimen(db, idResep, eks);
+  return {
+    idEksperimen: eks.id,
+    nomorEksperimen: eks.nomor,
+    hppPorsi: Number.isFinite(hpp.hppPorsi) ? hpp.hppPorsi : null,
+    bahan: biaya.rincian.map((r) => ({
+      idBahan: r.idBahan,
+      nama: r.bahan ? r.bahan.nama : 'Bahan terhapus',
+      jumlah: Number(r.jumlah) || 0,
+      satuan: r.satuan || '',
+      biaya: Number.isFinite(r.biaya) ? Math.round(r.biaya) : null,
+    })),
+  };
+}
+
+/** Bahan yang berubah saja: [{jenis: 'tambah'|'hapus'|'takaran'|'harga', nama, lama, baru}]. */
+export function bedaBahan(lama = [], baru = []) {
+  const kunci = (daftar) => {
+    const ke = {};
+    return new Map(daftar.map((b) => [`${b.idBahan}#${(ke[b.idBahan] = (ke[b.idBahan] || 0) + 1)}`, b]));
+  };
+  const pLama = kunci(lama);
+  const pBaru = kunci(baru);
+  const hasil = [];
+  for (const [k, b] of pBaru) {
+    const l = pLama.get(k);
+    if (!l) hasil.push({ jenis: 'tambah', nama: b.nama, baru: b });
+    else if (l.jumlah !== b.jumlah || l.satuan !== b.satuan) hasil.push({ jenis: 'takaran', nama: b.nama, lama: l, baru: b });
+    else if (l.biaya !== b.biaya) hasil.push({ jenis: 'harga', nama: b.nama, lama: l, baru: b });
+  }
+  for (const [k, l] of pLama) if (!pBaru.has(k)) hasil.push({ jenis: 'hapus', nama: l.nama, lama: l });
+  return hasil;
+}
+
+function pastikanLogAwal(db, idResep) {
+  if (logResep(db, idResep).length) return;
+  const kini = potretResep(db, idResep);
+  if (!kini) return;
+  db.simpan('LogResep', {
+    idResep, idEksperimen: kini.idEksperimen, nomorEksperimen: kini.nomorEksperimen, waktu: Date.now(),
+    sebab: 'Catatan awal', hppLama: null, hppBaru: kini.hppPorsi, bahan: kini.bahan, perubahan: [],
+  });
+}
+
+/** Catat perubahan bahan resep dibanding catatan terakhir. Tidak mencatat apa pun bila bahannya sama. */
+export function catatLogResep(db, idResep, sebab) {
+  const kini = potretResep(db, idResep);
+  if (!kini) return null;
+  const akhir = logResep(db, idResep)[0];
+  if (!akhir) return pastikanLogAwal(db, idResep);
+  const perubahan = bedaBahan(akhir.bahan || [], kini.bahan);
+  if (!perubahan.length) return null;
+  return db.simpan('LogResep', {
+    idResep, idEksperimen: kini.idEksperimen, nomorEksperimen: kini.nomorEksperimen,
+    waktu: Math.max(Date.now(), (akhir.waktu || 0) + 1),
+    sebab, hppLama: akhir.hppBaru, hppBaru: kini.hppPorsi, bahan: kini.bahan, perubahan,
+  });
+}
+
+/** Jalankan `ubah`, lalu catat perubahan bahan di resep-resep ini (patokan dibuat dulu bila belum ada). */
+export function denganLogResep(db, idResep, sebab, ubah) {
+  const daftar = [...new Set([].concat(idResep).filter(Boolean))];
+  daftar.forEach((id) => pastikanLogAwal(db, id));
+  const hasil = ubah();
+  daftar.forEach((id) => catatLogResep(db, id, sebab));
+  return hasil;
+}
+
+/** Resep yang eksperimen hitungan HPP-nya memakai bahan ini. */
+export function resepPemakaiBahan(db, idBahan) {
+  return db.semua('Resep').filter((r) => {
+    const eks = eksperimenUntukHitung(db, r, targetResep(db, r.id));
+    return eks && db.semua('BahanEksperimen', (b) => b.idEksperimen === eks.id && b.idBahan === idBahan).length > 0;
+  }).map((r) => r.id);
 }
 
 // ---------- HPP Jual: HPP resep ini + HPP resep lain (mis. saus) ----------

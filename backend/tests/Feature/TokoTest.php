@@ -177,7 +177,9 @@ class TokoTest extends TestCase
         $this->assertSame([['bank' => 'BCA', 'nomor' => '1234567890', 'atasNama' => 'Rasa']], $info['bayarManual']['rekening']);
         $this->assertSame('https://contoh.test/qris.png', $info['bayarManual']['qrisUrl']);
         $this->assertSame('Kue', $info['menu'][0]['kategori']);
-        $this->assertEquals([6000, 8000, 25], [$info['menu'][0]['harga'], $info['menu'][0]['hargaAsli'], $info['menu'][0]['diskon']], 'diskon produk 25%');
+        $this->assertEquals([6000, 8000, 25, 'persen'], [$info['menu'][0]['harga'], $info['menu'][0]['hargaAsli'], $info['menu'][0]['diskon'], $info['menu'][0]['diskonJenis']], 'diskon produk 25%');
+        $this->assertSame(6500.0, \App\Services\Penjualan::hargaJual(['harga' => 8000, 'diskon' => 1500, 'diskonJenis' => 'nominal']), 'potongan Rupiah');
+        $this->assertSame(0.0, \App\Services\Penjualan::hargaJual(['harga' => 8000, 'diskon' => 9000, 'diskonJenis' => 'nominal']), 'potongan dibatasi harga');
         $this->assertSame(['Sari'], array_column($info['testimoni'], 'nama'), 'hanya testimoni yang tayang');
         $this->assertSame(['Pre-order'], array_column($info['banner'], 'judul'), 'hanya banner etalase yang aktif');
         $this->assertSame('https://contoh.test/header.jpg', $info['headerUrl']);

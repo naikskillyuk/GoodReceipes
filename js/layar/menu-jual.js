@@ -7,7 +7,7 @@ import { Ikon } from '../ui/ikon.js';
 import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
 import {
-  daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoTampilMenu, hargaJual, diskonBerlaku, opsiMenu, hargaSaranMenu,
+  daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoTampilMenu, hargaJual, diskonBerlaku, labelDiskon, opsiMenu, hargaSaranMenu,
   sisaMenu, stokIsiMenu, stokMakanan,
 } from '../lib/toko.js';
 import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
@@ -60,7 +60,7 @@ function EditorOpsi({ m, ubah }) {
   </div>`;
 }
 
-const KOSONG = { jenis: '', idRef: '', nama: '', harga: 0, keterangan: '', aktif: true, online: true, diskon: 0, diskonSampai: 0, opsi: [], segera: false };
+const KOSONG = { jenis: '', idRef: '', nama: '', harga: 0, keterangan: '', aktif: true, online: true, diskon: 0, diskonJenis: 'persen', diskonSampai: 0, opsi: [], segera: false };
 
 /** Formulir tambah / ubah menu: pilih dari daftar, harga jual, potensi keuntungan, diskon, varian, dan status. */
 function FormMenu({ db, awal, onTutup }) {
@@ -80,7 +80,8 @@ function FormMenu({ db, awal, onTutup }) {
   const hpp = ada ? hppMenu(db, d) : NaN;
   const saran = ada ? hargaSaranMenu(db, d.jenis, d.idRef) : 0;
   const harga = hargaJual(d);
-  const diskon = diskonBerlaku(d);
+  const nominal = d.diskonJenis === 'nominal';
+  const diskon = labelDiskon(d);
   const laba = Number.isFinite(hpp) && harga > 0 ? harga - hpp : NaN;
   const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
   const sisa = ada ? sisaMenu(db, d) : null;
@@ -90,13 +91,15 @@ function FormMenu({ db, awal, onTutup }) {
     if (!ada) return setGalat('Pilih resep atau paket dulu.');
     if (!String(d.nama || '').trim()) return setGalat('Isi nama menu.');
     if (!(d.harga > 0)) return setGalat('Isi harga jual.');
+    if (nominal && Number(d.diskon) >= d.harga) return setGalat('Potongan harga harus lebih kecil dari harga jual.');
     const isian = {
       nama: d.nama.trim().slice(0, 60),
       harga: d.harga,
       keterangan: String(d.keterangan || '').trim().slice(0, 200),
       aktif: !!d.aktif,
       online: !!d.aktif && !!d.online,
-      diskon: Math.max(0, Math.min(90, Math.round(Number(d.diskon) || 0))),
+      diskonJenis: nominal ? 'nominal' : 'persen',
+      diskon: nominal ? Math.max(0, Math.min(d.harga, Math.round(Number(d.diskon) || 0))) : Math.max(0, Math.min(90, Math.round(Number(d.diskon) || 0))),
       diskonSampai: Number(d.diskonSampai) || 0,
       opsi: opsiMenu(d),
       segera: !!d.segera,
@@ -133,7 +136,7 @@ function FormMenu({ db, awal, onTutup }) {
 
         <div class="ringkas-laba" aria-label="Potensi keuntungan">
           <div><small>HPP</small><b>${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</b></div>
-          <div><small>Harga jual${diskon ? ` (−${diskon}%)` : ''}</small><b>${rupiah(harga)}</b></div>
+          <div><small>Harga jual${diskon ? ` (${diskon})` : ''}</small><b>${rupiah(harga)}</b></div>
           <div class=${Number.isFinite(laba) && laba < 0 ? 'rugi' : 'untung'}><small>Untung per jual</small><b>${Number.isFinite(laba) ? rupiah(laba) : '–'}</b></div>
           <div><small>Margin</small><b>${mg ? persen(mg.marginPersen) : '–'}</b></div>
         </div>
@@ -141,7 +144,18 @@ function FormMenu({ db, awal, onTutup }) {
         <p class="bantu">Stok: ${sisa === null ? 'tidak dilacak' : sisa > 0 ? `bisa dijual ${sisa}` : 'habis'}${isi.length ? ` · isi paket: ${isi.map((x) => `${x.resep ? x.resep.nama : '?'} ${tampilJumlah(x.stok)}${x.per !== 1 ? `/${tampilJumlah(x.per)}` : ''}`).join(', ')}` : ''}</p>
 
         <div class="baris-diskon">
-          <label class="bidang"><span>Diskon (%)</span><${InputAngka} kelas="input kecil" aria-label="Diskon persen" nilai=${d.diskon || 0} onUbah=${(n) => atur({ diskon: Math.max(0, Math.min(90, Math.round(n) || 0)) })} placeholder="0" /></label>
+          <div class="bidang"><span>Diskon</span>
+            <div style="display:flex;gap:6px">
+              <select class="pilih kecil" style="width:auto" aria-label="Jenis diskon" value=${nominal ? 'nominal' : 'persen'} onChange=${(e) => atur({ diskonJenis: e.target.value, diskon: 0 })}>
+                <option value="persen">%</option>
+                <option value="nominal">Rp</option>
+              </select>
+              ${nominal
+                ? html`<${InputRupiah} kelas="input kecil" aria-label="Potongan harga" nilai=${d.diskon || 0} onUbah=${(n) => atur({ diskon: Math.max(0, Math.round(n) || 0) })} />`
+                : html`<${InputAngka} kelas="input kecil" aria-label="Diskon persen" nilai=${d.diskon || 0} onUbah=${(n) => atur({ diskon: Math.max(0, Math.min(90, Math.round(n) || 0)) })} placeholder="0" />`}
+            </div>
+            <small class="bantu">${nominal ? 'Potongan langsung dari harga jual, mis. Rp 2.000.' : 'Persen dari harga jual (maks. 90%), dibulatkan ke Rp 100.'}</small>
+          </div>
           <label class="bidang"><span>Diskon sampai (opsional)</span><input class="input kecil" type="date" aria-label="Diskon sampai" value=${d.diskonSampai ? keInputWaktu(d.diskonSampai).slice(0, 10) : ''} onChange=${(e) => atur({ diskonSampai: e.target.value ? dariInputWaktu(e.target.value + 'T23:59') : 0 })} /></label>
         </div>
         <${EditorOpsi} m=${d} ubah=${atur} />
@@ -211,7 +225,7 @@ export function MenuJual({ k }) {
                     <td>
                       <span class="sel-menu">
                         <span class="foto-mini"><${Foto} src=${fotoTampilMenu(db, m)} ikon=${m.jenis === 'paket' ? 'kotak' : 'kue'} ukuranIkon=${18} /></span>
-                        <span><b>${m.nama}</b><small>${m.jenis === 'paket' ? 'Paket' : 'Resep'}${opsi.length ? ` · ${opsi.length} varian` : ''}${diskonBerlaku(m) ? ` · diskon ${diskonBerlaku(m)}%` : ''}</small></span>
+                        <span><b>${m.nama}</b><small>${m.jenis === 'paket' ? 'Paket' : 'Resep'}${opsi.length ? ` · ${opsi.length} varian` : ''}${labelDiskon(m) ? ` · diskon ${labelDiskon(m).slice(1)}` : ''}</small></span>
                       </span>
                     </td>
                     ${dapur && html`<td class="angka">${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</td>`}

@@ -394,3 +394,44 @@ test('paket: HPP jual tiap resep tanpa packing + packing paket sekali', async ()
   assert.equal(repo.dataPaket(db, paket.id), null);
   assert.equal(db.semua('BiayaPaket').length, 0);
 });
+
+test('log resep: hanya bahan yang berubah, dengan HPP sebelum dan sesudah', async () => {
+  const db = await dbBaru();
+  const kat = repo.daftarKategori(db)[0].id;
+  const tepung = repo.simpanBahan(db, { nama: 'Tepung', hargaBeli: 10000, isiKemasan: 1, satuanBeli: 'kg' });
+  const gula = repo.simpanBahan(db, { nama: 'Gula', hargaBeli: 20000, isiKemasan: 1, satuanBeli: 'kg' });
+  const resep = repo.buatResep(db, { nama: 'Kue', idKategori: kat });
+  const eks = repo.simpanEksperimen(db, {
+    eksperimen: { ...repo.draftEksperimen(db, resep.id).eksperimen, porsi: 10 },
+    baris: [{ idBahan: tepung.id, jumlah: 500, satuan: 'g' }, { idBahan: gula.id, jumlah: 100, satuan: 'g' }],
+  });
+  let log = repo.logResep(db, resep.id);
+  assert.equal(log.length, 1, 'catatan awal');
+  assert.equal(log[0].perubahan.length, 0);
+  assert.equal(Math.round(log[0].hppBaru), 700);
+
+  // Takaran gula berubah: hanya gula yang tercatat.
+  repo.simpanEksperimen(db, {
+    eksperimen: db.ambil('Eksperimen', eks.id),
+    baris: [{ idBahan: tepung.id, jumlah: 500, satuan: 'g' }, { idBahan: gula.id, jumlah: 150, satuan: 'g' }],
+  });
+  log = repo.logResep(db, resep.id);
+  assert.equal(log.length, 2);
+  assert.deepEqual(log[0].perubahan.map((p) => [p.jenis, p.nama]), [['takaran', 'Gula']]);
+  assert.equal(Math.round(log[0].hppLama), 700);
+  assert.equal(Math.round(log[0].hppBaru), 800);
+
+  // Harga tepung naik.
+  repo.simpanBahan(db, { ...db.ambil('Bahan', tepung.id), hargaBeli: 12000 });
+  log = repo.logResep(db, resep.id);
+  assert.equal(log.length, 3);
+  assert.equal(log[0].sebab, 'Harga Tepung diperbarui');
+  assert.deepEqual(log[0].perubahan.map((p) => [p.jenis, p.nama, p.lama.biaya, p.baru.biaya]), [['harga', 'Tepung', 5000, 6000]]);
+
+  // Simpan tanpa perubahan bahan: tidak ada catatan baru.
+  repo.simpanEksperimen(db, { eksperimen: { ...db.ambil('Eksperimen', eks.id), suhuC: 180 }, baris: repo.bahanEksperimen(db, eks.id) });
+  assert.equal(repo.logResep(db, resep.id).length, 3);
+
+  repo.hapusResep(db, resep.id);
+  assert.equal(repo.logResep(db, resep.id).length, 0);
+});

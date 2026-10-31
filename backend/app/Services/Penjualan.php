@@ -212,22 +212,36 @@ class Penjualan
         return [max(0, min($subtotal, $diskon)), $p, ''];
     }
 
-    /** Diskon produk yang berlaku (persen). Sama dengan diskonBerlaku di js/lib/toko.js. */
+    /**
+     * Diskon produk yang berlaku: persen (maks. 90), atau Rupiah (maks. harga) bila diskonJenis 'nominal'.
+     * Sama dengan diskonBerlaku di js/lib/toko.js.
+     */
     public static function diskonBerlaku(array $m): float
     {
-        $d = max(0.0, min(90.0, (float) ($m['diskon'] ?? 0)));
+        $nilai = (float) ($m['diskon'] ?? 0);
+        $d = self::diskonNominal($m)
+            ? max(0.0, min((float) ($m['harga'] ?? 0), round($nilai)))
+            : max(0.0, min(90.0, $nilai));
         $sampai = (int) ($m['diskonSampai'] ?? 0);
 
         return $d > 0 && (! $sampai || self::sekarang() <= $sampai) ? $d : 0.0;
     }
 
-    /** Harga jual setelah diskon produk, dibulatkan ke Rp 100. */
+    public static function diskonNominal(array $m): bool
+    {
+        return ($m['diskonJenis'] ?? '') === 'nominal';
+    }
+
+    /** Harga jual setelah diskon produk: persen dibulatkan ke Rp 100, potongan Rupiah dikurangkan apa adanya. */
     public static function hargaJual(array $m): float
     {
         $harga = (float) ($m['harga'] ?? 0);
         $d = self::diskonBerlaku($m);
+        if ($d <= 0) {
+            return $harga;
+        }
 
-        return $d > 0 ? max(0.0, round($harga * (100 - $d) / 100 / 100) * 100) : $harga;
+        return self::diskonNominal($m) ? max(0.0, $harga - $d) : max(0.0, round($harga * (100 - $d) / 100 / 100) * 100);
     }
 
     /** Pilihan tambahan berbayar menu: [{nama, harga}]. Sama dengan opsiMenu di js/lib/toko.js. */
@@ -399,6 +413,7 @@ class Penjualan
                 'harga' => self::hargaJual($m),
                 'hargaAsli' => (float) $m['harga'],
                 'diskon' => self::diskonBerlaku($m),
+                'diskonJenis' => self::diskonNominal($m) ? 'nominal' : 'persen',
                 'opsi' => self::opsiMenu($m),
                 // Foto menu sendiri, atau foto paket / foto acuan resep.
                 'fotoUrl' => (string) ($m['fotoUrl'] ?: ($m['jenis'] === 'paket' ? ($fotoPaket[$m['idRef']] ?? '') : ($fotoResep[$m['idRef']] ?? ''))),

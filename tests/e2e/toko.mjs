@@ -123,7 +123,17 @@ try {
   await page.getByLabel('Pilih resep atau paket').selectOption('paket:' + ids.paket);
   await page.getByLabel('Diskon persen').fill('50');
   await page.getByLabel('Diskon persen').blur();
-  await page.getByText('Harga jual (−50%)').waitFor();
+  await page.getByText('Harga jual (-50%)').waitFor();
+  // Diskon bisa juga potongan Rupiah langsung; dicoba lalu kembali ke 50%.
+  await page.getByLabel('Jenis diskon').selectOption('nominal');
+  await page.getByLabel('Potongan harga').fill('1000');
+  await page.getByLabel('Potongan harga').blur();
+  await page.getByText('Harga jual (-Rp 1.000)').waitFor();
+  await page.getByLabel('Potensi keuntungan').getByText('Rp 5.000').waitFor();
+  await page.getByLabel('Jenis diskon').selectOption('persen');
+  await page.getByLabel('Diskon persen').fill('50');
+  await page.getByLabel('Diskon persen').blur();
+  await page.getByText('Harga jual (-50%)').waitFor();
   await page.getByRole('button', { name: 'Tambah pilihan' }).click();
   await page.getByLabel('Nama pilihan 1').fill('Tambah keju');
   await page.getByLabel('Harga pilihan 1').fill('1000');

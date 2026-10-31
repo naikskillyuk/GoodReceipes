@@ -1,4 +1,4 @@
-// Detail resep: hero berwarna kategori, tiga tab (Eksperimen, HPP & Harga, Marketing).
+// Detail resep: hero berwarna kategori, tab Eksperimen, HPP Resep, HPP Jual, Marketing, dan Log perubahan bahan.
 
 import { html } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Tab, Stat, Foto, Kosong } from '../ui/komponen.js';
@@ -9,6 +9,7 @@ import { ringkasResep, dataHPP, skorDariDB, fotoSrc, penilaianEksperimen, hapusR
 import { desimal1, angka, rupiah } from '../lib/util.js';
 import { PanelHPPResep, PanelHPPJual } from './hpp.js';
 import { PanelMarketing } from './marketing.js';
+import { PanelLogResep } from './log-resep.js';
 
 function ringkasEksperimen(e) {
   const bagian = [];
@@ -93,7 +94,7 @@ export function DetailResep({ k, id, tab }) {
   const data = dataHPP(db, id);
   const warna = r.kategori ? r.kategori.warna : 'var(--tomat)';
   const hppPorsi = data && data.eksperimen && Number.isFinite(data.hppPorsi) ? angka(Math.round(data.hppPorsi)) : '–';
-  const tabAktif = ['hpp', 'jual', 'marketing'].includes(tab) ? tab : 'eksperimen';
+  const tabAktif = ['hpp', 'jual', 'marketing', 'log'].includes(tab) ? tab : 'eksperimen';
 
   return html`<${Kerangka} k=${k} aktif="resep" plus=${tabAktif === 'eksperimen' ? { href: `/resep/${id}/eksperimen/baru`, label: 'Eksperimen baru' } : null}>
     <${Hero}
@@ -117,11 +118,13 @@ export function DetailResep({ k, id, tab }) {
         { label: 'HPP Resep', href: `/resep/${id}/hpp`, aktif: tabAktif === 'hpp' },
         { label: 'HPP Jual', href: `/resep/${id}/jual`, aktif: tabAktif === 'jual' },
         { label: 'Marketing', href: `/resep/${id}/marketing`, aktif: tabAktif === 'marketing' },
+        { label: 'Log', href: `/resep/${id}/log`, aktif: tabAktif === 'log' },
       ]}
     />
     ${tabAktif === 'eksperimen' && html`<${PanelEksperimen} k=${k} r=${r} />`}
     ${tabAktif === 'hpp' && html`<${PanelHPPResep} k=${k} resep=${resep} />`}
     ${tabAktif === 'jual' && html`<${PanelHPPJual} k=${k} resep=${resep} />`}
     ${tabAktif === 'marketing' && html`<${PanelMarketing} k=${k} resep=${resep} />`}
+    ${tabAktif === 'log' && html`<${PanelLogResep} k=${k} resep=${resep} />`}
   <//>`;
 }
