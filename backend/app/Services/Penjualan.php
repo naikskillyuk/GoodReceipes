@@ -170,7 +170,7 @@ class Penjualan
      * Diskon dari kode promo. Mengembalikan [diskon, promo|null, galat].
      * Aturan sama dengan hitungPromo() di js/lib/toko.js.
      */
-    public function promo(int $id, string $kode, float $subtotal, string $idPelanggan, bool $online): array
+    public function promo(int $id, string $kode, float $subtotal, string $idPelanggan, bool $online, array $item = []): array
     {
         $kode = Str::upper(trim($kode));
         if ($kode === '') {
@@ -204,12 +204,54 @@ class Penjualan
         if ($galat) {
             return [0, null, $galat];
         }
-        $diskon = $p['jenis'] === 'persen' ? floor($subtotal * (float) $p['nilai'] / 100) : (float) $p['nilai'];
+        $nilai = (float) $p['nilai'];
+        $batas = $subtotal;
+        if ((string) ($p['idMenu'] ?? '') !== '') {
+            $menu = $this->ambil($id, 'Menu', (string) $p['idMenu']);
+            $d = self::dasarPromo($p, $item, $menu ? (string) $menu['nama'] : 'produk yang sudah dihapus');
+            if ($d['galat'] !== '') {
+                return [0, null, $d['galat']];
+            }
+            $batas = min($subtotal, $d['dasar']);
+            // Persen: dari harga item yang kena promo. Rupiah: potongan dikali berapa kali promo berlaku.
+            $diskon = $p['jenis'] === 'persen' ? floor($d['dasar'] / $d['jumlah'] * $d['kena'] * $nilai / 100) : $nilai * $d['kali'];
+        } else {
+            $diskon = $p['jenis'] === 'persen' ? floor($subtotal * $nilai / 100) : $nilai;
+        }
         if ($p['jenis'] === 'persen' && $p['maksDiskon'] > 0) {
             $diskon = min($diskon, (float) $p['maksDiskon']);
         }
 
-        return [max(0, min($subtotal, $diskon)), $p, ''];
+        return [max(0, min($batas, $diskon)), $p, ''];
+    }
+
+    /**
+     * Promo khusus produk: dihitung dari item menu promo saja. Kelipatan = tiap minJumlah item dapat potongan,
+     * sekali = 1x per pesanan. Sama dengan dasarPromo di js/lib/toko.js.
+     *
+     * @return array{galat: string, dasar: float, jumlah: float, kali: int, kena: float}
+     */
+    public static function dasarPromo(array $p, array $item, string $namaProduk): array
+    {
+        $jumlah = 0.0;
+        $dasar = 0.0;
+        foreach ($item as $i) {
+            if (is_array($i) && (string) ($i['idMenu'] ?? '') === (string) $p['idMenu']) {
+                $jumlah += (float) ($i['jumlah'] ?? 0);
+                $dasar += (float) ($i['harga'] ?? 0) * (float) ($i['jumlah'] ?? 0);
+            }
+        }
+        $min = max(1, (int) floor((float) ($p['minJumlah'] ?? 1)));
+        $kosong = ['dasar' => 0.0, 'jumlah' => 0.0, 'kali' => 0, 'kena' => 0.0];
+        if ($jumlah <= 0) {
+            return ['galat' => 'Kode promo ini khusus untuk '.$namaProduk.'.'] + $kosong;
+        }
+        if ($jumlah < $min) {
+            return ['galat' => 'Promo ini berlaku untuk pembelian minimal '.$min.' '.$namaProduk.'.'] + $kosong;
+        }
+        $kali = ($p['berlaku'] ?? '') === 'sekali' ? 1 : (int) floor($jumlah / $min);
+
+        return ['galat' => '', 'dasar' => $dasar, 'jumlah' => $jumlah, 'kali' => $kali, 'kena' => min($jumlah, $kali * $min)];
     }
 
     /**
@@ -286,10 +328,20 @@ class Penjualan
         $sekarang = self::sekarang();
         $daftar = $this->semua($id, 'Promo', fn ($p) => $p['aktif'] && $p['online'] && trim((string) $p['kode']) !== ''
             && (! $p['mulai'] || $p['mulai'] <= $sekarang) && (! $p['sampai'] || $p['sampai'] >= $sekarang));
+        // Promo khusus produk hanya tampil bila produknya dijual online.
+        $namaMenu = [];
+        foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
+            $namaMenu[$m['id']] = (string) $m['nama'];
+        }
+        $daftar = array_values(array_filter($daftar, fn ($p) => (string) ($p['idMenu'] ?? '') === '' || isset($namaMenu[$p['idMenu']])));
 
         return array_map(fn ($p) => [
             'kode' => Str::upper(trim((string) $p['kode'])),
             'nama' => mb_substr((string) $p['nama'], 0, 60),
+            'idMenu' => (string) ($p['idMenu'] ?? ''),
+            'produk' => $namaMenu[$p['idMenu'] ?? ''] ?? '',
+            'minJumlah' => max(1, (int) ($p['minJumlah'] ?? 1)),
+            'berlaku' => ($p['berlaku'] ?? '') === 'sekali' ? 'sekali' : 'kelipatan',
             'jenis' => $p['jenis'] === 'persen' ? 'persen' : 'rupiah',
             'nilai' => (float) $p['nilai'],
             'minBelanja' => (float) $p['minBelanja'],
@@ -527,7 +579,7 @@ class Penjualan
         }
 
         $idPelanggan = 'plg_'.$hp;
-        [$diskon, $promo, $galatPromo] = $this->promo($id, (string) ($req['kodePromo'] ?? ''), $subtotal, $idPelanggan, true);
+        [$diskon, $promo, $galatPromo] = $this->promo($id, (string) ($req['kodePromo'] ?? ''), $subtotal, $idPelanggan, true, $item);
         if ($galatPromo) {
             return ['ok' => false, 'galat' => $galatPromo];
         }

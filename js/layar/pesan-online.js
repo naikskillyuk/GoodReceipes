@@ -14,7 +14,7 @@ import { InfoTransfer, teksJadwal } from './pesanan.js';
 import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
 import { KartuBanner } from '../ui/banner.js';
 import { Bintang } from './pelanggan.js';
-import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris, LABEL_AMBIL, teksDiskon } from '../lib/toko.js';
+import { pesanOnline, kirimTestimoni, normalHp, namaItem, kunciBaris, LABEL_AMBIL, teksDiskon, syaratPromoProduk } from '../lib/toko.js';
 import { panggilApi } from '../lib/sync.js';
 import { LOGO_BAWAAN, ambilMerek } from '../lib/repo.js';
 import { rupiah, tanggal } from '../lib/util.js';
@@ -264,7 +264,7 @@ function BannerPromo({ info, pakaiKode, keMenu }) {
       kunci: 'p' + p.kode,
       label: 'Promo',
       judul: teksPromo(p),
-      teks: [p.nama, p.minBelanja > 0 ? `min. belanja ${rupiah(p.minBelanja)}` : '', p.untuk === 'baru' ? 'khusus pelanggan baru' : '', p.sampai ? `s/d ${tanggal(p.sampai)}` : ''].filter(Boolean).join(' · '),
+      teks: [p.nama, p.produk ? syaratPromoProduk(p.produk, p) : '', p.minBelanja > 0 ? `min. belanja ${rupiah(p.minBelanja)}` : '', p.untuk === 'baru' ? 'khusus pelanggan baru' : '', p.sampai ? `s/d ${tanggal(p.sampai)}` : ''].filter(Boolean).join(' · '),
       foto: foto[i % Math.max(1, foto.length)] || '',
       aksi: html`<button type="button" class="et-banner-kode" onClick=${() => pakaiKode(p.kode)}>Pakai kode <b>${p.kode}</b></button>`,
     })),

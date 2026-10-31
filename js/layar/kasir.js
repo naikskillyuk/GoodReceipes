@@ -85,7 +85,7 @@ export function Kasir({ k }) {
   const baris = keranjang.map((b) => ({ ...b, item: itemKeranjang(db, [b]).item[0] })).filter((b) => b.item);
   const { item, subtotal } = itemKeranjang(db, keranjang);
   const nomorHp = normalHp(hp);
-  const promo = kode.trim() ? cekPromo(db, kode, { subtotal, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '' }) : { diskon: 0, galat: '' };
+  const promo = kode.trim() ? cekPromo(db, kode, { subtotal, item, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '' }) : { diskon: 0, galat: '' };
   const total = subtotal - (promo.galat ? 0 : promo.diskon);
   const pelanggan = nomorHp ? db.ambil('Pelanggan', idPelanggan(nomorHp)) : null;
 

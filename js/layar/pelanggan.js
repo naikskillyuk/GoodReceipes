@@ -4,7 +4,9 @@ import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Stat, Kosong, Tab, InputRupiah, InputAngka, unduhBerkas } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
-import { daftarPelanggan, daftarPromo, cariPromo, tampilHp, tampilanToko, daftarTestimoni, simpanTestimoni } from '../lib/toko.js';
+import {
+  daftarPelanggan, daftarPromo, cariPromo, tampilHp, tampilanToko, daftarTestimoni, simpanTestimoni, daftarMenu, namaProdukPromo, syaratPromoProduk,
+} from '../lib/toko.js';
 import { rupiah, tanggal, tampilJumlah } from '../lib/util.js';
 
 const UNTUK = { semua: 'Semua pembeli', baru: 'Pelanggan baru (pesanan pertama)', lama: 'Pelanggan lama (pernah memesan)' };
@@ -42,7 +44,21 @@ function Pelanggan({ db }) {
   </div>`;
 }
 
-const PROMO_BARU = { kode: '', nama: '', jenis: 'persen', nilai: 10, maksDiskon: 0, minBelanja: 0, untuk: 'semua', mulai: null, sampai: null, kuota: 0, aktif: true, online: true };
+const PROMO_BARU = {
+  kode: '', nama: '', jenis: 'persen', nilai: 10, maksDiskon: 0, minBelanja: 0, untuk: 'semua', mulai: null, sampai: null, kuota: 0, aktif: true, online: true,
+  idMenu: '', minJumlah: 1, berlaku: 'kelipatan',
+};
+
+/** Contoh hitungan promo khusus produk, supaya admin paham arti "kelipatan" dan "sekali per pesanan". */
+function contohPromoProduk(d, nama) {
+  const min = Math.max(1, Math.floor(Number(d.minJumlah) || 1));
+  const besar = d.jenis === 'persen' ? `${tampilJumlah(d.nilai || 0)}%` : rupiah(d.nilai || 0);
+  const beli = (n) => `beli ${n} ${nama}`;
+  if (d.berlaku === 'sekali') return `Contoh: ${beli(min)} hemat ${besar}${d.jenis === 'persen' ? ` dari ${min} item` : ''}; ${beli(min * 3)} tetap hemat ${besar}${d.jenis === 'persen' ? ` dari ${min} item saja` : ''}.`;
+  if (d.jenis === 'persen') return `Contoh: ${beli(min)} hemat ${besar} dari ${min} item; ${beli(min * 2 + (min > 1 ? 1 : 0))} hemat ${besar} dari ${min * 2} item.`;
+  const nilai = Number(d.nilai) || 0;
+  return `Contoh: ${beli(min)} hemat ${rupiah(nilai)}; ${beli(min * 2)} hemat ${rupiah(nilai * 2)}; ${beli(min * 3)} hemat ${rupiah(nilai * 3)}.`;
+}
 const keTanggal = (ts) => (ts ? new Date(ts - new Date(ts).getTimezoneOffset() * 60000).toISOString().slice(0, 10) : '');
 const dariTanggal = (teks, akhir = false) => (teks ? new Date(teks + (akhir ? 'T23:59:59' : 'T00:00:00')).getTime() : null);
 
@@ -50,6 +66,8 @@ function FormPromo({ db, promo, onSelesai }) {
   const [d, setD] = useState(() => ({ ...PROMO_BARU, ...(promo || {}) }));
   const [galat, setGalat] = useState('');
   const ubah = (patch) => (setD({ ...d, ...patch }), setGalat(''));
+  const menu = daftarMenu(db);
+  const namaProduk = namaProdukPromo(db, d);
   const simpan = () => {
     const kode = d.kode.trim().toUpperCase().replace(/\s+/g, '');
     if (!/^[A-Z0-9_-]{3,20}$/.test(kode)) return setGalat('Kode 3-20 huruf/angka tanpa spasi, mis. HEMAT10.');
@@ -57,7 +75,11 @@ function FormPromo({ db, promo, onSelesai }) {
     if (lain && lain.id !== d.id) return setGalat('Kode itu sudah dipakai promo lain.');
     if (!(d.nilai > 0)) return setGalat('Isi besar diskon.');
     if (d.jenis === 'persen' && d.nilai > 100) return setGalat('Diskon persen maksimal 100.');
-    db.simpan('Promo', { ...d, kode, nama: d.nama.trim(), maksDiskon: d.maksDiskon || 0, minBelanja: d.minBelanja || 0, kuota: d.kuota || 0 });
+    const minJumlah = Math.max(1, Math.min(100, Math.floor(Number(d.minJumlah) || 1)));
+    db.simpan('Promo', {
+      ...d, kode, nama: d.nama.trim(), maksDiskon: d.maksDiskon || 0, minBelanja: d.minBelanja || 0, kuota: d.kuota || 0,
+      idMenu: d.idMenu || '', minJumlah: d.idMenu ? minJumlah : 1, berlaku: d.idMenu && d.berlaku === 'sekali' ? 'sekali' : 'kelipatan',
+    });
     tampilToast(`Promo ${kode} disimpan.`);
     onSelesai();
   };
@@ -72,6 +94,25 @@ function FormPromo({ db, promo, onSelesai }) {
       <label class="bidang"><span>Kode promo</span><input class="input" maxlength="20" style="text-transform:uppercase" value=${d.kode} placeholder="HEMAT10" onInput=${(e) => ubah({ kode: e.target.value })} /></label>
       <label class="bidang"><span>Nama (opsional)</span><input class="input" maxlength="60" value=${d.nama} placeholder="Promo pembukaan" onInput=${(e) => ubah({ nama: e.target.value })} /></label>
     </div>
+    <label class="bidang"><span>Berlaku untuk</span>
+      <select class="pilih" aria-label="Berlaku untuk" value=${d.idMenu || ''} onChange=${(e) => ubah({ idMenu: e.target.value })}>
+        <option value="" selected=${!d.idMenu}>Seluruh belanja</option>
+        ${menu.map(({ menu: m }) => html`<option value=${m.id} selected=${d.idMenu === m.id}>Hanya ${m.nama}${m.aktif ? '' : ' (nonaktif)'}</option>`)}
+        ${d.idMenu && !menu.some(({ menu: m }) => m.id === d.idMenu) && html`<option value=${d.idMenu} selected>Produk yang sudah dihapus</option>`}
+      </select>
+    </label>
+    ${d.idMenu && html`<div class="kolom" style="gap:10px">
+      <div class="dua-kolom">
+        <label class="bidang"><span>Minimal beli (item)</span><${InputAngka} kelas="input" aria-label="Minimal beli" nilai=${d.minJumlah || 1} onUbah=${(n) => ubah({ minJumlah: Math.max(1, Math.min(100, Math.floor(n) || 1)) })} /></label>
+        <div class="bidang"><span>Cara berlaku</span>
+          <div class="chips" role="group" aria-label="Cara berlaku">
+            <button type="button" class=${'chip' + (d.berlaku !== 'sekali' ? ' aktif' : '')} onClick=${() => ubah({ berlaku: 'kelipatan' })}>Kelipatan</button>
+            <button type="button" class=${'chip' + (d.berlaku === 'sekali' ? ' aktif' : '')} onClick=${() => ubah({ berlaku: 'sekali' })}>Sekali per pesanan</button>
+          </div>
+        </div>
+      </div>
+      <p class="bantu">${contohPromoProduk(d, namaProduk)}</p>
+    </div>`}
     <div class="chips" role="group" aria-label="Jenis diskon">
       <button type="button" class=${'chip' + (d.jenis === 'persen' ? ' aktif' : '')} onClick=${() => ubah({ jenis: 'persen' })}>Persen (%)</button>
       <button type="button" class=${'chip' + (d.jenis === 'nominal' ? ' aktif' : '')} onClick=${() => ubah({ jenis: 'nominal' })}>Potongan (Rp)</button>
@@ -108,10 +149,11 @@ function FormPromo({ db, promo, onSelesai }) {
   </section>`;
 }
 
-function ringkasPromo(p) {
+function ringkasPromo(db, p) {
   const besar = p.jenis === 'persen' ? `${tampilJumlah(p.nilai)}%${p.maksDiskon > 0 ? ' maks. ' + rupiah(p.maksDiskon) : ''}` : rupiah(p.nilai);
   return [
     besar,
+    p.idMenu && syaratPromoProduk(namaProdukPromo(db, p), p),
     p.minBelanja > 0 && 'min. ' + rupiah(p.minBelanja),
     p.untuk !== 'semua' && (p.untuk === 'baru' ? 'pelanggan baru' : 'pelanggan lama'),
     p.sampai && 's.d. ' + tanggal(p.sampai),
@@ -133,7 +175,7 @@ function Promo({ db, bisaUbah }) {
         buka === p.id
           ? html`<div style="grid-column:1/-1" key=${p.id}><${FormPromo} db=${db} promo=${p} onSelesai=${() => setBuka('')} /></div>`
           : html`<button class=${'baris-stok' + (p.aktif ? '' : ' mati')} key=${p.id} disabled=${!bisaUbah} onClick=${() => setBuka(p.id)}>
-              <span class="teks"><b>${p.kode}${p.nama ? ' · ' + p.nama : ''}</b><small>${ringkasPromo(p)}</small></span>
+              <span class="teks"><b>${p.kode}${p.nama ? ' · ' + p.nama : ''}</b><small>${ringkasPromo(db, p)}</small></span>
               <span class="angka-stok"><b>${dipakai}${p.kuota > 0 ? '/' + p.kuota : ''}</b><small>${p.aktif ? 'dipakai' : 'nonaktif'}</small></span>
             </button>`,
       )}

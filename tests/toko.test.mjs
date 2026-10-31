@@ -137,6 +137,42 @@ test('promo: persen dengan batas, minimal belanja, pelanggan baru/lama, kuota, o
   assert.equal(pel.find((x) => x.pelanggan.hp === '6281200000001').totalBelanja, 12800);
 });
 
+test('promo khusus produk: potongan Rp / persen, berlaku kelipatan atau sekali per pesanan', async () => {
+  const { db, brownies } = await dbContoh();
+  const mix = toko.tambahMenu(db, 'resep', brownies, { nama: 'Paket MIX', harga: 25000 });
+  const lain = toko.tambahMenu(db, 'resep', brownies, { nama: 'Kue lain', harga: 10000 });
+  const item = (n, m = 0) => [{ idMenu: mix.id, harga: 25000, jumlah: n }, ...(m ? [{ idMenu: lain.id, harga: 10000, jumlah: m }] : [])];
+  const hitung = (promo, n, m = 0) => toko.hitungPromo({ aktif: true, idMenu: mix.id, ...promo }, { subtotal: n * 25000 + m * 10000, item: item(n, m), namaProduk: 'Paket MIX' });
+
+  // Rupiah, kelipatan tiap 2: beli 2 -> 1x, beli 5 -> 2x.
+  const rp = { jenis: 'nominal', nilai: 5000, minJumlah: 2, berlaku: 'kelipatan' };
+  assert.match(hitung(rp, 1).galat, /minimal 2 Paket MIX/);
+  assert.equal(hitung(rp, 2).diskon, 5000);
+  assert.equal(hitung(rp, 5, 3).diskon, 10000, 'produk lain tidak dihitung');
+  assert.match(hitung(rp, 0, 3).galat, /khusus untuk Paket MIX/);
+  // Rupiah, sekali per pesanan.
+  assert.equal(hitung({ ...rp, berlaku: 'sekali' }, 6).diskon, 5000);
+  // Persen, kelipatan per item: semua item produk itu.
+  assert.equal(hitung({ jenis: 'persen', nilai: 10, minJumlah: 1 }, 3, 2).diskon, 7500);
+  // Persen, kelipatan tiap 2: beli 5 -> diskon untuk 4 item.
+  assert.equal(hitung({ jenis: 'persen', nilai: 10, minJumlah: 2 }, 5).diskon, 10000);
+  // Persen, sekali per pesanan: hanya untuk minJumlah item, dan tetap kena batas maks.
+  assert.equal(hitung({ jenis: 'persen', nilai: 10, minJumlah: 2, berlaku: 'sekali' }, 5).diskon, 5000);
+  assert.equal(hitung({ jenis: 'persen', nilai: 50, minJumlah: 1, maksDiskon: 20000 }, 4).diskon, 20000);
+  // Potongan tidak melebihi nilai produk itu.
+  assert.equal(hitung({ jenis: 'nominal', nilai: 40000, minJumlah: 1 }, 1, 5).diskon, 25000);
+
+  // Lewat kasir: varian dengan pilihan tambahan tetap dihitung satu produk.
+  db.simpan('Promo', { kode: 'MIX5', jenis: 'nominal', nilai: 5000, idMenu: mix.id, minJumlah: 2, berlaku: 'kelipatan', aktif: true, online: true });
+  const p = toko.buatPesanan(db, { keranjang: [{ idMenu: mix.id, jumlah: 3 }, { idMenu: lain.id, jumlah: 1 }, { idMenu: mix.id, jumlah: 1, harga: 27000 }], kodePromo: 'mix5' });
+  assert.equal(p.subtotal, 3 * 25000 + 10000 + 27000);
+  assert.equal(p.diskon, 10000);
+  assert.equal(p.total, p.subtotal - 10000);
+  assert.throws(() => toko.buatPesanan(db, { keranjang: [{ idMenu: lain.id, jumlah: 4 }], kodePromo: 'MIX5' }), /khusus untuk Paket MIX/);
+  assert.equal(toko.syaratPromoProduk('Paket MIX', { minJumlah: 2, berlaku: 'kelipatan' }), 'Paket MIX · tiap beli 2 (kelipatan)');
+  assert.equal(toko.syaratPromoProduk('Paket MIX', { minJumlah: 1, berlaku: 'sekali' }), 'Paket MIX · sekali per pesanan');
+});
+
 test('nomor WhatsApp dan nomor pesanan', () => {
   assert.equal(toko.normalHp('0812-3456-789'), '628123456789');
   assert.equal(toko.normalHp('+62 812 3456 789'), '628123456789');

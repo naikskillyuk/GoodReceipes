@@ -146,6 +146,28 @@ class TokoTest extends TestCase
             'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1]]]);
         $this->assertFalse($lagi['ok']);
         $this->assertStringContainsString('pelanggan baru', $lagi['galat']);
+
+        // Kode promo khusus produk: potongan Rp 3.000 tiap beli 2 Brownies (kelipatan), produk lain tidak ikut.
+        $this->api(['aksi' => 'sinkron', 'kunci' => $kunci, 'sejak' => 0, 'baris' => ['Promo' => [
+            $this->baris(['id' => 'prm_2', 'kode' => 'BROWNIES2', 'jenis' => 'nominal', 'nilai' => 3000, 'untuk' => 'semua', 'aktif' => true, 'online' => true,
+                'idMenu' => 'mnu_a', 'minJumlah' => 2, 'berlaku' => 'kelipatan']),
+            $this->baris(['id' => 'prm_3', 'kode' => 'SEKALI', 'jenis' => 'persen', 'nilai' => 50, 'untuk' => 'semua', 'aktif' => true, 'online' => true,
+                'idMenu' => 'mnu_a', 'minJumlah' => 2, 'berlaku' => 'sekali']),
+        ]]]);
+        $info = $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-uji-123']);
+        $p2 = collect($info['promo'])->firstWhere('kode', 'BROWNIES2');
+        $this->assertSame(['Brownies', 2, 'kelipatan'], [$p2['produk'], $p2['minJumlah'], $p2['berlaku']]);
+        $kurang = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888', 'kodePromo' => 'brownies2',
+            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1], ['idMenu' => 'mnu_p', 'jumlah' => 1]]]);
+        $this->assertFalse($kurang['ok']);
+        $this->assertStringContainsString('minimal 2 Brownies', $kurang['galat']);
+        $promo = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888', 'kodePromo' => 'brownies2',
+            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 5]]]);
+        $this->assertTrue($promo['ok'], json_encode($promo));
+        $this->assertEquals(40000 - 2 * 3000, $promo['total'], 'beli 5 = 2 kelipatan');
+        $sekali = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888', 'kodePromo' => 'SEKALI',
+            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 4]]]);
+        $this->assertEquals(32000 - 8000, $sekali['total'], '50% dari 2 Brownies saja, sekali per pesanan');
     }
 
     public function test_pesanan_online_transfer_qris_manual_dan_testimoni(): void

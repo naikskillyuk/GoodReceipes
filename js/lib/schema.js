@@ -161,11 +161,13 @@ export const TABEL = {
     kolom: { id: 't', nama: 't', hp: 't', catatan: 't', dibuat: 'n' },
   },
   // Kode promo. jenis 'persen' | 'nominal'. untuk: 'semua' | 'baru' (belum pernah pesan) | 'lama'.
+  // idMenu = promo khusus satu produk ('' = seluruh belanja): minJumlah = minimal beli produk itu,
+  // berlaku 'kelipatan' (tiap minJumlah item dapat potongan; bawaan) | 'sekali' (1x per pesanan).
   Promo: {
     awalan: 'prm',
     kolom: {
       id: 't', kode: 't', nama: 't', jenis: 't', nilai: 'n', minBelanja: 'n', maksDiskon: 'n', untuk: 't',
-      mulai: 'n', sampai: 'n', kuota: 'n', aktif: 'b', online: 'b',
+      mulai: 'n', sampai: 'n', kuota: 'n', aktif: 'b', online: 'b', idMenu: 't', minJumlah: 'n', berlaku: 't',
     },
   },
   // Satu baris saja (id tetap 'stl_merek'): nama dan logo aplikasi, ikut tersinkron dan tampil di halaman penilai.

@@ -309,8 +309,9 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       bayarManual: pakaiMayar(s) ? null : bayarManual(s),
       testimoni: testimoniTampil(),
       promo: hidup('Promo', (p) => benar(p.aktif, false) && benar(p.online, false) && String(p.kode || '').trim() && (!angka(p.mulai) || angka(p.mulai) <= Date.now()) && (!angka(p.sampai) || angka(p.sampai) >= Date.now()))
+        .filter((p) => !p.idMenu || menu.some((m) => m.id === p.idMenu))
         .slice(0, 6)
-        .map((p) => ({ kode: String(p.kode).trim().toUpperCase(), nama: String(p.nama || ''), jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), minBelanja: angka(p.minBelanja), maksDiskon: angka(p.maksDiskon), untuk: p.untuk || 'semua', sampai: angka(p.sampai) })),
+        .map((p) => ({ kode: String(p.kode).trim().toUpperCase(), nama: String(p.nama || ''), idMenu: String(p.idMenu || ''), produk: (menu.find((m) => m.id === p.idMenu) || {}).nama || '', minJumlah: Math.max(1, Math.floor(angka(p.minJumlah) || 1)), berlaku: p.berlaku === 'sekali' ? 'sekali' : 'kelipatan', jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), minBelanja: angka(p.minBelanja), maksDiskon: angka(p.maksDiskon), untuk: p.untuk || 'semua', sampai: angka(p.sampai) })),
       latarUrl: (keadaan.situs && keadaan.situs.latarUrl) || '',
       banner: hidup('Banner', (b) => benar(b.aktif, false) && ['etalase', 'semua'].includes(b.tampilDi || 'etalase') && (String(b.judul || '').trim() || /^(https?:|\/foto\/)/.test(String(b.fotoUrl || ''))))
         .sort((a, b) => angka(a.urutan) - angka(b.urutan))
@@ -320,7 +321,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       menu,
     };
   }
-  function promoOnline(kode, subtotal, idPelanggan) {
+  function promoOnline(kode, subtotal, idPelanggan, item = []) {
     const k = String(kode || '').trim().toUpperCase();
     if (!k) return { diskon: 0, galat: '', kode: '' };
     const p = hidup('Promo', (x) => String(x.kode || '').trim().toUpperCase() === k)[0];
@@ -338,9 +339,25 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     else if (p.untuk === 'lama' && !lama) galat = 'Promo ini khusus pelanggan yang sudah pernah memesan.';
     else if (angka(p.kuota) > 0 && dipakai >= angka(p.kuota)) galat = 'Kuota promo ini sudah habis.';
     if (galat) return { diskon: 0, galat, kode: '' };
-    let diskon = p.jenis === 'persen' ? Math.floor((subtotal * angka(p.nilai)) / 100) : angka(p.nilai);
+    let diskon;
+    let batas = subtotal;
+    if (p.idMenu) {
+      // Promo khusus produk (sama dengan Penjualan::dasarPromo): kelipatan tiap minJumlah item, atau sekali per pesanan.
+      const nama = (tabel('Menu')[p.idMenu] || {}).nama || 'produk yang sudah dihapus';
+      const milik = item.filter((i) => i.idMenu === p.idMenu);
+      const jumlah = milik.reduce((j, i) => j + i.jumlah, 0);
+      const dasar = milik.reduce((j, i) => j + i.harga * i.jumlah, 0);
+      const min = Math.max(1, Math.floor(angka(p.minJumlah) || 1));
+      if (!jumlah) return { diskon: 0, galat: `Kode promo ini khusus untuk ${nama}.`, kode: '' };
+      if (jumlah < min) return { diskon: 0, galat: `Promo ini berlaku untuk pembelian minimal ${min} ${nama}.`, kode: '' };
+      const kali = p.berlaku === 'sekali' ? 1 : Math.floor(jumlah / min);
+      batas = Math.min(subtotal, dasar);
+      diskon = p.jenis === 'persen' ? Math.floor(((dasar / jumlah) * Math.min(jumlah, kali * min) * angka(p.nilai)) / 100) : angka(p.nilai) * kali;
+    } else {
+      diskon = p.jenis === 'persen' ? Math.floor((subtotal * angka(p.nilai)) / 100) : angka(p.nilai);
+    }
     if (p.jenis === 'persen' && angka(p.maksDiskon) > 0) diskon = Math.min(diskon, angka(p.maksDiskon));
-    return { diskon: Math.max(0, Math.min(subtotal, diskon)), galat: '', kode: k };
+    return { diskon: Math.max(0, Math.min(batas, diskon)), galat: '', kode: k };
   }
   function pesanOnline(req) {
     const s = tokoDariToken(req.token);
@@ -382,7 +399,7 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       if ((stok[r] || 0) + 1e-9 < butuh) return { ok: false, galat: 'Maaf, stok tidak cukup untuk jumlah pesanan ini. Kurangi jumlahnya.' };
     }
     const idPelanggan = 'plg_' + hp;
-    const promo = promoOnline(req.kodePromo, subtotal, idPelanggan);
+    const promo = promoOnline(req.kodePromo, subtotal, idPelanggan, item);
     if (promo.galat) return { ok: false, galat: promo.galat };
     const total = subtotal - promo.diskon;
     const sekarang = Date.now();

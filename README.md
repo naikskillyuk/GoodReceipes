@@ -55,7 +55,7 @@ Semua memakai data yang sama: harga dan menu yang diatur admin langsung tampil d
 - **Pilihan tambahan / varian berbayar**: di *Menu & Harga Jual* buka *Pilihan tambahan / varian* lalu isi nama dan harganya (mis. Digoreng +Rp 2.000, Tambah keju +Rp 3.000). Pembeli di etalase dan kasir bisa mencentang beberapa pilihan; harga ditambahkan otomatis (dihitung ulang oleh server untuk pesanan online), dan pilihan tercatat di setiap pesanan.
 - **Etalase**: layar sambutan (foto latar + logo), banner promo yang bergeser otomatis, ikon pintasan, grid menu, dan testimoni yang bergeser otomatis; warna putih, hijau, dan kuning.
 - **Testimoni**: pembeli mengirim testimoni + bintang setelah pesanannya lunas; admin menayangkan, menyembunyikan, atau menulis testimoni sendiri di *Pelanggan, Promo & Testimoni → Testimoni*.
-- **Pelanggan dan promo**: pelanggan tercatat otomatis dari nomor WhatsApp (bisa diunduh CSV). Kode promo persen atau potongan, dengan minimal belanja, batas tanggal, kuota, dan khusus pelanggan baru/lama.
+- **Pelanggan dan promo**: pelanggan tercatat otomatis dari nomor WhatsApp (bisa diunduh CSV). Kode promo persen atau potongan, dengan minimal belanja, batas tanggal, kuota, dan khusus pelanggan baru/lama. Kode promo juga bisa **khusus satu produk** (mis. Paket MIX) dengan minimal beli, berlaku **kelipatan** (Rp 5.000 tiap beli 2: beli 4 hemat Rp 10.000) atau **sekali per pesanan**; produk lain di keranjang tidak ikut didiskon.
 - Bisa dipasang ke layar utama (PWA). Saat sinyal putus, aplikasi tetap terbuka dan perubahan menunggu lalu terkirim begitu tersambung lagi.
 
 ## Mencoba di komputer

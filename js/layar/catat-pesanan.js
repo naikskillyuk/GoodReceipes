@@ -93,7 +93,7 @@ export function CatatPesanan({ k }) {
   const keranjang = f.baris.map(keKeranjang);
   const { item, subtotal } = itemKeranjang(db, keranjang);
   const nomorHp = normalHp(f.hp);
-  const promo = f.kode.trim() ? cekPromo(db, f.kode, { subtotal, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '', kecuali: idUbah }) : { diskon: 0, galat: '' };
+  const promo = f.kode.trim() ? cekPromo(db, f.kode, { subtotal, item, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '', kecuali: idUbah }) : { diskon: 0, galat: '' };
   const ongkir = f.antar ? f.ongkir : 0;
   const total = subtotal - (promo.galat ? 0 : promo.diskon) + ongkir;
   const pelanggan = nomorHp ? db.ambil('Pelanggan', idPelanggan(nomorHp)) : null;

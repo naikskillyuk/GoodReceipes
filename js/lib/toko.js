@@ -506,11 +506,33 @@ export function daftarPelanggan(db) {
 
 // ---------- Promo ----------
 
+/** Cara promo khusus produk dihitung (promo.berlaku). */
+export const BERLAKU_PROMO = { kelipatan: 'Berlaku kelipatan', sekali: 'Sekali per pesanan' };
+
+/**
+ * Promo khusus produk (promo.idMenu terisi): hitung dari item menu itu saja.
+ * Mengembalikan {galat} atau {dasar, jumlah, kali, kena}: dasar = nilai belanja produk itu (termasuk pilihan
+ * tambahan), kali = berapa kali potongan diberikan, kena = jumlah item yang mendapat diskon persen.
+ * Kelipatan: tiap minJumlah item dapat potongan (min. 2: beli 2 -> 1x, beli 5 -> 2x). Sekali: 1x per pesanan.
+ * Sama dengan Penjualan::dasarPromo di server.
+ */
+export function dasarPromo(promo, item = [], namaProduk = 'produk promo') {
+  const milik = (Array.isArray(item) ? item : []).filter((i) => i && i.idMenu && i.idMenu === promo.idMenu);
+  const jumlah = milik.reduce((j, i) => j + (Number(i.jumlah) || 0), 0);
+  const dasar = milik.reduce((j, i) => j + (Number(i.harga) || 0) * (Number(i.jumlah) || 0), 0);
+  const min = Math.max(1, Math.floor(Number(promo.minJumlah) || 1));
+  if (!jumlah) return { galat: `Kode promo ini khusus untuk ${namaProduk}.` };
+  if (jumlah < min) return { galat: `Promo ini berlaku untuk pembelian minimal ${min} ${namaProduk}.` };
+  const kali = promo.berlaku === 'sekali' ? 1 : Math.floor(jumlah / min);
+  return { dasar, jumlah, kali, kena: Math.min(jumlah, kali * min) };
+}
+
 /**
  * Diskon dari satu promo (aturan sama dengan Penjualan::promo di server).
  * lama = pelanggan sudah pernah memesan; dipakai = berapa kali kode ini sudah dipakai.
+ * item = isi pesanan (untuk promo khusus produk); namaProduk = nama menu promo itu (untuk pesan galat).
  */
-export function hitungPromo(promo, { subtotal, lama = false, dipakai = 0, online = false, sekarang = Date.now() }) {
+export function hitungPromo(promo, { subtotal, item = [], namaProduk = '', lama = false, dipakai = 0, online = false, sekarang = Date.now() }) {
   const gagal = (galat) => ({ diskon: 0, galat });
   if (!promo || !promo.aktif) return gagal('Kode promo tidak ditemukan.');
   if (online && !promo.online) return gagal('Kode promo ini hanya berlaku di toko.');
@@ -520,9 +542,20 @@ export function hitungPromo(promo, { subtotal, lama = false, dipakai = 0, online
   if (promo.untuk === 'baru' && lama) return gagal('Promo ini khusus pelanggan baru.');
   if (promo.untuk === 'lama' && !lama) return gagal('Promo ini khusus pelanggan yang sudah pernah memesan.');
   if (promo.kuota > 0 && dipakai >= promo.kuota) return gagal('Kuota promo ini sudah habis.');
-  let diskon = promo.jenis === 'persen' ? Math.floor((subtotal * (Number(promo.nilai) || 0)) / 100) : Number(promo.nilai) || 0;
+  const nilai = Number(promo.nilai) || 0;
+  let batas = subtotal;
+  let diskon;
+  if (promo.idMenu) {
+    const d = dasarPromo(promo, item, namaProduk || 'produk promo');
+    if (d.galat) return gagal(d.galat);
+    batas = Math.min(subtotal, d.dasar);
+    // Persen: dari harga item yang kena promo. Rupiah: potongan dikali berapa kali promo berlaku.
+    diskon = promo.jenis === 'persen' ? Math.floor(((d.dasar / d.jumlah) * d.kena * nilai) / 100) : nilai * d.kali;
+  } else {
+    diskon = promo.jenis === 'persen' ? Math.floor((subtotal * nilai) / 100) : nilai;
+  }
   if (promo.jenis === 'persen' && promo.maksDiskon > 0) diskon = Math.min(diskon, promo.maksDiskon);
-  return { diskon: Math.max(0, Math.min(subtotal, diskon)), galat: '' };
+  return { diskon: Math.max(0, Math.min(batas, diskon)), galat: '' };
 }
 
 export function cariPromo(db, kode) {
@@ -530,15 +563,33 @@ export function cariPromo(db, kode) {
   return k ? db.semua('Promo', (p) => String(p.kode || '').trim().toUpperCase() === k)[0] || null : null;
 }
 
-/** Cek kode promo untuk pesanan kasir. */
-export function cekPromo(db, kode, { subtotal, idPelanggan = '', kecuali = '' }) {
+/**
+ * Syarat promo khusus produk untuk ditampilkan, mis. "Paket MIX · tiap beli 2 (kelipatan)" atau
+ * "Paket MIX · min. beli 2, sekali per pesanan". '' bila promo untuk seluruh belanja.
+ */
+export function syaratPromoProduk(produk, { minJumlah = 1, berlaku = 'kelipatan' } = {}) {
+  if (!produk) return '';
+  const min = Math.max(1, Math.floor(Number(minJumlah) || 1));
+  if (berlaku === 'sekali') return `${produk} · ${min > 1 ? `min. beli ${min}, ` : ''}sekali per pesanan`;
+  return `${produk} · ${min > 1 ? `tiap beli ${min} (kelipatan)` : 'per item'}`;
+}
+
+/** Nama menu sasaran promo khusus produk ('' bila promo untuk seluruh belanja). */
+export function namaProdukPromo(db, promo) {
+  if (!promo || !promo.idMenu) return '';
+  const m = db.ambil('Menu', promo.idMenu);
+  return m ? m.nama : 'produk yang sudah dihapus';
+}
+
+/** Cek kode promo untuk pesanan kasir. item = isi pesanan (dipakai promo khusus produk). */
+export function cekPromo(db, kode, { subtotal, item = [], idPelanggan = '', kecuali = '' }) {
   const k = String(kode || '').trim().toUpperCase();
   if (!k) return { diskon: 0, galat: '', promo: null };
   const promo = cariPromo(db, k);
   const sah = db.semua('Pesanan', (p) => pesananSah(p) && p.id !== kecuali);
   const lama = !!idPelanggan && sah.some((p) => p.idPelanggan === idPelanggan);
   const dipakai = sah.filter((p) => String(p.kodePromo || '').toUpperCase() === k).length;
-  return { ...hitungPromo(promo, { subtotal, lama, dipakai }), promo };
+  return { ...hitungPromo(promo, { subtotal, item, namaProduk: namaProdukPromo(db, promo), lama, dipakai }), promo };
 }
 
 export function daftarPromo(db) {
@@ -650,7 +701,7 @@ function isiPesanan(db, { keranjang, nama = '', hp = '', catatan = '', kodePromo
   if (!item.length) throw new Error('Keranjang masih kosong.');
   const nomorHp = hp ? normalHp(hp) : '';
   if (hp && !nomorHp) throw new Error('Nomor WhatsApp tidak valid, mis. 0812xxxxxxx.');
-  const promo = cekPromo(db, kodePromo, { subtotal, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '', kecuali });
+  const promo = cekPromo(db, kodePromo, { subtotal, item, idPelanggan: nomorHp ? idPelanggan(nomorHp) : '', kecuali });
   if (promo.galat) throw new Error(promo.galat);
   const biaya = Math.max(0, Math.round(Number(ongkir) || 0));
   const pelanggan = nomorHp ? simpanPelanggan(db, { nama, hp: nomorHp }) : null;

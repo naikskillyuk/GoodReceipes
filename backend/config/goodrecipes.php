@@ -165,7 +165,7 @@ return [
             'db' => 'promo',
             'kolom' => [
                 'id' => 't', 'kode' => 't', 'nama' => 't', 'jenis' => 't', 'nilai' => 'n', 'minBelanja' => 'n', 'maksDiskon' => 'n', 'untuk' => 't',
-                'mulai' => 'n', 'sampai' => 'n', 'kuota' => 'n', 'aktif' => 'b', 'online' => 'b',
+                'mulai' => 'n', 'sampai' => 'n', 'kuota' => 'n', 'aktif' => 'b', 'online' => 'b', 'idMenu' => 't', 'minJumlah' => 'n', 'berlaku' => 't',
             ],
         ],
         'Setelan' => [
