@@ -7095,3 +7095,43 @@ a.chip {
   height: 18px;
   accent-color: var(--hijau);
 }
+
+/* Kode promo di keranjang etalase: kolom kode + tombol "Gunakan", lalu rincian diskon. */
+.et-kode-promo {
+  display: flex;
+  gap: 8px;
+}
+.et-kode-promo .input {
+  flex: 1;
+  min-width: 0;
+}
+.et-kode-promo .et-tombol {
+  flex: none;
+  padding: 0 18px;
+}
+.et-promo-rinci {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--e-muda);
+  border: 1px dashed var(--e-utama);
+}
+.et-promo-judul {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.et-promo-judul small {
+  display: block;
+  color: var(--e-muted);
+  font-size: 13px;
+}
+.et-promo-hemat {
+  margin: 0;
+  font-weight: 800;
+  color: var(--e-utama-2);
+  font-size: 13.5px;
+}

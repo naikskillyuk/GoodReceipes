@@ -157,6 +157,15 @@ class TokoTest extends TestCase
         $info = $this->api(['aksi' => 'infoToko', 'token' => 'token-toko-uji-123']);
         $p2 = collect($info['promo'])->firstWhere('kode', 'BROWNIES2');
         $this->assertSame(['Brownies', 2, 'kelipatan'], [$p2['produk'], $p2['minJumlah'], $p2['berlaku']]);
+        // Tombol "Gunakan" di keranjang: rincian tanpa membuat pesanan.
+        $jumlahPesanan = \DB::table('pesanan')->count();
+        $cek = $this->api(['aksi' => 'cekPromo', 'token' => 'token-toko-uji-123', 'kodePromo' => 'brownies2',
+            'item' => [['idMenu' => 'mnu_a', 'jumlah' => 4], ['idMenu' => 'mnu_p', 'jumlah' => 1]]]);
+        $this->assertTrue($cek['ok'], json_encode($cek));
+        $this->assertEquals(['BROWNIES2', 'Brownies', 52000, 6000, 46000], [$cek['kode'], $cek['produk'], $cek['subtotal'], $cek['diskon'], $cek['total']]);
+        $this->assertSame($jumlahPesanan, \DB::table('pesanan')->count(), 'cek promo tidak membuat pesanan');
+        $salah = $this->api(['aksi' => 'cekPromo', 'token' => 'token-toko-uji-123', 'kodePromo' => 'BROWNIES2', 'item' => [['idMenu' => 'mnu_p', 'jumlah' => 1]]]);
+        $this->assertStringContainsString('khusus untuk Brownies', $salah['galat']);
         $kurang = $this->api(['aksi' => 'pesanOnline', 'token' => 'token-toko-uji-123', 'nama' => 'Sari', 'hp' => '0812999888', 'kodePromo' => 'brownies2',
             'item' => [['idMenu' => 'mnu_a', 'jumlah' => 1], ['idMenu' => 'mnu_p', 'jumlah' => 1]]]);
         $this->assertFalse($kurang['ok']);

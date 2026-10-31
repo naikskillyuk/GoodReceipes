@@ -1192,6 +1192,7 @@ export const pengaturanMayar = {
 export const pesanOnline = {
   info: (url, token, opsi) => panggilApi(url, { aksi: 'infoToko', token }, opsi),
   kirim: (url, token, isi, opsi) => panggilApi(url, { aksi: 'pesanOnline', token, ...isi }, opsi),
+  cekPromo: (url, token, isi, opsi) => panggilApi(url, { aksi: 'cekPromo', token, ...isi }, opsi),
   status: (url, token, idPesanan, opsi) => panggilApi(url, { aksi: 'statusPesanan', token, idPesanan }, opsi),
   bukti: (url, token, idPesanan, opsi) => panggilApi(url, { aksi: 'kirimBukti', token, idPesanan }, opsi),
 };

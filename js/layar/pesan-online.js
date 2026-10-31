@@ -249,6 +249,13 @@ function HeaderEtalase({ info, logo, jumlahKeranjang, ke, cariMenu }) {
 
 const teksPromo = (p) => (p.jenis === 'persen' ? `Diskon ${p.nilai.toLocaleString('id-ID')}%` : `Hemat ${rupiah(p.nilai)}`);
 
+/** Keterangan promo yang dipakai di keranjang, mis. "Hemat Rp 5.000 · Paket MIX · tiap beli 2 (kelipatan)". */
+const keteranganPromo = (p) =>
+  [
+    teksPromo(p) + (p.jenis === 'persen' && p.maksDiskon > 0 ? ` (maks. ${rupiah(p.maksDiskon)})` : ''),
+    p.produk ? syaratPromoProduk(p.produk, p) : 'seluruh belanja',
+  ].join(' · ');
+
 function BannerPromo({ info, pakaiKode, keMenu }) {
   const foto = (info.menu || []).filter((m) => m.fotoUrl).map((m) => m.fotoUrl);
   const aksiBanner = (b) => {
@@ -439,7 +446,43 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
   const [mengirim, setMengirim] = useState(false);
   useEffect(() => tulis(kunciKode(token), kode.trim()), [kode]);
   const item = baris;
-  const total = item.reduce((j, b) => j + b.harga * b.jumlah, 0);
+  const subtotal = item.reduce((j, b) => j + b.harga * b.jumlah, 0);
+
+  // Kode promo: dicek ke server saat menekan "Gunakan", lalu rinciannya tampil. Dicek ulang otomatis
+  // bila isi keranjang atau nomor WhatsApp berubah (promo produk / pelanggan baru bisa jadi tidak berlaku).
+  const [promo, setPromo] = useState(null);
+  const [galatPromo, setGalatPromo] = useState('');
+  const [mengecek, setMengecek] = useState(false);
+  const isiItem = () => item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi }));
+  const gunakan = async (teks = kode) => {
+    const k = String(teks || '').trim();
+    if (!k) return setGalatPromo('Masukkan kode promo.');
+    setMengecek(true);
+    setGalatPromo('');
+    try {
+      const j = await pesanOnline.cekPromo(url, token, { kodePromo: k, hp, item: isiItem() });
+      setPromo(j);
+      setKode(j.kode);
+    } catch (err) {
+      setPromo(null);
+      setGalatPromo(err.message || 'Kode promo tidak bisa dipakai.');
+    } finally {
+      setMengecek(false);
+    }
+  };
+  const hapusPromo = () => (setPromo(null), setKode(''), setGalatPromo(''));
+  const kunciIsi = JSON.stringify(item.map((b) => [b.m.id, b.jumlah, b.opsi]));
+  const hpSah = normalHp(hp);
+  useEffect(() => {
+    // Kode dari banner "Pakai kode" atau kunjungan sebelumnya langsung dicoba.
+    if (kode.trim() && item.length) gunakan();
+  }, []);
+  useEffect(() => {
+    if (!promo || !item.length) return;
+    const t = setTimeout(() => gunakan(promo.kode), 600);
+    return () => clearTimeout(t);
+  }, [kunciIsi, hpSah]);
+  const total = promo ? promo.total : subtotal;
 
   const kirim = async (e) => {
     e.preventDefault();
@@ -453,7 +496,7 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
     setMengirim(true);
     setGalat('');
     try {
-      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, caraAmbil: cara, jadwal, catatan: catatan.trim(), kodePromo: kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
+      const j = await pesanOnline.kirim(url, token, { nama: nama.trim(), hp, caraAmbil: cara, jadwal, catatan: catatan.trim(), kodePromo: promo ? promo.kode : kode.trim(), item: item.map((b) => ({ idMenu: b.m.id, jumlah: b.jumlah, opsi: b.opsi })) });
       ingatPesanan(token, j.idPesanan);
       tulis(kunciKode(token), '');
       kosongkan();
@@ -502,8 +545,26 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
       ${cara && html`<label class="bidang"><span>${cara === 'ojol' ? 'Jam driver ojek datang ke toko' : 'Jam Anda datang mengambil'} (opsional)</span><input class="input" type="datetime-local" min=${keInputWaktu(Date.now())} value=${jam} onInput=${(e) => (setJam(e.target.value), setGalat(''))} /><span class="bantu">Kosongkan bila belum pasti. Toko akan mengabari lewat WhatsApp saat pesanan siap.</span></label>`}
       ${cara === 'ojol' && html`<div class="info">Pesan ojeknya sendiri lewat aplikasi Gojek / Grab ${jam ? 'sesuai jam di atas' : 'setelah toko mengabari pesanan siap'}${info.alamat ? html`, dengan titik jemput <b>${info.alamat}</b>` : ' ke alamat toko'}. Ongkir dibayar langsung ke driver dan tidak termasuk total di bawah.</div>`}
       <label class="bidang"><span>Catatan (opsional)</span><input class="input" maxlength="300" value=${catatan} onInput=${(e) => setCatatan(e.target.value)} placeholder="mis. tanpa kacang" /></label>
-      <label class="bidang"><span>Kode promo (opsional)</span><input class="input" maxlength="30" style="text-transform:uppercase" value=${kode} onInput=${(e) => setKode(e.target.value)} /></label>
-      <div class="hasil-baris"><span><b class="biasa">Total</b>${kode.trim() ? html`<br /><small class="teks-kecil">Diskon promo dihitung saat dipesan</small>` : ''}</span><b class="et-total">${rupiah(total)}</b></div>
+      <div class="bidang">
+        <label for="kode-promo">Kode promo (opsional)</label>
+        <div class="et-kode-promo">
+          <input id="kode-promo" class="input" maxlength="30" style="text-transform:uppercase" placeholder="mis. BESTMIX" value=${kode}
+            onInput=${(e) => (setKode(e.target.value), setGalatPromo(''), promo && e.target.value.trim().toUpperCase() !== promo.kode && setPromo(null))}
+            onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), gunakan())} />
+          <button type="button" class="et-tombol garis" disabled=${mengecek || !kode.trim()} onClick=${() => gunakan()}>${mengecek ? 'Mengecek…' : promo ? 'Terpakai' : 'Gunakan'}</button>
+        </div>
+        ${galatPromo && html`<p class="galat-teks" role="alert">${galatPromo}</p>`}
+      </div>
+      ${promo && html`<div class="et-promo-rinci" role="status" aria-label="Rincian promo">
+        <div class="et-promo-judul">
+          <span><b>${promo.kode}</b>${promo.nama ? ` · ${promo.nama}` : ''}<small>${keteranganPromo(promo)}</small></span>
+          <button type="button" class="tautan-kecil" onClick=${hapusPromo}>Hapus</button>
+        </div>
+        <div class="hasil-baris"><span>Subtotal</span><b class="biasa">${rupiah(promo.subtotal)}</b></div>
+        <div class="hasil-baris"><span>Diskon (${promo.kode})</span><b class="baik">−${rupiah(promo.diskon)}</b></div>
+        <p class="et-promo-hemat">Anda hemat ${rupiah(promo.diskon)}</p>
+      </div>`}
+      <div class="hasil-baris"><span><b class="biasa">Total</b>${!promo && kode.trim() ? html`<br /><small class="teks-kecil">Tekan Gunakan untuk melihat diskon</small>` : ''}</span><b class="et-total">${rupiah(total)}</b></div>
       ${!info.buka && html`<div class="info">Toko sedang tutup. ${info.catatan || 'Silakan kembali lagi nanti.'}</div>`}
       ${info.buka && !info.bayarOnline && html`<div class="info">Toko ini belum menerima pesanan online. Hubungi toko${info.wa ? ' di WhatsApp' : ''} untuk memesan.</div>`}
       ${galat && html`<p class="galat-teks" role="alert">${galat}</p>`}

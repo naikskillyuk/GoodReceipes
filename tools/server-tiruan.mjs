@@ -359,6 +359,44 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
     if (p.jenis === 'persen' && angka(p.maksDiskon) > 0) diskon = Math.min(diskon, angka(p.maksDiskon));
     return { diskon: Math.max(0, Math.min(batas, diskon)), galat: '', kode: k };
   }
+  /** Item keranjang pembeli dengan harga dari menu (sama dengan Penjualan::itemOnline). */
+  function itemOnline(daftar) {
+    const menu = Object.fromEntries(hidup('Menu', (m) => benar(m.aktif, false) && benar(m.online, false)).map((m) => [m.id, m]));
+    const masuk = Array.isArray(daftar) ? daftar : [];
+    if (!masuk.length) return { galat: 'Pilih menu yang ingin dipesan.' };
+    const item = [];
+    let subtotal = 0;
+    for (const it of masuk) {
+      const m = menu[it && it.idMenu];
+      const jumlah = Math.floor(Number(it && it.jumlah));
+      if (!m || !(jumlah >= 1 && jumlah <= 100)) return { galat: 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.' };
+      const mau = new Set((Array.isArray(it.opsi) ? it.opsi : []).filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()));
+      const opsi = opsiMenu(m).filter((o) => mau.has(o.nama.toLowerCase()));
+      if (opsi.length !== mau.size) return { galat: 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.' };
+      const harga = hargaMenu(m) + opsi.reduce((j, o) => j + o.harga, 0);
+      item.push({ idMenu: m.id, nama: String(m.nama), harga, jumlah, ...(opsi.length ? { opsi: opsi.map((o) => o.nama) } : {}) });
+      subtotal += harga * jumlah;
+    }
+    return { item, subtotal, galat: '' };
+  }
+  /** Tombol "Gunakan" kode promo di keranjang (sama dengan Penjualan::cekPromoOnline). */
+  function cekPromo(req) {
+    if (!tokoDariToken(req.token)) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
+    if (!String(req.kodePromo || '').trim()) return { ok: false, galat: 'Masukkan kode promo.' };
+    const { item, subtotal, galat } = itemOnline(req.item);
+    if (galat) return { ok: false, galat };
+    let hp = String(req.hp || '').replace(/\D/g, '');
+    if (hp.startsWith('0')) hp = '62' + hp.slice(1);
+    else if (hp.startsWith('8')) hp = '62' + hp;
+    const promo = promoOnline(req.kodePromo, subtotal, /^62\d{8,13}$/.test(hp) ? 'plg_' + hp : '', item);
+    if (promo.galat) return { ok: false, galat: promo.galat };
+    const p = hidup('Promo', (x) => String(x.kode || '').trim().toUpperCase() === promo.kode)[0];
+    return {
+      ok: true, kode: promo.kode, nama: String(p.nama || ''), jenis: p.jenis === 'persen' ? 'persen' : 'rupiah', nilai: angka(p.nilai), maksDiskon: angka(p.maksDiskon),
+      produk: p.idMenu ? (tabel('Menu')[p.idMenu] || {}).nama || '' : '', minJumlah: Math.max(1, Math.floor(angka(p.minJumlah) || 1)), berlaku: p.berlaku === 'sekali' ? 'sekali' : 'kelipatan',
+      subtotal, diskon: promo.diskon, total: subtotal - promo.diskon,
+    };
+  }
   function pesanOnline(req) {
     const s = tokoDariToken(req.token);
     if (!s) return { ok: false, galat: 'Link pemesanan tidak ditemukan atau sudah diganti.' };
@@ -378,22 +416,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
       if (jadwal < Date.now() - 15 * 60 * 1000) return { ok: false, galat: 'Pilih jam ambil yang belum lewat.' };
       if (jadwal > Date.now() + 60 * 24 * 60 * 60 * 1000) return { ok: false, galat: 'Jam ambil paling lambat 60 hari dari sekarang.' };
     } else jadwal = 0;
-    const menu = Object.fromEntries(hidup('Menu', (m) => benar(m.aktif, false) && benar(m.online, false)).map((m) => [m.id, m]));
-    const masuk = Array.isArray(req.item) ? req.item : [];
-    if (!masuk.length) return { ok: false, galat: 'Pilih menu yang ingin dipesan.' };
-    const item = [];
-    let subtotal = 0;
-    for (const it of masuk) {
-      const m = menu[it && it.idMenu];
-      const jumlah = Math.floor(Number(it && it.jumlah));
-      if (!m || !(jumlah >= 1 && jumlah <= 100)) return { ok: false, galat: 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.' };
-      const mau = new Set((Array.isArray(it.opsi) ? it.opsi : []).filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()));
-      const opsi = opsiMenu(m).filter((o) => mau.has(o.nama.toLowerCase()));
-      if (opsi.length !== mau.size) return { ok: false, galat: 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.' };
-      const harga = hargaMenu(m) + opsi.reduce((j, o) => j + o.harga, 0);
-      item.push({ idMenu: m.id, nama: String(m.nama), harga, jumlah, ...(opsi.length ? { opsi: opsi.map((o) => o.nama) } : {}) });
-      subtotal += harga * jumlah;
-    }
+    const { item, subtotal, galat: galatItem } = itemOnline(req.item);
+    if (galatItem) return { ok: false, galat: galatItem };
     const stok = stokMakanan();
     for (const [r, butuh] of Object.entries(kebutuhan(item))) {
       if ((stok[r] || 0) + 1e-9 < butuh) return { ok: false, galat: 'Maaf, stok tidak cukup untuk jumlah pesanan ini. Kurangi jumlahnya.' };
@@ -463,6 +487,8 @@ export function buatServer(keadaan = { tabel: {}, foto: {} }, opsi = {}) {
         return kirimNilai(req);
       case 'infoToko':
         return infoToko(req);
+      case 'cekPromo':
+        return cekPromo(req);
       case 'pesanOnline':
         return pesanOnline(req);
       case 'statusPesanan':

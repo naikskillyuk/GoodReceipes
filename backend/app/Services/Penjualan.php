@@ -502,6 +502,89 @@ class Penjualan
         ];
     }
 
+    /**
+     * Item pesanan online dari keranjang pembeli: harga selalu dari menu di server, bukan dari pembeli.
+     *
+     * @return array{0: array, 1: float, 2: string} [item, subtotal, galat]
+     */
+    private function itemOnline(int $id, mixed $masuk): array
+    {
+        $menu = [];
+        foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
+            $menu[$m['id']] = $m;
+        }
+        $masuk = is_array($masuk) ? $masuk : [];
+        if (! $masuk || count($masuk) > config('goodrecipes.maks_item_pesanan')) {
+            return [[], 0, 'Pilih menu yang ingin dipesan.'];
+        }
+        $item = [];
+        $subtotal = 0;
+        foreach ($masuk as $it) {
+            $m = $menu[is_array($it) && is_string($it['idMenu'] ?? null) ? $it['idMenu'] : ''] ?? null;
+            $jumlah = is_array($it) && is_numeric($it['jumlah'] ?? null) ? (int) $it['jumlah'] : 0;
+            if (! $m || $jumlah < 1 || $jumlah > config('goodrecipes.maks_jumlah_per_item')) {
+                return [[], 0, 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.'];
+            }
+            // Pilihan tambahan: hanya yang memang ada di menu, harganya dari server.
+            $mau = array_map(fn ($x) => mb_strtolower(trim((string) $x)), is_array($it['opsi'] ?? null) ? array_filter($it['opsi'], 'is_string') : []);
+            $opsi = array_values(array_filter(self::opsiMenu($m), fn ($o) => in_array(mb_strtolower($o['nama']), $mau, true)));
+            if (count($opsi) !== count(array_unique($mau))) {
+                return [[], 0, 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.'];
+            }
+            $harga = self::hargaJual($m) + array_sum(array_column($opsi, 'harga'));
+            $item[] = ['idMenu' => $m['id'], 'nama' => (string) $m['nama'], 'harga' => $harga, 'jumlah' => $jumlah]
+                + ($opsi ? ['opsi' => array_column($opsi, 'nama')] : []);
+            $subtotal += $harga * $jumlah;
+        }
+
+        return [$item, $subtotal, ''];
+    }
+
+    /**
+     * Pembeli menekan "Gunakan" pada kode promo di keranjang: cek kode untuk isi keranjang saat ini
+     * (tanpa membuat pesanan) dan kembalikan rinciannya. Nomor WhatsApp dipakai untuk promo pelanggan baru/lama.
+     */
+    public function cekPromoOnline(array $req): array
+    {
+        $toko = $this->tokoDariToken($req['token'] ?? null);
+        if (! $toko) {
+            return ['ok' => false, 'galat' => 'Link pemesanan tidak ditemukan atau sudah diganti.'];
+        }
+        $id = $toko['idData'];
+        if (trim((string) ($req['kodePromo'] ?? '')) === '') {
+            return ['ok' => false, 'galat' => 'Masukkan kode promo.'];
+        }
+        [$item, $subtotal, $galatItem] = $this->itemOnline($id, $req['item'] ?? null);
+        if ($galatItem) {
+            return ['ok' => false, 'galat' => $galatItem];
+        }
+        $hp = self::hp($req['hp'] ?? '');
+        [$diskon, $p, $galat] = $this->promo($id, (string) $req['kodePromo'], $subtotal, $hp ? 'plg_'.$hp : '', true, $item);
+        if ($galat) {
+            return ['ok' => false, 'galat' => $galat];
+        }
+        $produk = '';
+        if ((string) ($p['idMenu'] ?? '') !== '') {
+            $m = $this->ambil($id, 'Menu', (string) $p['idMenu']);
+            $produk = $m ? (string) $m['nama'] : '';
+        }
+
+        return [
+            'ok' => true,
+            'kode' => Str::upper(trim((string) $p['kode'])),
+            'nama' => mb_substr((string) $p['nama'], 0, 60),
+            'jenis' => $p['jenis'] === 'persen' ? 'persen' : 'rupiah',
+            'nilai' => (float) $p['nilai'],
+            'maksDiskon' => (float) $p['maksDiskon'],
+            'produk' => $produk,
+            'minJumlah' => max(1, (int) ($p['minJumlah'] ?? 1)),
+            'berlaku' => ($p['berlaku'] ?? '') === 'sekali' ? 'sekali' : 'kelipatan',
+            'subtotal' => $subtotal,
+            'diskon' => $diskon,
+            'total' => $subtotal - $diskon,
+        ];
+    }
+
     /** Pembeli memesan lewat link: pesanan "menunggu" + link bayar Mayar. Stok dipotong setelah lunas. */
     public function pesanOnline(array $req): array
     {
@@ -542,33 +625,9 @@ class Penjualan
             $jadwal = 0;
         }
 
-        // Item: harga selalu dari menu di server, bukan dari pembeli.
-        $menu = [];
-        foreach ($this->semua($id, 'Menu', fn ($m) => $m['aktif'] && $m['online']) as $m) {
-            $menu[$m['id']] = $m;
-        }
-        $masuk = is_array($req['item'] ?? null) ? $req['item'] : [];
-        if (! $masuk || count($masuk) > config('goodrecipes.maks_item_pesanan')) {
-            return ['ok' => false, 'galat' => 'Pilih menu yang ingin dipesan.'];
-        }
-        $item = [];
-        $subtotal = 0;
-        foreach ($masuk as $it) {
-            $m = $menu[is_array($it) && is_string($it['idMenu'] ?? null) ? $it['idMenu'] : ''] ?? null;
-            $jumlah = is_array($it) && is_numeric($it['jumlah'] ?? null) ? (int) $it['jumlah'] : 0;
-            if (! $m || $jumlah < 1 || $jumlah > config('goodrecipes.maks_jumlah_per_item')) {
-                return ['ok' => false, 'galat' => 'Ada menu yang sudah tidak tersedia. Muat ulang halaman.'];
-            }
-            // Pilihan tambahan: hanya yang memang ada di menu, harganya dari server.
-            $mau = array_map(fn ($x) => mb_strtolower(trim((string) $x)), is_array($it['opsi'] ?? null) ? array_filter($it['opsi'], 'is_string') : []);
-            $opsi = array_values(array_filter(self::opsiMenu($m), fn ($o) => in_array(mb_strtolower($o['nama']), $mau, true)));
-            if (count($opsi) !== count(array_unique($mau))) {
-                return ['ok' => false, 'galat' => 'Ada pilihan tambahan yang sudah tidak tersedia. Muat ulang halaman.'];
-            }
-            $harga = self::hargaJual($m) + array_sum(array_column($opsi, 'harga'));
-            $item[] = ['idMenu' => $m['id'], 'nama' => (string) $m['nama'], 'harga' => $harga, 'jumlah' => $jumlah]
-                + ($opsi ? ['opsi' => array_column($opsi, 'nama')] : []);
-            $subtotal += $harga * $jumlah;
+        [$item, $subtotal, $galatItem] = $this->itemOnline($id, $req['item'] ?? null);
+        if ($galatItem) {
+            return ['ok' => false, 'galat' => $galatItem];
         }
         // Cek stok untuk semua item sekaligus (paket ikut dihitung).
         $stok = $this->stokMakanan($id);

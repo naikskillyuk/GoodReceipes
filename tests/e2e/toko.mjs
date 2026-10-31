@@ -319,7 +319,19 @@ try {
   await pembeli.getByRole('button', { name: 'Keranjang (2)' }).click();
   await pembeli.getByLabel('Nama').fill('Sari');
   await pembeli.getByLabel('Nomor WhatsApp').fill('081299998888');
-  // Cara ambil wajib dipilih, lengkap dengan jamnya.
+  // Kode promo: "Gunakan" mengecek ke server lalu menampilkan rincian; kode salah ditolak; "Hapus" membatalkan.
+  await pembeli.getByLabel('Kode promo (opsional)').fill('salah123');
+  await pembeli.getByRole('button', { name: 'Gunakan' }).click();
+  await pembeli.getByText('Kode promo tidak ditemukan.').waitFor();
+  await pembeli.getByLabel('Kode promo (opsional)').fill('hemat10');
+  await pembeli.getByRole('button', { name: 'Gunakan' }).click();
+  const rinci = pembeli.getByRole('status', { name: 'Rincian promo' });
+  await rinci.getByText('Diskon (HEMAT10)').waitFor();
+  await rinci.getByText(/^Anda hemat Rp/).waitFor();
+  await foto(pembeli, '07c-etalase-promo');
+  await rinci.getByRole('button', { name: 'Hapus' }).click();
+  assert.equal(await rinci.count(), 0, 'promo dihapus dari keranjang');
+  // Cara ambil wajib dipilih; jam ambil opsional.
   await pembeli.getByRole('button', { name: 'Pesan & bayar' }).click();
   await pembeli.getByText('Pilih cara ambil pesanan').waitFor();
   await pembeli.getByRole('radio', { name: /Ambil sendiri/ }).check();
