@@ -155,7 +155,15 @@ class ApiController extends Controller
             });
         } catch (Throwable $e) {
             report($e);
-            $pesan = $e instanceof \RuntimeException ? $e->getMessage() : 'Terjadi kesalahan di server.';
+            // Galat database (QueryException turunan PDOException/RuntimeException) jangan dikirim apa adanya:
+            // isinya SQL, host, dan data. Kolom/tabel belum ada = migrasi belum dijalankan ke database server.
+            $kodeSql = $e instanceof \PDOException ? (string) ($e->errorInfo[0] ?? $e->getCode()) : '';
+            $pesan = match (true) {
+                in_array($kodeSql, ['42703', '42P01', '42S22', '42S02'], true) => 'Database server belum diperbarui. Admin perlu menjalankan "php artisan migrate" ke database server.',
+                $e instanceof \PDOException => 'Server tidak bisa menyimpan ke database. Coba lagi sebentar lagi.',
+                $e instanceof \RuntimeException => $e->getMessage(),
+                default => 'Terjadi kesalahan di server.',
+            };
 
             return $this->keluar(['ok' => false, 'galat' => $pesan]);
         }
