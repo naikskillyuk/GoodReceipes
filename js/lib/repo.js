@@ -384,7 +384,9 @@ export function hppResep(db, idResep) {
   const kini = hppEksperimen(db, idResep, eksperimen);
   const tersimpan = !!target && typeof target.hppSimpan === 'number' && Number.isFinite(target.hppSimpan);
   const hppPorsi = tersimpan ? target.hppSimpan : kini.hpp.hppPorsi;
-  const packingPorsi = tersimpan ? Number(target.packingSimpan) || 0 : kini.hpp.packingPorsi;
+  // HPP yang disimpan sebelum kolom packingSimpan ada: pakai packing hitungan saat ini.
+  const packingTersimpan = tersimpan && typeof target.packingSimpan === 'number' && Number.isFinite(target.packingSimpan);
+  const packingPorsi = packingTersimpan ? target.packingSimpan : kini.hpp.packingPorsi;
   const berubah = tersimpan && Number.isFinite(kini.hpp.hppPorsi) && Math.abs(kini.hpp.hppPorsi - target.hppSimpan) >= 0.5;
   return {
     resep,

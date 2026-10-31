@@ -120,8 +120,8 @@ export function DetailPaket({ k, id }) {
             <button class="ikon-btn" aria-label=${'Keluarkan ' + nama} onClick=${() => db.hapus('IsiPaket', i.id)}><${Ikon} nama="sampah" ukuran=${20} /></button>
             ${Number.isFinite(i.biayaProduksi) &&
             html`<small class="teks-kecil" style="flex-basis:100%">${rupiah(i.biayaProduksi)} per ${i.satuanPorsi} × ${tampilJumlah(i.jumlah)}${i.biayaPorsiResep > 0 ? (i.pakaiPacking ? ` · termasuk packing resep ${rupiah(i.biayaPorsiResep)}` : ` · packing resep ini (${rupiah(i.biayaPorsiResep)}) tidak ikut`) : ''}</small>`}
-            ${i.biayaPorsiResep > 0 &&
-            html`<label class="centang-kecil" style="flex-basis:100%"><input type="checkbox" checked=${!!i.pakaiPacking} onChange=${(e) => db.simpan('IsiPaket', { ...db.ambil('IsiPaket', i.id), pakaiPacking: e.target.checked })} /><span>Tetap pakai packing ${nama.toLowerCase()} (${rupiah(i.biayaPorsiResep)}/${i.satuanPorsi}), mis. tetap diberi plastik</span></label>`}
+            ${i.resep &&
+            html`<label class="centang-kecil" style="flex-basis:100%"><input type="checkbox" checked=${!!i.pakaiPacking} onChange=${(e) => db.simpan('IsiPaket', { ...db.ambil('IsiPaket', i.id), pakaiPacking: e.target.checked })} /><span>Tetap pakai packing ${nama.toLowerCase()}${i.biayaPorsiResep > 0 ? ` (${rupiah(i.biayaPorsiResep)}/${i.satuanPorsi})` : ' (belum ada packing di HPP resep ini)'}, mis. tetap diberi plastik</span></label>`}
           </div>`;
         })}
         ${pilihan.length > 0
