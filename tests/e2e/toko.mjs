@@ -486,6 +486,8 @@ try {
   assert.ok(await kasir.locator('a.chip.aktif', { hasText: '7 hari' }).count(), 'rentang dari beranda (7 hari)');
   await kasir.getByRole('heading', { name: 'Produk terlaris' }).waitFor();
   await kasir.locator('#lap-produk tbody tr', { hasText: 'Brownies Fudgy' }).first().waitFor();
+  await kasir.getByRole('heading', { name: 'Satuan vs paket' }).waitFor();
+  assert.ok(await kasir.locator('#lap-produk .tanda.jenis-satuan').count(), 'produk satuan ditandai');
   await kasir.locator('#lap-pelanggan tbody tr', { hasText: 'Budi' }).waitFor();
   await kasir.locator('#lap-stok tbody tr', { hasText: 'Brownies Fudgy' }).waitFor();
   assert.ok((await kasir.locator('#lap-pesanan tbody tr').count()) >= 3, 'daftar pesanan');

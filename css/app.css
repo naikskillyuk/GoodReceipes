@@ -7225,3 +7225,26 @@ a.chip {
   opacity: 0.4;
   cursor: default;
 }
+
+/* Laporan: satuan vs paket */
+.tanda.jenis-satuan {
+  background: var(--hijau-muda);
+  color: var(--hijau-2);
+}
+.tanda.jenis-paket {
+  background: #fdf0d2;
+  color: #8a5a00;
+}
+.tanda.jenis-lain {
+  background: var(--kartu-2);
+  color: var(--muted);
+}
+.ubin-jenis .ubin {
+  gap: 4px;
+}
+.ubin-jenis .jenis-paket .batang-favorit span {
+  background: #e0a526;
+}
+.ubin-jenis .jenis-lain .batang-favorit span {
+  background: var(--muted);
+}

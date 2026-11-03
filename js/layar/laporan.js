@@ -5,7 +5,7 @@ import { html, useState } from '../../vendor/preact-htm.js';
 import { Kerangka, Hero, Kosong } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
 import { tautan, pergi } from '../ui/router.js';
-import { buatLaporan, rentangPreset, PRESET_RENTANG, keIsoTanggal, dariIsoTanggal, keCsv, tabelCsv, awalHari, SARING_STATUS, saringPesanan } from '../lib/laporan.js';
+import { buatLaporan, rentangPreset, PRESET_RENTANG, keIsoTanggal, dariIsoTanggal, keCsv, tabelCsv, awalHari, SARING_STATUS, saringPesanan, JENIS_JUAL, LABEL_JENIS_JUAL } from '../lib/laporan.js';
 import { statusBayar, STATUS_PESANAN, LABEL_METODE, namaItem, ambilToko, tampilHp, hapusPesanan, peranAkun, AKSI_MASSAL, prosesMassal } from '../lib/toko.js';
 import { tanya, tampilToast } from '../ui/pesan.js';
 import { ambilMerek } from '../lib/repo.js';
@@ -82,6 +82,7 @@ function Ringkasan({ lap }) {
       <div class="ubin"><small>Pesanan batal</small><b>${angka(r.batal)}</b>${r.menunggu > 0 && html`<small class="teks-kecil">${r.menunggu} menunggu bayar</small>`}</div>
     </div>
     <p class="bantu">Penjualan = total pesanan yang dibuat di rentang ini (tanpa yang batal / belum dibayar online). Uang masuk = pembayaran yang lunas di rentang ini.</p>
+    <${PerJenis} lap=${lap} />
     <h3 class="judul-sub">Uang masuk per ${lap.grafik.satuan}</h3>
     <${GrafikPemasukan} perHari=${lap.grafik.ember} satuan=${lap.grafik.satuan} />
     <div class="kolom-2 laporan-dua">
@@ -113,6 +114,25 @@ function Ringkasan({ lap }) {
             </ol>`}
       </div>
     </div>`;
+}
+
+/** Perbandingan penjualan satuan vs paket (nilai dari harga item, sebelum diskon pesanan). */
+function PerJenis({ lap }) {
+  const daftar = lap.perJenis;
+  const totalNilai = daftar.reduce((j, x) => j + x.penjualan, 0);
+  const persen = (n) => (totalNilai ? Math.round((n / totalNilai) * 100) : 0);
+  return html`<h3 class="judul-sub">Satuan vs paket</h3>
+    <div class="ubin-tren ubin-jenis">
+      ${daftar.map(
+        (x) => html`<div class=${'ubin jenis-' + x.jenis} key=${x.jenis}>
+          <small>${x.label}${x.jenis === 'lain' ? ' (di luar menu)' : ''}</small>
+          <b>${rupiah(x.penjualan)}</b>
+          <span class="batang-favorit" aria-hidden="true"><span style=${`width:${persen(x.penjualan)}%`}></span></span>
+          <small class="teks-kecil">${persen(x.penjualan)}% · ${angka(x.item)} item · ${angka(x.pesanan)} pesanan</small>
+        </div>`,
+      )}
+    </div>
+    <p class="bantu">Satuan = menu dari satu resep. Paket = menu dari Paket Produk. Nilai dihitung dari harga item sebelum diskon pesanan; satu pesanan bisa berisi keduanya.</p>`;
 }
 
 /** Chip saring status pesanan (tersimpan di alamat, jadi ikut saat dicetak / dibagikan). */
@@ -212,20 +232,29 @@ function TabelPesanan({ db, pesanan, status }) {
 
 function TabelProduk({ lap }) {
   const [semua, setSemua] = useState(false);
-  const daftar = semua ? lap.produk : lap.produk.slice(0, BATAS_BARIS);
-  const maks = lap.produk.length ? lap.produk[0].jumlah || 1 : 1;
-  return html`<${Tabel} kepala=${['#', 'Produk', { angka: 'Terjual' }, { angka: 'Pesanan' }, { angka: 'Penjualan' }]} kosong=${lap.produk.length ? '' : 'Belum ada produk terjual di rentang ini.'}>
+  const [jenis, setJenis] = useState('');
+  const produk = jenis ? lap.produk.filter((x) => x.jenis === jenis) : lap.produk;
+  const daftar = semua ? produk : produk.slice(0, BATAS_BARIS);
+  const maks = produk.length ? produk[0].jumlah || 1 : 1;
+  const pilihan = [{ kunci: '', label: 'Semua' }, ...JENIS_JUAL.filter((j) => lap.produk.some((x) => x.jenis === j.kunci))];
+  return html`${pilihan.length > 2 && html`<div class="chips tak-cetak" role="group" aria-label="Saring jenis produk">
+      ${pilihan.map((j) => {
+        const n = j.kunci ? lap.produk.filter((x) => x.jenis === j.kunci).length : lap.produk.length;
+        return html`<button type="button" key=${j.kunci || 'semua'} class=${'chip' + (jenis === j.kunci ? ' aktif' : '')} aria-pressed=${jenis === j.kunci} onClick=${() => setJenis(j.kunci)}>${j.label} (${angka(n)})</button>`;
+      })}
+    </div>`}
+    <${Tabel} kepala=${['#', 'Produk', { angka: 'Terjual' }, { angka: 'Pesanan' }, { angka: 'Penjualan' }]} kosong=${produk.length ? '' : 'Belum ada produk terjual di rentang ini.'}>
       ${daftar.map(
         (x, i) => html`<tr key=${x.nama + i}>
           <td><span class="peringkat">${i + 1}</span></td>
-          <td><b>${x.nama}</b><span class="batang-favorit" aria-hidden="true"><span style=${`width:${(x.jumlah / maks) * 100}%`}></span></span></td>
+          <td><b>${x.nama}</b> <span class=${'tanda jenis-' + x.jenis}>${LABEL_JENIS_JUAL[x.jenis]}</span><span class="batang-favorit" aria-hidden="true"><span style=${`width:${(x.jumlah / maks) * 100}%`}></span></span></td>
           <td class="angka"><b>${angka(x.jumlah)}</b></td>
           <td class="angka">${angka(x.pesanan)}</td>
           <td class="angka">${rupiah(x.penjualan)}</td>
         </tr>`,
       )}
     <//>
-    <${Lebih} total=${lap.produk.length} semua=${semua} setSemua=${setSemua} />`;
+    <${Lebih} total=${produk.length} semua=${semua} setSemua=${setSemua} />`;
 }
 
 function TabelPelanggan({ lap }) {
@@ -336,7 +365,7 @@ export function Laporan({ k }) {
         <${SaringStatus} db=${db} lap=${lap} status=${status} alamat=${alamatRentang(lap.dari, lap.sampai)} />
         <${TabelPesanan} key=${status} db=${db} pesanan=${pesanan} status=${status} />
       <//>
-      <${Bagian} kunci="produk" judul="Produk terlaris" sub="Urut dari jumlah terjual." onCsv=${csv('produk')}>
+      <${Bagian} kunci="produk" judul="Produk terlaris" sub="Urut dari jumlah terjual. Saring satuan atau paket untuk membandingkan." onCsv=${csv('produk')}>
         <${TabelProduk} lap=${lap} />
       <//>
       <${Bagian} kunci="pelanggan" judul="Pelanggan teratas" sub="Urut dari total belanja. Baru = pesanan pertamanya ada di rentang ini." onCsv=${csv('pelanggan')}>

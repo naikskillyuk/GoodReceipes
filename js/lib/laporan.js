@@ -4,6 +4,19 @@
 import { statusBayar, daftarStokMakanan, normalHp, namaItem, LABEL_METODE } from './toko.js';
 
 const SEHARI_MS = 24 * 60 * 60 * 1000;
+
+/** Jenis penjualan: menu dari resep = satuan, menu dari paket = paket, selain itu (item di luar menu / menu dihapus) = lain. */
+export const JENIS_JUAL = [
+  { kunci: 'satuan', label: 'Satuan' },
+  { kunci: 'paket', label: 'Paket' },
+  { kunci: 'lain', label: 'Lainnya' },
+];
+export const LABEL_JENIS_JUAL = Object.fromEntries(JENIS_JUAL.map((j) => [j.kunci, j.label]));
+function jenisJual(db, idMenu) {
+  const m = idMenu ? db.ambil('Menu', idMenu) : null;
+  if (!m) return 'lain';
+  return m.jenis === 'paket' ? 'paket' : 'satuan';
+}
 const BATAS_HARIAN = 62; // lebih panjang dari ini, grafik dikelompokkan per bulan
 
 export function awalHari(ts = Date.now()) {
@@ -128,6 +141,7 @@ export function buatLaporan(db, { dari, sampai }) {
   }
 
   const produk = new Map();
+  const perJenis = new Map(JENIS_JUAL.map((j) => [j.kunci, { jenis: j.kunci, label: j.label, item: 0, pesanan: 0, penjualan: 0 }]));
   const pelanggan = new Map();
   const perSumber = new Map();
   const perJam = Array.from({ length: 24 }, (_, jam) => ({ jam, pesanan: 0, penjualan: 0 }));
@@ -161,16 +175,24 @@ export function buatLaporan(db, { dari, sampai }) {
     s.penjualan += total;
     perSumber.set(sumber, s);
 
+    const jenisDiPesanan = new Set();
     for (const i of Array.isArray(p.item) ? p.item : []) {
       const n = Number(i.jumlah) || 0;
+      const nilai = n * (Number(i.harga) || 0);
       const kunci = i.idMenu || 'lain:' + String(i.nama || '').toLowerCase();
-      const x = produk.get(kunci) || { idMenu: i.idMenu || '', nama: i.nama || 'Tanpa nama', jumlah: 0, penjualan: 0, pesanan: 0 };
+      const jenis = jenisJual(db, i.idMenu);
+      const x = produk.get(kunci) || { idMenu: i.idMenu || '', nama: i.nama || 'Tanpa nama', jenis, jumlah: 0, penjualan: 0, pesanan: 0 };
       x.jumlah += n;
-      x.penjualan += n * (Number(i.harga) || 0);
+      x.penjualan += nilai;
       x.pesanan += 1;
       produk.set(kunci, x);
       itemTerjual += n;
+      const pj = perJenis.get(jenis);
+      pj.item += n;
+      pj.penjualan += nilai;
+      jenisDiPesanan.add(jenis);
     }
+    for (const jenis of jenisDiPesanan) perJenis.get(jenis).pesanan += 1;
 
     const k = kunciPelanggan(p);
     if (!k) {
@@ -239,6 +261,8 @@ export function buatLaporan(db, { dari, sampai }) {
     },
     grafik: { satuan, ember },
     pesanan,
+    // Penjualan per jenis memakai harga item (sebelum diskon pesanan); "Lainnya" hanya tampil bila ada.
+    perJenis: [...perJenis.values()].filter((j) => j.jenis !== 'lain' || j.item > 0),
     produk: [...produk.values()].sort((a, b) => b.jumlah - a.jumlah || b.penjualan - a.penjualan || a.nama.localeCompare(b.nama)),
     pelanggan: [...pelanggan.values()].sort((a, b) => b.belanja - a.belanja || b.pesanan - a.pesanan || a.nama.localeCompare(b.nama)),
     stok: stok.filter((s) => s.awal || s.produksi || s.masuk || s.terjual || s.rusak || s.koreksi || s.sekarang),
@@ -303,7 +327,7 @@ export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
       }),
     ];
   }
-  if (bagian === 'produk') return [['Peringkat', 'Produk', 'Terjual', 'Jumlah pesanan', 'Penjualan (Rp)'], ...lap.produk.map((x, i) => [i + 1, x.nama, x.jumlah, x.pesanan, x.penjualan])];
+  if (bagian === 'produk') return [['Peringkat', 'Produk', 'Terjual', 'Jumlah pesanan', 'Penjualan (Rp)', 'Jenis'], ...lap.produk.map((x, i) => [i + 1, x.nama, x.jumlah, x.pesanan, x.penjualan, LABEL_JENIS_JUAL[x.jenis] || ''])];
   if (bagian === 'pelanggan') return [['Peringkat', 'Pelanggan', 'WhatsApp', 'Pesanan', 'Belanja (Rp)', 'Terakhir pesan', 'Pelanggan baru'], ...lap.pelanggan.map((c, i) => [i + 1, c.nama, c.hp, c.pesanan, c.belanja, tgl(c.terakhir), c.baru ? 'Ya' : ''])];
   if (bagian === 'stok') return [['Produk', 'Satuan', 'Stok awal', 'Produksi', 'Tambah stok', 'Terjual', 'Rusak', 'Koreksi', 'Stok akhir', 'Stok sekarang'], ...lap.stok.map((s) => [s.nama, s.satuan, s.awal, s.produksi, s.masuk, s.terjual, s.rusak, s.koreksi, s.akhir, s.sekarang])];
   const r = lap.ringkasan;
@@ -323,6 +347,9 @@ export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
     [],
     ['Metode bayar', 'Transaksi', 'Nilai (Rp)'],
     ...lap.metode.map((m) => [m.label, m.jumlah, m.nilai]),
+    [],
+    ['Jenis penjualan', 'Item terjual', 'Pesanan', 'Penjualan (Rp, sebelum diskon)'],
+    ...lap.perJenis.map((j) => [j.label, j.item, j.pesanan, j.penjualan]),
     [],
     ['Sumber pesanan', 'Pesanan', 'Penjualan (Rp)'],
     ...lap.sumber.map((s) => [s.sumber, s.pesanan, s.penjualan]),

@@ -82,6 +82,7 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
     return p;
   };
   const br = (n) => ({ idMenu: menu.id, nama: 'Brownies', harga: 10000, jumlah: n });
+  db.simpan('Menu', { id: 'mnu_kopi', jenis: 'paket', idRef: 'pkt_kopi', nama: 'Es Kopi', harga: 15000, aktif: true });
   const kopi = (n) => ({ idMenu: 'mnu_kopi', nama: 'Es Kopi', harga: 15000, jumlah: n });
   pesan(5, 9, [br(5)], { nama: 'Ani', hp: '628111' }); // sebelum rentang: Ani pelanggan lama
   pesan(10, 9, [br(2)], { nama: 'Ani', hp: '628111' });
@@ -109,7 +110,8 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
   assert.equal(lap.pesanan.length, 6, 'semua pesanan di rentang, termasuk batal');
   assert.equal(lap.pesanan[0].nama, 'Dodi', 'terbaru dulu');
 
-  assert.deepEqual(lap.produk.map((x) => [x.nama, x.jumlah, x.penjualan]), [['Brownies', 7, 70000], ['Es Kopi', 3, 45000]]);
+  assert.deepEqual(lap.produk.map((x) => [x.nama, x.jumlah, x.penjualan, x.jenis]), [['Brownies', 7, 70000, 'satuan'], ['Es Kopi', 3, 45000, 'paket']]);
+  assert.deepEqual(lap.perJenis.map((j) => [j.jenis, j.item, j.pesanan, j.penjualan]), [['satuan', 7, 4, 70000], ['paket', 3, 2, 45000]], 'satuan vs paket; Lainnya disembunyikan bila kosong');
   assert.deepEqual(lap.pelanggan.map((c) => [c.nama, c.pesanan, c.belanja, c.baru]), [['Budi', 2, 55000, true], ['Ani', 1, 20000, false], ['Cici', 1, 10000, true]]);
   assert.deepEqual(lap.metode.map((m) => [m.metode, m.jumlah, m.nilai]), [['tunai', 3, 65000], ['transfer', 1, 40000], ['mayar', 0, 0]]);
   assert.equal(lap.perJam[14].pesanan, 2);
@@ -127,7 +129,9 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
 
   const csv = keCsv(tabelCsv(db, lap, 'produk'));
   assert.ok(csv.startsWith('﻿Peringkat;Produk;Terjual'));
-  assert.ok(csv.includes('1;Brownies;7;4;70000'));
+  assert.ok(csv.includes('1;Brownies;7;4;70000;Satuan'));
+  assert.ok(csv.includes('2;Es Kopi;3;2;45000;Paket'));
+  assert.ok(keCsv(tabelCsv(db, lap, 'ringkasan')).includes('Paket;3;2;45000'));
   assert.equal(keCsv([['a;b', 'c"d']]), '﻿"a;b";"c""d"');
   for (const bagian of ['ringkasan', 'pesanan', 'pelanggan', 'stok']) assert.ok(tabelCsv(db, lap, bagian).length > 1, bagian);
 });
