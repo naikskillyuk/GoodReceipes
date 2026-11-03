@@ -477,6 +477,7 @@ img {
 }
 .nav-pil {
   flex: 1;
+  min-width: 0;
   height: 64px;
   display: flex;
   align-items: center;
@@ -491,6 +492,8 @@ img {
   box-shadow: var(--bayang);
 }
 .nav-pil a {
+  flex: 0 1 48px;
+  min-width: 36px;
   width: 48px;
   height: 48px;
   display: inline-flex;
@@ -498,6 +501,22 @@ img {
   justify-content: center;
   border-radius: 999px;
 }
+.nav-pil button {
+  flex: 0 1 48px;
+  min-width: 36px;
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nav-pil button.aktif,
 .nav-pil a.aktif {
   background: var(--hijau);
   color: #fff;
@@ -1883,8 +1902,11 @@ button.tautan-hijau {
 .lembar {
   width: 100%;
   max-width: 560px;
+  max-height: 88vh;
   max-height: 88dvh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--bg);
   border-radius: 32px 32px 0 0;
   padding: 22px 20px calc(20px + var(--aman-bawah));
@@ -3999,7 +4021,7 @@ button.baris-stok {
 .baris-keranjang {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas: 'teks subtotal' 'stepper stepper';
+  grid-template-areas: 'teks subtotal' 'stepper hapus';
   gap: 6px 10px;
   padding: 10px 0;
   border-top: 1px solid var(--garis);
@@ -4016,6 +4038,24 @@ button.baris-stok {
 }
 .baris-keranjang .stepper {
   grid-area: stepper;
+}
+.baris-keranjang .hapus-baris {
+  grid-area: hapus;
+  justify-self: end;
+}
+.hapus-baris {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: #b3261e;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.hapus-baris:hover {
+  background: rgba(179, 38, 30, 0.08);
 }
 .baris-keranjang .subtotal {
   grid-area: subtotal;
@@ -4346,9 +4386,14 @@ details.pembeli summary {
   --e-kuning-muda: #fff6d6;
   --e-serif: Georgia, 'Times New Roman', serif;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--e-latar);
   color: var(--e-tinta);
-  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+/* Bar "Buka keranjang" melayang di atas navigasi: beri ruang supaya isi paling bawah tidak tertutup. */
+.etalase.ada-bar {
+  padding-bottom: calc(156px + env(safe-area-inset-bottom));
 }
 .etalase .bantu,
 .etalase .teks-kecil {
@@ -7134,4 +7179,49 @@ a.chip {
   font-weight: 800;
   color: var(--e-utama-2);
   font-size: 13.5px;
+}
+
+/* HP: daftar semua menu (dari tombol Menu di bilah bawah) */
+.menu-hp {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.menu-hp a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--kartu);
+  border: 1px solid var(--garis);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 18px;
+  text-decoration: none;
+}
+.menu-hp a.aktif {
+  background: var(--hijau);
+  border-color: var(--hijau);
+  color: #fff;
+}
+.menu-hp a span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Keranjang etalase: tombol hapus per baris dan kosongkan */
+.et-baris-aksi {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.et-kosongkan {
+  color: #b3261e;
+  align-self: auto;
+}
+.et-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }

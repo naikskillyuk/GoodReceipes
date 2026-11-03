@@ -169,7 +169,8 @@ try {
   await page.getByRole('button', { name: 'Buat pesanan & bayar' }).click();
   await page.getByRole('dialog').waitFor();
   await page.getByRole('button', { name: 'Rp 20.000' }).click();
-  assert.match(await page.locator('[role=dialog] .hasil-baris b').innerText(), /Rp 5\.600/, 'kembalian');
+  assert.match(await page.locator('[role=dialog] .hasil-baris', { hasText: 'Kembalian' }).locator('b').innerText(), /Rp 5\.600/, 'kembalian');
+  assert.match(await page.getByRole('region', { name: 'Detail pesanan' }).innerText(), /2× Brownies/, 'detail pesanan tampil di dialog bayar');
   await page.getByRole('button', { name: 'Terima Rp 14.400' }).click();
   await page.waitForURL(/#\/kasir$/);
   assert.equal(await evalDb(page, 'return toko.stokMakanan(db).get(a)', ids.brownies), 14);

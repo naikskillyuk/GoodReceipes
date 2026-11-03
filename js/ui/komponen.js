@@ -5,7 +5,7 @@ import { Ikon } from './ikon.js';
 import { IkonKategori } from './ikon-kategori.js';
 import { tautan } from './router.js';
 import { kompres } from './gambar.js';
-import { tampilToast } from './pesan.js';
+import { tampilToast, Modal } from './pesan.js';
 import { angka, tampilJumlah, bacaJumlah, bacaRupiah } from '../lib/util.js';
 import { daftarKategori, pakaiKategori, ambilMerek, LOGO_BAWAAN } from '../lib/repo.js';
 import { tampilanToko, ALAMAT_TOKO } from '../lib/toko.js';
@@ -44,7 +44,7 @@ const MENU_ADMIN = [
   { kunci: 'rumah', jalur: '/', label: 'Beranda', ikon: 'rumah', pil: true },
   { kunci: 'resep', jalur: '/resep', label: 'Resep & HPP', ikon: 'resep', pil: true },
   { kunci: 'paket', jalur: '/paket', label: 'Paket Produk', ikon: 'kotak' },
-  { kunci: 'bahan', jalur: '/bahan', label: 'Daftar Bahan', ikon: 'keranjang', pil: true },
+  { kunci: 'bahan', jalur: '/bahan', label: 'Daftar Bahan', ikon: 'keranjang' },
   { kunci: 'stok-bahan', jalur: '/stok-bahan', label: 'Stok Bahan & Belanja', ikon: 'kotak' },
   { kunci: 'produksi', jalur: '/produksi', label: 'Produksi', ikon: 'panci' },
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
@@ -66,7 +66,7 @@ const MENU_TOKO = [
   { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
   { kunci: 'pesanan', jalur: '/pesanan', label: 'Status Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'laporan', jalur: '/laporan', label: 'Laporan', ikon: 'daftar' },
-  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue', pil: true },
+  { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Akun', ikon: 'orang', pil: true },
 ];
@@ -99,6 +99,8 @@ export function Kerangka({ k, aktif, plus, children }) {
   const kategori = toko ? [] : daftarKategori(db);
   const kategoriAktif = k.rute.kueri.kat || '';
   const merek = ambilMerek(db);
+  // HP: bilah bawah hanya memuat beberapa menu; tombol "Menu" membuka daftar lengkap.
+  const [menuHp, setMenuHp] = useState(false);
   return html`<div class="app">
     <aside class="sisi" aria-label="Menu utama">
       <div class="merek"><${LogoMerek} src=${merek.logo} ukuran=${44} /><span>${merek.nama.split('.').map((b, i) => (i ? html`.<wbr />${b}` : b))}<small class="merek-mode">${toko ? 'Kasir' : 'Admin'}</small></span></div>
@@ -130,6 +132,7 @@ export function Kerangka({ k, aktif, plus, children }) {
               <${Ikon} nama=${m.ikon} />
             </a>`,
           )}
+          <button type="button" class=${MENU.some((m) => m.kunci === aktif && !m.pil) ? 'aktif' : ''} aria-label="Semua menu" aria-haspopup="dialog" onClick=${() => setMenuHp(true)}><${Ikon} nama="menu" /></button>
         </nav>
         ${plus &&
         (plus.href
@@ -137,6 +140,16 @@ export function Kerangka({ k, aktif, plus, children }) {
           : html`<button class="plus" onClick=${plus.onKlik} aria-label=${plus.label}><${Ikon} nama="plus" ukuran=${30} /><span class="plus-label">${plus.label}</span></button>`)}
       </div>
     </main>
+    ${menuHp &&
+    html`<${Modal} judul="Menu" onTutup=${() => setMenuHp(false)}>
+      <nav class="menu-hp" aria-label="Semua menu">
+        ${MENU.map(
+          (m) => html`<a href=${hrefMenu(m)} onClick=${m.luar ? klikMenu(k, m) : () => setMenuHp(false)} class=${aktif === m.kunci ? 'aktif' : ''} aria-current=${aktif === m.kunci ? 'page' : null}>
+            <${Ikon} nama=${m.ikon} ukuran=${20} /><span>${m.label}</span>
+          </a>`,
+        )}
+      </nav>
+    <//>`}
   </div>`;
 }
 

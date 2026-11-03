@@ -161,6 +161,7 @@ export function Kasir({ k }) {
                     <button aria-label=${'Tambah ' + namaItem(i)} onClick=${() => aturBaris(kunci, i.jumlah + 1)}><${Ikon} nama="plus" ukuran=${16} /></button>
                   </span>
                   <b class="subtotal">${rupiah(i.harga * i.jumlah)}</b>
+                  <button class="hapus-baris" aria-label=${'Hapus ' + namaItem(i) + ' dari keranjang'} onClick=${() => aturBaris(kunci, 0)}><${Ikon} nama="sampah" ukuran=${18} /></button>
                 </div>`,
               )}
               <details class="pembeli" open=${!!(nama || hp)}>

@@ -6,7 +6,7 @@
 import { html, useState, useEffect, useRef } from '../../vendor/preact-htm.js';
 import { Kosong, Foto, LogoMerek } from '../ui/komponen.js';
 import { Ikon } from '../ui/ikon.js';
-import { tampilToast } from '../ui/pesan.js';
+import { tampilToast, tanya } from '../ui/pesan.js';
 import { pergi } from '../ui/router.js';
 import { terapkanMerekDokumen } from '../ui/merek.js';
 import { scriptUrlAman } from './penilai.js';
@@ -102,12 +102,13 @@ function waTautan(wa, teks) {
 
 function TombolTambah({ m, n, atur }) {
   const habis = m.sisa !== null && m.sisa <= 0;
-  if (habis) return html`<span class="et-habis">Habis</span>`;
+  // Sudah di keranjang tapi stok habis: tetap bisa dikurangi/dihapus, hanya tidak bisa ditambah.
+  if (habis && !n) return html`<span class="et-habis">Habis</span>`;
   if (!n) return html`<button type="button" class="et-plus" aria-label=${'Tambah ' + m.nama} onClick=${(e) => (e.stopPropagation(), atur(m, 1))}><${Ikon} nama="plus" ukuran=${18} /></button>`;
   return html`<span class="et-stepper" onClick=${(e) => e.stopPropagation()}>
     <button type="button" aria-label=${'Kurangi ' + m.nama} onClick=${() => atur(m, n - 1)}><${Ikon} nama="minus" ukuran=${14} /></button>
     <output>${n}</output>
-    <button type="button" aria-label=${'Tambah ' + m.nama} onClick=${() => atur(m, n + 1)}><${Ikon} nama="plus" ukuran=${14} /></button>
+    <button type="button" aria-label=${'Tambah ' + m.nama} disabled=${habis} onClick=${() => atur(m, n + 1)}><${Ikon} nama="plus" ukuran=${14} /></button>
   </span>`;
 }
 
@@ -484,6 +485,9 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
   }, [kunciIsi, hpSah]);
   const total = promo ? promo.total : subtotal;
 
+  const kosongkanKeranjang = async () => {
+    if (await tanya({ judul: 'Kosongkan keranjang?', teks: 'Semua menu di keranjang dihapus.', ya: 'Kosongkan', bahaya: true })) kosongkan();
+  };
   const kirim = async (e) => {
     e.preventDefault();
     if (!item.length) return setGalat('Keranjang masih kosong.');
@@ -519,10 +523,13 @@ function Keranjang({ k, info, url, token, baris, aturBaris, kosongkan, keMenu, s
         (b) => html`<div class="et-baris-keranjang" key=${b.kunci}>
           <span class="et-mini-foto"><${Foto} src=${b.m.fotoUrl} ikon="kue" ukuranIkon=${22} /></span>
           <span class="et-baris-teks"><b>${b.m.nama}</b>${b.opsi.length ? html`<small class="et-opsi-teks">+ ${b.opsi.join(', ')}</small>` : ''}<small>${tampilHarga(b.m, b.harga)}</small></span>
-          <span class="et-baris-kanan"><b>${b.m.segera ? '' : rupiah(b.harga * b.jumlah)}</b><${TombolTambah} m=${{ ...b.m, nama: namaItem({ nama: b.m.nama, opsi: b.opsi }) }} n=${b.jumlah} atur=${(_, n) => aturBaris(b.kunci, n)} /></span>
+          <span class="et-baris-kanan"><b>${b.m.segera ? '' : rupiah(b.harga * b.jumlah)}</b><span class="et-baris-aksi"><button type="button" class="hapus-baris" aria-label=${'Hapus ' + namaItem({ nama: b.m.nama, opsi: b.opsi }) + ' dari keranjang'} onClick=${() => aturBaris(b.kunci, 0)}><${Ikon} nama="sampah" ukuran=${18} /></button><${TombolTambah} m=${{ ...b.m, nama: namaItem({ nama: b.m.nama, opsi: b.opsi }) }} n=${b.jumlah} atur=${(_, n) => aturBaris(b.kunci, n)} /></span></span>
         </div>`,
       )}
-      <button type="button" class="et-lihat" onClick=${() => keMenu('')}>+ Tambah menu lain</button>
+      <div class="baris-pisah">
+        <button type="button" class="et-lihat" onClick=${() => keMenu('')}>+ Tambah menu lain</button>
+        <button type="button" class="et-lihat et-kosongkan" onClick=${kosongkanKeranjang}>Kosongkan keranjang</button>
+      </div>
     </section>
     <form class="et-panel kolom" onSubmit=${kirim} novalidate aria-labelledby="h-data-pembeli">
       <h2 class="et-h2" id="h-data-pembeli">Data pemesan</h2>
@@ -916,8 +923,9 @@ export function PesanOnline({ k, token }) {
     { l: 'pesanan', label: 'Pesanan', ikon: 'struk' },
   ];
   const aktif = layar === 'produk' ? 'menu' : layar;
+  const adaBar = jumlahKeranjang > 0 && layar !== 'keranjang' && layar !== 'pesanan' && layar !== 'produk';
 
-  return html`<div class="etalase">
+  return html`<div class=${'etalase' + (adaBar ? ' ada-bar' : '')}>
     ${layar !== 'produk' && (layar || !info || galat) &&
     html`<header class="et-kepala">
       <button type="button" class="et-merek" onClick=${() => ke('')}><${LogoMerek} src=${logo} ukuran=${36} /><span>${namaToko}</span></button>
@@ -926,7 +934,7 @@ export function PesanOnline({ k, token }) {
       </button>
     </header>`}
     <main class=${'et-isi' + (layar === 'produk' ? ' penuh' : '') + (!layar && info && !galat ? ' beranda' : '')}>${isiLayar}</main>
-    ${jumlahKeranjang > 0 && layar !== 'keranjang' && layar !== 'pesanan' && layar !== 'produk' &&
+    ${adaBar &&
     html`<button type="button" class="et-bar-keranjang" onClick=${() => ke('keranjang')}>
       <span>${jumlahKeranjang} item · ${rupiah(totalKeranjang)}</span><b>Buka keranjang</b>
     </button>`}

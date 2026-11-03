@@ -51,6 +51,19 @@ export function InfoTransfer({ rekening, qris, total }) {
   </div>`;
 }
 
+/** Detail pesanan di dialog bayar: pembeli, item, diskon/ongkir, supaya kasir bisa mencocokkan sebelum menandai lunas. */
+function RincianBayar({ p }) {
+  const item = Array.isArray(p.item) ? p.item : [];
+  return html`<section class="kartu kolom" style="gap:6px" aria-label="Detail pesanan">
+    ${(p.nama || p.hp) && html`<div class="hasil-baris"><span>Pembeli</span><b class="biasa">${p.nama || '–'}${p.hp ? ' · ' + tampilHp(p.hp) : ''}</b></div>`}
+    ${item.map((i, n) => html`<div class="hasil-baris" key=${n}><span>${i.jumlah}× ${i.nama}${i.opsi && i.opsi.length ? html`<br /><small class="teks-opsi">+ ${i.opsi.join(', ')}</small>` : ''}<br /><small class="teks-kecil">@ ${rupiah(i.harga)}</small></span><b class="biasa">${rupiah(i.harga * i.jumlah)}</b></div>`)}
+    ${(p.diskon > 0 || p.ongkir > 0) && html`<div class="hasil-baris"><span>Subtotal</span><b class="biasa">${rupiah(p.subtotal)}</b></div>`}
+    ${p.diskon > 0 && html`<div class="hasil-baris"><span>Diskon${p.kodePromo ? ' (' + p.kodePromo + ')' : ''}</span><b class="baik">−${rupiah(p.diskon)}</b></div>`}
+    ${p.ongkir > 0 && html`<div class="hasil-baris"><span>Ongkir</span><b class="biasa">${rupiah(p.ongkir)}</b></div>`}
+    ${p.catatan && html`<div class="hasil-baris"><span>Catatan</span><b class="biasa">${p.catatan}</b></div>`}
+  </section>`;
+}
+
 /** Pembayaran satu pesanan: tunai, transfer/QRIS manual (ditandai lunas), atau Mayar bila diaktifkan admin. */
 export function DialogBayar({ k, pesanan, onTutup }) {
   const { db } = k;
@@ -123,6 +136,7 @@ export function DialogBayar({ k, pesanan, onTutup }) {
   return html`<${Modal} judul=${`Bayar pesanan #${pesanan.nomor}`} onTutup=${() => onTutup(false)}>
     <div class="kolom" style="gap:14px">
       <div class="total-bayar"><small>Total</small><b>${rupiah(pesanan.total)}</b></div>
+      <${RincianBayar} p=${pesanan} />
       <${Tab} item=${[
         { label: 'Tunai', aktif: cara === 'tunai', onKlik: () => setCara('tunai') },
         { label: 'Transfer / QRIS', aktif: cara === 'transfer', onKlik: () => setCara('transfer') },
