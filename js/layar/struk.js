@@ -7,7 +7,8 @@ import { Ikon } from '../ui/ikon.js';
 import { tautan } from '../ui/router.js';
 import { tampilToast } from '../ui/pesan.js';
 import { salin } from './bagikan.js';
-import { dataStruk, teksStruk, pesanStrukWa, waktuStruk } from '../lib/struk.js';
+import { dataStruk, teksStruk, pesanStrukWa, waktuStruk, tautanBluetoothPrint } from '../lib/struk.js';
+import { alamatServer } from '../lib/akun.js';
 import { rupiah, angka } from '../lib/util.js';
 
 const KERTAS = [
@@ -16,13 +17,28 @@ const KERTAS = [
   { kunci: 'a4', label: 'A4 / PDF', kolom: 42 },
 ];
 const KUNCI_KERTAS = 'struk-kertas';
+// Cara cetak: jendela cetak browser, atau aplikasi Android "Bluetooth Print" (mate.bluetoothprint).
+const CARA = [
+  { kunci: 'browser', label: 'Jendela cetak browser' },
+  { kunci: 'btprint', label: 'Aplikasi Bluetooth Print' },
+];
+const KUNCI_CARA = 'struk-cara-cetak';
+const APP_BTPRINT = 'https://play.google.com/store/apps/details?id=mate.bluetoothprint';
 
-function bacaKertas() {
+function baca(kunci, pilihan, bawaan) {
   try {
-    const k = localStorage.getItem(KUNCI_KERTAS);
-    return KERTAS.some((x) => x.kunci === k) ? k : '58';
+    const k = localStorage.getItem(kunci);
+    return pilihan.some((x) => x.kunci === k) ? k : bawaan;
   } catch {
-    return '58';
+    return bawaan;
+  }
+}
+
+function simpan(kunci, nilai) {
+  try {
+    localStorage.setItem(kunci, nilai);
+  } catch {
+    /* tidak tersimpan: tetap dipakai sampai halaman ditutup */
   }
 }
 
@@ -71,7 +87,8 @@ export function KertasStruk({ d, kertas = '58' }) {
 export function LayarStruk({ k, id }) {
   const { db, rute } = k;
   const d = dataStruk(db, id);
-  const [kertas, setKertas] = useState(bacaKertas);
+  const [kertas, setKertas] = useState(() => baca(KUNCI_KERTAS, KERTAS, '58'));
+  const [cara, setCara] = useState(() => baca(KUNCI_CARA, CARA, 'browser'));
   const kembali = rute.kueri.dari === 'kasir' ? '/kasir' : '/pesanan/' + id;
 
   // Ukuran kertas cetak mengikuti pilihan (printer kasir tanpa margin, A4 dengan margin biasa).
@@ -93,15 +110,12 @@ export function LayarStruk({ k, id }) {
   if (!d) {
     return html`<div class="penilai"><div class="isi"><${Kosong} judul="Pesanan tidak ditemukan"><a class="btn solid" href=${tautan('/pesanan')}>Ke daftar pesanan</a><//></div></div>`;
   }
-  const pilih = (x) => {
-    setKertas(x);
-    try {
-      localStorage.setItem(KUNCI_KERTAS, x);
-    } catch {
-      /* tidak tersimpan: tetap dipakai sampai halaman ditutup */
-    }
-  };
-  const teks = teksStruk(d, (KERTAS.find((x) => x.kunci === kertas) || KERTAS[0]).kolom);
+  const pilih = (x) => (setKertas(x), simpan(KUNCI_KERTAS, x));
+  const pilihCara = (x) => (setCara(x), simpan(KUNCI_CARA, x));
+  const kolom = (KERTAS.find((x) => x.kunci === kertas) || KERTAS[0]).kolom;
+  const teks = teksStruk(d, kolom);
+  const btprint = cara === 'btprint';
+  const tautanBt = btprint ? tautanBluetoothPrint(alamatServer(db), d, kolom) : '';
   const wa = `https://wa.me/${d.hp || ''}?text=${encodeURIComponent(pesanStrukWa(d))}`;
   const bisaBagikan = typeof navigator !== 'undefined' && !!navigator.share;
   const bagikan = async () => {
@@ -115,16 +129,29 @@ export function LayarStruk({ k, id }) {
   return html`<div class=${'cetak struk-halaman k-' + kertas}>
     <div class="cetak-alat struk-alat">
       <a class="btn" href=${tautan(kembali)}><${Ikon} nama="kembali" ukuran=${18} />Kembali</a>
+      <div class="chips" role="group" aria-label="Cara cetak">
+        ${CARA.map((x) => html`<button type="button" key=${x.kunci} class=${'chip' + (cara === x.kunci ? ' aktif' : '')} aria-pressed=${cara === x.kunci} onClick=${() => pilihCara(x.kunci)}>${x.label}</button>`)}
+      </div>
       <div class="chips" role="group" aria-label="Ukuran kertas">
-        ${KERTAS.map((x) => html`<button type="button" key=${x.kunci} class=${'chip' + (kertas === x.kunci ? ' aktif' : '')} aria-pressed=${kertas === x.kunci} onClick=${() => pilih(x.kunci)}>${x.label}</button>`)}
+        ${KERTAS.filter((x) => !btprint || x.kunci !== 'a4').map((x) => html`<button type="button" key=${x.kunci} class=${'chip' + (kertas === x.kunci ? ' aktif' : '')} aria-pressed=${kertas === x.kunci} onClick=${() => pilih(x.kunci)}>${x.label}</button>`)}
       </div>
       <div class="baris-btn">
-        <button class="btn solid" onClick=${() => window.print()}><${Ikon} nama="struk" ukuran=${18} />Cetak struk</button>
+        ${btprint
+          ? tautanBt
+            ? html`<a class="btn solid" href=${tautanBt}><${Ikon} nama="struk" ukuran=${18} />Cetak struk</a>`
+            : html`<button class="btn solid" disabled><${Ikon} nama="struk" ukuran=${18} />Cetak struk</button>`
+          : html`<button class="btn solid" onClick=${() => window.print()}><${Ikon} nama="struk" ukuran=${18} />Cetak struk</button>`}
         <a class="btn" href=${wa} target="_blank" rel="noopener"><${Ikon} nama="kirim" ukuran=${18} />${d.hp ? 'Kirim ke WhatsApp pembeli' : 'Kirim lewat WhatsApp'}</a>
         ${bisaBagikan && html`<button class="btn" onClick=${bagikan}><${Ikon} nama="bagikan" ukuran=${18} />Bagikan</button>`}
         <button class="btn" onClick=${async () => tampilToast((await salin(teks)) ? 'Teks struk disalin.' : 'Gagal menyalin.')}><${Ikon} nama="salin" ukuran=${18} />Salin teks</button>
       </div>
-      <p class="teks-kecil">Printer kasir Bluetooth / USB: pilih printernya di jendela cetak. Untuk PDF, pilih <b>Simpan sebagai PDF</b>.</p>
+      ${btprint
+        ? html`<p class="teks-kecil">
+            ${tautanBt ? '' : html`<b>Alamat server belum diatur, jadi struk belum bisa dikirim ke aplikasi. </b>`}
+            Khusus HP Android: pasang <a href=${APP_BTPRINT} target="_blank" rel="noopener">Bluetooth Print</a>, sambungkan printernya di aplikasi itu,
+            lalu nyalakan <b>Browser Print</b> di pengaturan aplikasi. Setelah itu tombol Cetak struk langsung mencetak lewat aplikasi.
+          </p>`
+        : html`<p class="teks-kecil">Printer kasir Bluetooth / USB: pilih printernya di jendela cetak. Untuk PDF, pilih <b>Simpan sebagai PDF</b>.</p>`}
     </div>
     <${KertasStruk} d=${d} kertas=${kertas} />
   </div>`;

@@ -81,6 +81,17 @@ function pecah(teks, lebar) {
  * Dipakai untuk WhatsApp (dibungkus blok monospace) dan bagikan / salin.
  */
 export function teksStruk(d, lebar = 32) {
+  const tengah = (t) => pecah(t, lebar).map((b) => ' '.repeat(Math.max(0, Math.floor((lebar - b.length) / 2))) + b);
+  return [...kepalaStruk(d).flatMap(tengah), ...badanStruk(d, lebar)].join('\n');
+}
+
+/** Baris kepala struk (nama toko, alamat, WA), belum dirata tengah. */
+function kepalaStruk(d) {
+  return [d.toko.nama.toUpperCase(), d.toko.alamat, d.toko.wa ? 'WA ' + d.toko.wa : ''].filter(Boolean);
+}
+
+/** Baris struk di bawah kepala, rata kolom selebar `lebar`. */
+function badanStruk(d, lebar) {
   const garis = '-'.repeat(lebar);
   const tengah = (t) => pecah(t, lebar).map((b) => ' '.repeat(Math.max(0, Math.floor((lebar - b.length) / 2))) + b);
   const kiriKanan = (kiri, kanan) => {
@@ -90,11 +101,7 @@ export function teksStruk(d, lebar = 32) {
     return [...baris, akhir + ' '.repeat(Math.max(1, lebar - akhir.length - kanan.length)) + kanan];
   };
   const info = (label, isi) => pecah(`${label.padEnd(7)}: ${isi}`, lebar);
-  const out = [];
-  out.push(...tengah(d.toko.nama.toUpperCase()));
-  if (d.toko.alamat) out.push(...tengah(d.toko.alamat));
-  if (d.toko.wa) out.push(...tengah('WA ' + d.toko.wa));
-  out.push(garis);
+  const out = [garis];
   out.push(...info('No', '#' + d.nomor));
   out.push(...info('Tanggal', waktuStruk(d.waktu)));
   if (d.kasir) out.push(...info('Kasir', d.kasir));
@@ -120,7 +127,34 @@ export function teksStruk(d, lebar = 32) {
   if (d.catatan) out.push(...info('Catatan', d.catatan));
   out.push(...tengah(d.batal ? '*** PESANAN DIBATALKAN ***' : d.lunas ? `LUNAS ${waktuStruk(d.lunasPada)}` : '*** BELUM DIBAYAR ***'));
   out.push('', ...tengah('Terima kasih!'));
-  return out.join('\n');
+  return out;
+}
+
+/**
+ * Isi struk untuk aplikasi Android "Bluetooth Print": [[teks, tebal, rata, format], ...]
+ * (rata 0 kiri / 1 tengah; format 0 normal / 3 lebar ganda). Disusun jadi JSON oleh GET /api/cetak.
+ */
+export function barisBluetoothPrint(d, lebar = 32) {
+  const [nama, ...sisa] = kepalaStruk(d);
+  return [[nama, 1, 1, 0], ...sisa.map((b) => [b, 0, 1, 0]), ...badanStruk(d, lebar).map((b) => [b, 0, 0, 0]), [' ', 0, 0, 0], [' ', 0, 0, 0]];
+}
+
+/** base64url dari teks UTF-8 (aman di alamat URL). */
+function base64Url(teks) {
+  const bita = new TextEncoder().encode(teks);
+  let biner = '';
+  for (const b of bita) biner += String.fromCharCode(b);
+  return btoa(biner).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Tautan yang membuka aplikasi Bluetooth Print dan mencetak struk:
+ * my.bluetoothprint.scheme://https://server/api/cetak?d=...  ('' bila alamat server belum ada).
+ */
+export function tautanBluetoothPrint(alamatApi, d, lebar = 32) {
+  if (!/^https?:\/\//i.test(alamatApi || '')) return '';
+  const api = alamatApi.replace(/\/+$/, '');
+  return `my.bluetoothprint.scheme://${api}/cetak?d=${base64Url(JSON.stringify(barisBluetoothPrint(d, lebar)))}`;
 }
 
 /** Pesan WhatsApp berisi struk (blok monospace supaya kolom tetap rata). */

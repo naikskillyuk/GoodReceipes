@@ -6,7 +6,7 @@ import { buatDB, penyimpananMemori } from '../js/lib/db.js';
 import * as repo from '../js/lib/repo.js';
 import * as toko from '../js/lib/toko.js';
 import { muatContoh } from '../js/lib/seed.js';
-import { dataStruk, teksStruk, pesanStrukWa } from '../js/lib/struk.js';
+import { dataStruk, teksStruk, pesanStrukWa, barisBluetoothPrint, tautanBluetoothPrint } from '../js/lib/struk.js';
 import { buatLaporan, rentangPreset, keCsv, tabelCsv, keIsoTanggal, dariIsoTanggal } from '../js/lib/laporan.js';
 
 async function siapkan() {
@@ -54,6 +54,24 @@ test('struk: belum dibayar dan nama item panjang dibungkus', async () => {
   assert.match(teks, /BELUM DIBAYAR/);
   assert.match(teks, /\+ Saus extra/);
   assert.match(teks, /2 x 12\.500\s+25\.000/);
+});
+
+test('struk: isi dan tautan untuk aplikasi Bluetooth Print', async () => {
+  const { db, brownies, menu } = await siapkan();
+  toko.ubahStokMakanan(db, brownies, { jenis: 'koreksi', nilai: 50 });
+  const p = toko.buatPesanan(db, { keranjang: [{ idMenu: menu.id, jumlah: 3 }], nama: 'Budi', oleh: 'Sari' });
+  toko.bayarTunai(db, p, 50000);
+  const d = dataStruk(db, p.id);
+  const baris = barisBluetoothPrint(d, 32);
+  assert.deepEqual(baris[0], ['DAPUR ANI', 1, 1, 0]);
+  assert.ok(baris.every(([t, , rata]) => rata === 1 || t.length <= 32));
+  assert.ok(baris.some(([t]) => /^TOTAL\s+Rp 30\.000$/.test(t)));
+
+  assert.equal(tautanBluetoothPrint('', d), '');
+  const url = tautanBluetoothPrint('https://server.test/api/', d, 32);
+  assert.match(url, /^my\.bluetoothprint\.scheme:\/\/https:\/\/server\.test\/api\/cetak\?d=[A-Za-z0-9_-]+$/);
+  const isi = Buffer.from(url.split('d=')[1], 'base64url').toString('utf8');
+  assert.deepEqual(JSON.parse(isi), baris);
 });
 
 test('rentang preset: bulan lalu, 7 hari, iso tanggal', () => {

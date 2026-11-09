@@ -307,6 +307,39 @@ class ApiController extends Controller
         return Storage::disk('local')->response($jalur, null, ['Cache-Control' => 'public, max-age=31536000, immutable']);
     }
 
+    /**
+     * Struk untuk aplikasi Android "Bluetooth Print" (mate.bluetoothprint). Aplikasi membuka
+     * GET /api/cetak?d=... lalu mencetak JSON yang dikembalikan. Data struk ada di perangkat kasir,
+     * jadi isinya dikirim di `d` (base64url dari JSON [[teks, tebal, rata, format], ...]).
+     * Server tidak menyimpan apa pun; isi disusun ulang hanya sebagai entri teks yang valid.
+     */
+    public function cetakBluetooth(Request $request): JsonResponse
+    {
+        $d = (string) $request->query('d', '');
+        $baris = strlen($d) <= 12000 ? json_decode((string) base64_decode(strtr($d, '-_', '+/'), true), true) : null;
+        $entri = [];
+        foreach (is_array($baris) ? array_slice($baris, 0, 300) : [] as $b) {
+            if (! is_array($b) || ! is_string($b[0] ?? null)) {
+                continue;
+            }
+            $teks = mb_substr((string) preg_replace('/[[:cntrl:]]+/u', ' ', $b[0]), 0, 200);
+            $entri[] = [
+                'type' => 0,
+                // Baris kosong harus berisi spasi agar ikut tercetak.
+                'content' => $teks === '' ? ' ' : $teks,
+                'bold' => ($b[1] ?? 0) ? 1 : 0,
+                'align' => min(2, max(0, (int) ($b[2] ?? 0))),
+                'format' => min(4, max(0, (int) ($b[3] ?? 0))),
+            ];
+        }
+        if (! $entri) {
+            $entri[] = ['type' => 0, 'content' => 'Struk tidak valid. Cetak ulang dari aplikasi.', 'bold' => 0, 'align' => 0, 'format' => 0];
+        }
+
+        // Format seperti contoh resmi aplikasi: objek {"0": {...}, "1": {...}}.
+        return response()->json($entri, 200, ['Cache-Control' => 'no-store'], JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
     private function keluar(array $isi): JsonResponse
     {
         // Selalu 200; keberhasilan dibaca dari `ok`.
