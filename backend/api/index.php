@@ -11,4 +11,8 @@ foreach (['framework/cache/data', 'framework/views', 'framework/sessions', 'logs
 }
 $_ENV['LARAVEL_STORAGE_PATH'] = $_SERVER['LARAVEL_STORAGE_PATH'] = $storage;
 
+// Skrip ini ada di /api/index.php, sehingga Laravel mengira "/api" adalah folder aplikasi dan
+// /api/cetak dibaca sebagai /cetak (404). Anggap skripnya di akar agar semua alamat /api/... cocok.
+$_SERVER['SCRIPT_NAME'] = $_SERVER['PHP_SELF'] = '/index.php';
+
 require __DIR__.'/../public/index.php';
