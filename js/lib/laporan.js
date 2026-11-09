@@ -1,7 +1,7 @@
 // Laporan toko untuk rentang tanggal: ringkasan, pesanan, produk terlaris, pelanggan teratas,
 // mutasi stok produk, metode bayar, sumber pesanan, dan jam ramai. Juga ekspor CSV.
 
-import { statusBayar, daftarStokMakanan, normalHp, namaItem, LABEL_METODE } from './toko.js';
+import { statusBayar, daftarStokMakanan, normalHp, namaItem, LABEL_METODE, indeksRiwayatHpp, hppPadaWaktu } from './toko.js';
 
 const SEHARI_MS = 24 * 60 * 60 * 1000;
 
@@ -99,9 +99,31 @@ function buatEmber(dari, sampaiAkhir) {
   return { satuan: 'bulan', ember };
 }
 
+/** Penampung HPP dan laba kotor (lihat buatLaporan). */
+const labaKosong = () => ({ penjualan: 0, hpp: 0, item: 0, tanpaHpp: { item: 0, penjualan: 0 } });
+function tambahLaba(x, { n, bersih, hpp }) {
+  if (Number.isFinite(hpp)) {
+    x.penjualan += bersih;
+    x.hpp += hpp * n;
+    x.item += n;
+  } else {
+    x.tanpaHpp.item += n;
+    x.tanpaHpp.penjualan += bersih;
+  }
+}
+function akhiriLaba(x) {
+  const laba = x.penjualan - x.hpp;
+  return { ...x, laba, marginPersen: x.penjualan > 0 ? (laba / x.penjualan) * 100 : NaN };
+}
+
 /**
  * Laporan untuk rentang tanggal [dari, sampai] (keduanya tanggal, `sampai` termasuk).
  * Penjualan = total pesanan sah yang dibuat di rentang ini; pemasukan = pembayaran yang lunas di rentang ini.
+ *
+ * HPP dan laba kotor (hanya akun dapur yang punya riwayat HPP): tiap item memakai HPP menu yang berlaku saat
+ * pesanan dibuat (tabel RiwayatHpp), jadi laporan lama tidak berubah walau harga bahan naik. Nilai item dikurangi
+ * bagian diskon promo pesanan (dibagi sesuai nilai item). Item tanpa HPP tercatat (pesanan sebelum riwayat ada,
+ * item di luar menu) tidak ikut dihitung dan disebutkan terpisah.
  */
 export function buatLaporan(db, { dari, sampai }) {
   const mulai = awalHari(Math.min(dari, sampai));
@@ -141,7 +163,9 @@ export function buatLaporan(db, { dari, sampai }) {
   }
 
   const produk = new Map();
-  const perJenis = new Map(JENIS_JUAL.map((j) => [j.kunci, { jenis: j.kunci, label: j.label, item: 0, pesanan: 0, penjualan: 0 }]));
+  const perJenis = new Map(JENIS_JUAL.map((j) => [j.kunci, { jenis: j.kunci, label: j.label, item: 0, pesanan: 0, penjualan: 0, laba: labaKosong() }]));
+  const riwayatHpp = indeksRiwayatHpp(db);
+  const labaTotal = labaKosong();
   const pelanggan = new Map();
   const perSumber = new Map();
   const perJam = Array.from({ length: 24 }, (_, jam) => ({ jam, pesanan: 0, penjualan: 0 }));
@@ -176,15 +200,23 @@ export function buatLaporan(db, { dari, sampai }) {
     perSumber.set(sumber, s);
 
     const jenisDiPesanan = new Set();
-    for (const i of Array.isArray(p.item) ? p.item : []) {
+    const daftarItem = Array.isArray(p.item) ? p.item : [];
+    const nilaiItem = daftarItem.reduce((j, i) => j + (Number(i.jumlah) || 0) * (Number(i.harga) || 0), 0);
+    // Bagian nilai item yang tersisa setelah diskon promo pesanan.
+    const sisaDiskon = nilaiItem > 0 ? Math.max(0, 1 - (Number(p.diskon) || 0) / nilaiItem) : 1;
+    for (const i of daftarItem) {
       const n = Number(i.jumlah) || 0;
       const nilai = n * (Number(i.harga) || 0);
       const kunci = i.idMenu || 'lain:' + String(i.nama || '').toLowerCase();
       const jenis = jenisJual(db, i.idMenu);
-      const x = produk.get(kunci) || { idMenu: i.idMenu || '', nama: i.nama || 'Tanpa nama', jenis, jumlah: 0, penjualan: 0, pesanan: 0 };
+      const x = produk.get(kunci) || { idMenu: i.idMenu || '', nama: i.nama || 'Tanpa nama', jenis, jumlah: 0, penjualan: 0, pesanan: 0, laba: labaKosong() };
       x.jumlah += n;
       x.penjualan += nilai;
       x.pesanan += 1;
+      const isiLaba = { n, bersih: nilai * sisaDiskon, hpp: hppPadaWaktu(riwayatHpp, i.idMenu, t) };
+      tambahLaba(x.laba, isiLaba);
+      tambahLaba(labaTotal, isiLaba);
+      tambahLaba(perJenis.get(jenis).laba, isiLaba);
       produk.set(kunci, x);
       itemTerjual += n;
       const pj = perJenis.get(jenis);
@@ -260,10 +292,12 @@ export function buatLaporan(db, { dari, sampai }) {
       pembeliUmum,
     },
     grafik: { satuan, ember },
+    // ada = perangkat ini punya riwayat HPP (akun dapur) dan ada item yang HPP-nya tercatat.
+    laba: { ...akhiriLaba(labaTotal), ada: riwayatHpp.size > 0 && labaTotal.item > 0 },
     pesanan,
     // Penjualan per jenis memakai harga item (sebelum diskon pesanan); "Lainnya" hanya tampil bila ada.
-    perJenis: [...perJenis.values()].filter((j) => j.jenis !== 'lain' || j.item > 0),
-    produk: [...produk.values()].sort((a, b) => b.jumlah - a.jumlah || b.penjualan - a.penjualan || a.nama.localeCompare(b.nama)),
+    perJenis: [...perJenis.values()].filter((j) => j.jenis !== 'lain' || j.item > 0).map((j) => ({ ...j, laba: akhiriLaba(j.laba) })),
+    produk: [...produk.values()].map((x) => ({ ...x, laba: akhiriLaba(x.laba) })).sort((a, b) => b.jumlah - a.jumlah || b.penjualan - a.penjualan || a.nama.localeCompare(b.nama)),
     pelanggan: [...pelanggan.values()].sort((a, b) => b.belanja - a.belanja || b.pesanan - a.pesanan || a.nama.localeCompare(b.nama)),
     stok: stok.filter((s) => s.awal || s.produksi || s.masuk || s.terjual || s.rusak || s.koreksi || s.sekarang),
     metode: Object.keys(perMetode).map((m) => ({ metode: m, label: m === 'mayar' ? 'Online (Mayar)' : LABEL_METODE[m], jumlah: jumlahMetode[m], nilai: perMetode[m] })),
@@ -327,7 +361,17 @@ export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
       }),
     ];
   }
-  if (bagian === 'produk') return [['Peringkat', 'Produk', 'Terjual', 'Jumlah pesanan', 'Penjualan (Rp)', 'Jenis'], ...lap.produk.map((x, i) => [i + 1, x.nama, x.jumlah, x.pesanan, x.penjualan, LABEL_JENIS_JUAL[x.jenis] || ''])];
+  if (bagian === 'produk') {
+    const laba = lap.laba.ada;
+    const bulat = (n) => (Number.isFinite(n) ? Math.round(n) : '');
+    return [
+      ['Peringkat', 'Produk', 'Terjual', 'Jumlah pesanan', 'Penjualan (Rp)', 'Jenis', ...(laba ? ['Penjualan setelah promo (Rp)', 'HPP (Rp)', 'Laba kotor (Rp)', 'Margin (%)', 'Item tanpa HPP'] : [])],
+      ...lap.produk.map((x, i) => [
+        i + 1, x.nama, x.jumlah, x.pesanan, x.penjualan, LABEL_JENIS_JUAL[x.jenis] || '',
+        ...(laba ? (x.laba.item ? [bulat(x.laba.penjualan), bulat(x.laba.hpp), bulat(x.laba.laba), Number.isFinite(x.laba.marginPersen) ? Math.round(x.laba.marginPersen * 10) / 10 : ''] : ['', '', '', '']).concat([x.laba.tanpaHpp.item || '']) : []),
+      ]),
+    ];
+  }
   if (bagian === 'pelanggan') return [['Peringkat', 'Pelanggan', 'WhatsApp', 'Pesanan', 'Belanja (Rp)', 'Terakhir pesan', 'Pelanggan baru'], ...lap.pelanggan.map((c, i) => [i + 1, c.nama, c.hp, c.pesanan, c.belanja, tgl(c.terakhir), c.baru ? 'Ya' : ''])];
   if (bagian === 'stok') return [['Produk', 'Satuan', 'Stok awal', 'Produksi', 'Tambah stok', 'Terjual', 'Rusak', 'Koreksi', 'Stok akhir', 'Stok sekarang'], ...lap.stok.map((s) => [s.nama, s.satuan, s.awal, s.produksi, s.masuk, s.terjual, s.rusak, s.koreksi, s.akhir, s.sekarang])];
   const r = lap.ringkasan;
@@ -341,6 +385,15 @@ export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
     ['Diskon (Rp)', r.diskon],
     ['Ongkir (Rp)', r.ongkir],
     ['Belum dibayar (Rp)', r.belumBayar.nilai],
+    ...(lap.laba.ada
+      ? [
+          ['Penjualan ber-HPP setelah promo (Rp)', Math.round(lap.laba.penjualan)],
+          ['HPP terjual (Rp, saat pesanan dibuat)', Math.round(lap.laba.hpp)],
+          ['Laba kotor (Rp)', Math.round(lap.laba.laba)],
+          ['Margin kotor (%)', Math.round(lap.laba.marginPersen * 10) / 10],
+          ['Item tanpa HPP tercatat', lap.laba.tanpaHpp.item],
+        ]
+      : []),
     ['Pesanan batal', r.batal],
     ['Pelanggan', r.pelanggan],
     ['Pelanggan baru', r.pelangganBaru],

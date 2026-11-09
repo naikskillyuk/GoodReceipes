@@ -190,6 +190,10 @@ return [
                 'hppLama' => 'n', 'hppBaru' => 'n', 'bahan' => 'j', 'perubahan' => 'j',
             ],
         ],
+        'RiwayatHpp' => [
+            'db' => 'riwayat_hpp',
+            'kolom' => ['id' => 't', 'idMenu' => 't', 'hpp' => 'n', 'waktu' => 'n'],
+        ],
         'Testimoni' => [
             'db' => 'testimoni',
             'kolom' => [

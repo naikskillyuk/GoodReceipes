@@ -8,22 +8,31 @@ import { Modal, tanya, tampilToast } from '../ui/pesan.js';
 import { tautan } from '../ui/router.js';
 import {
   daftarMenu, pilihanMenu, tambahMenu, peranAkun, fotoTampilMenu, hargaJual, diskonBerlaku, labelDiskon, opsiMenu, hargaSaranMenu,
-  sisaMenu, stokIsiMenu, stokMakanan,
+  sisaMenu, stokIsiMenu, stokMakanan, hppRealMenu, catatRiwayatHpp,
 } from '../lib/toko.js';
 import { keInputWaktu, dariInputWaktu } from './catat-pesanan.js';
-import { dataHPP, dataPaket } from '../lib/repo.js';
-import { marginDariHarga } from '../lib/hpp.js';
+import { marginDariHarga, hargaMinimum, bulatkanHarga } from '../lib/hpp.js';
 import { rupiah, persen, tampilJumlah } from '../lib/util.js';
 
-/** HPP satu menu (hanya akun dapur yang punya datanya). */
-function hppMenu(db, menu) {
-  if (menu.jenis === 'paket') {
-    const p = dataPaket(db, menu.idRef);
-    return p ? p.hppPaket : NaN;
-  }
-  const d = dataHPP(db, menu.idRef);
-  return d ? d.hppJual : NaN;
+/** Untung dan margin satu menu pada harga jual (setelah diskon): real (harga bahan kini) dan dengan HPP tersimpan. */
+function labaMenu(h, harga) {
+  const ada = (n) => Number.isFinite(n) && harga > 0;
+  const real = ada(h.real) ? marginDariHarga(h.real, harga) : null;
+  const simpan = ada(h.simpan) ? marginDariHarga(h.simpan, harga) : null;
+  return { real, simpan, laba: real ? real.laba : NaN };
 }
+
+/** Harga jual (sebelum diskon) supaya margin real kembali ke `marginPersen`. 0 bila tidak bisa dihitung. */
+function hargaTetapMargin(d, hppReal, marginPersen) {
+  if (!Number.isFinite(hppReal) || !(marginPersen > 0 && marginPersen < 100)) return 0;
+  const efektif = bulatkanHarga(hargaMinimum(hppReal, marginPersen), 100);
+  const diskon = diskonBerlaku(d);
+  if (!diskon) return efektif;
+  if (d.diskonJenis === 'nominal') return efektif + diskon;
+  return bulatkanHarga(efektif / (1 - diskon / 100), 100);
+}
+
+const teksSelisih = (n) => (n > 0 ? 'naik ' : 'turun ') + rupiah(Math.abs(n));
 
 /** Sisa stok menu. Paket: isi yang paling sedikit menentukan; disebutkan isi yang kosong. */
 function TeksSisa({ db, m, sisa }) {
@@ -77,13 +86,16 @@ function FormMenu({ db, awal, onTutup }) {
   };
 
   const ada = !!d.idRef;
-  const hpp = ada ? hppMenu(db, d) : NaN;
+  const h = ada ? hppRealMenu(db, d) : { simpan: NaN, real: NaN, selisih: 0, berubah: false };
   const saran = ada ? hargaSaranMenu(db, d.jenis, d.idRef) : 0;
   const harga = hargaJual(d);
   const nominal = d.diskonJenis === 'nominal';
   const diskon = labelDiskon(d);
-  const laba = Number.isFinite(hpp) && harga > 0 ? harga - hpp : NaN;
-  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
+  const { laba, real: mg, simpan: mgSimpan } = labaMenu(h, harga);
+  // Harga bahan berubah: tawarkan harga yang mengembalikan margin seperti saat HPP disimpan.
+  // Patokannya harga yang tersimpan di menu, supaya angka tawaran tidak ikut bergeser saat harga diketik.
+  const patokan = labaMenu(h, awal ? hargaJual(awal) : harga).simpan;
+  const hargaTetap = h.berubah && patokan ? hargaTetapMargin(d, h.real, patokan.marginPersen) : 0;
   const sisa = ada ? sisaMenu(db, d) : null;
   const isi = ada && d.jenis === 'paket' ? stokIsiMenu(db, d) : [];
 
@@ -106,6 +118,7 @@ function FormMenu({ db, awal, onTutup }) {
     };
     if (baru) tambahMenu(db, d.jenis, d.idRef, isian);
     else db.simpan('Menu', { ...db.ambil('Menu', awal.id), ...isian });
+    catatRiwayatHpp(db); // menu baru langsung punya HPP untuk laporan
     tampilToast(baru ? `${isian.nama} masuk menu jual.` : `${isian.nama} disimpan.`);
     onTutup();
   };
@@ -135,11 +148,19 @@ function FormMenu({ db, awal, onTutup }) {
         </div>
 
         <div class="ringkas-laba" aria-label="Potensi keuntungan">
-          <div><small>HPP</small><b>${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</b></div>
+          <div><small>HPP${h.berubah ? ' (harga bahan kini)' : ''}</small><b>${Number.isFinite(h.real) ? rupiah(h.real) : '–'}</b>${h.berubah ? html`<small>tersimpan ${rupiah(h.simpan)}</small>` : ''}</div>
           <div><small>Harga jual${diskon ? ` (${diskon})` : ''}</small><b>${rupiah(harga)}</b></div>
-          <div class=${Number.isFinite(laba) && laba < 0 ? 'rugi' : 'untung'}><small>Untung per jual</small><b>${Number.isFinite(laba) ? rupiah(laba) : '–'}</b></div>
-          <div><small>Margin</small><b>${mg ? persen(mg.marginPersen) : '–'}</b></div>
+          <div class=${Number.isFinite(laba) && laba < 0 ? 'rugi' : 'untung'}><small>Untung per jual</small><b>${Number.isFinite(laba) ? rupiah(laba) : '–'}</b>${h.berubah && mgSimpan ? html`<small>dgn HPP tersimpan ${rupiah(mgSimpan.laba)}</small>` : ''}</div>
+          <div><small>Margin</small><b>${mg ? persen(mg.marginPersen) : '–'}</b>${h.berubah && mgSimpan ? html`<small>dgn HPP tersimpan ${persen(mgSimpan.marginPersen)}</small>` : ''}</div>
         </div>
+        ${h.berubah &&
+        html`<div class="status-simpan berubah">
+          <b>Harga bahan berubah sejak HPP disimpan:</b> HPP ${teksSelisih(h.selisih)} (${rupiah(h.simpan)} → ${rupiah(h.real)}). Untung dan margin di atas sudah memakai harga bahan terbaru; harga jual tidak berubah otomatis.
+          <div class="baris-btn" style="margin-top:8px">
+            ${hargaTetap > 0 && hargaTetap !== d.harga && html`<button type="button" class="btn kecil solid" onClick=${() => atur({ harga: hargaTetap })}>Pakai ${rupiah(hargaTetap)} (margin kembali ${persen(patokan.marginPersen)})</button>`}
+            <a class="btn kecil" href=${tautan(h.halamanHPP)}>Simpan ulang HPP</a>
+          </div>
+        </div>`}
         ${Number.isFinite(laba) && laba < 0 && html`<p class="galat-teks">Harga di bawah HPP: rugi ${rupiah(-laba)} per jual.</p>`}
         <p class="bantu">Stok: ${sisa === null ? 'tidak dilacak' : sisa > 0 ? `bisa dijual ${sisa}` : 'habis'}${isi.length ? ` · isi paket: ${isi.map((x) => `${x.resep ? x.resep.nama : '?'} ${tampilJumlah(x.stok)}${x.per !== 1 ? `/${tampilJumlah(x.per)}` : ''}`).join(', ')}` : ''}</p>
 
@@ -184,6 +205,9 @@ export function MenuJual({ k }) {
   const [cari, setCari] = useState('');
   const q = cari.trim().toLowerCase();
   const tampil = daftar.filter(({ menu: m }) => !q || m.nama.toLowerCase().includes(q));
+  // HPP real (harga bahan kini) dan tersimpan per menu; hanya akun dapur yang punya data resep.
+  const hpp = new Map(dapur ? daftar.map(({ menu: m }) => [m.id, hppRealMenu(db, m)]) : []);
+  const berubah = daftar.filter(({ menu: m }) => hpp.get(m.id)?.berubah);
   const hapus = async (m) => {
     const ya = await tanya({ judul: `Keluarkan “${m.nama}” dari menu?`, teks: 'Resep/paketnya tidak terhapus. Pesanan lama tetap tersimpan.', ya: 'Keluarkan', bahaya: true });
     if (ya) db.hapus('Menu', m.id);
@@ -198,6 +222,17 @@ export function MenuJual({ k }) {
         <input class="input" type="search" placeholder="Cari menu…" aria-label="Cari menu" value=${cari} onInput=${(e) => setCari(e.target.value)} />
         ${dapur && html`<button class="btn solid" onClick=${() => setForm('baru')}><${Ikon} nama="plus" ukuran=${18} />Tambah menu</button>`}
       </div>
+      ${berubah.length > 0 &&
+      html`<div class="status-simpan berubah" role="status">
+        <b>Harga bahan berubah untuk ${berubah.length} menu.</b> HPP, untung, dan margin di tabel memakai harga bahan terbaru (angka tersimpan tertulis kecil). Harga jual tidak berubah otomatis: tekan menu di bawah untuk menyesuaikan harganya.
+        <div class="daftar-margin-berubah">
+          ${berubah.map(({ menu: m }) => {
+            const h = hpp.get(m.id);
+            const { real, simpan } = labaMenu(h, hargaJual(m));
+            return html`<button type="button" class="btn kecil" key=${m.id} onClick=${() => setForm(m)}>${m.nama} · HPP ${teksSelisih(h.selisih)}${real && simpan ? ` · margin ${persen(simpan.marginPersen)} → ${persen(real.marginPersen)}` : ''}</button>`;
+          })}
+        </div>
+      </div>`}
       ${daftar.length === 0
         ? html`<${Kosong} judul="Menu masih kosong" teks=${dapur ? 'Tekan Tambah menu, lalu pilih resep atau paket yang mau dijual.' : 'Admin belum memasukkan menu.'} />`
         : html`<div class="tabel-gulir kartu tabel-kartu">
@@ -216,10 +251,9 @@ export function MenuJual({ k }) {
               </thead>
               <tbody>
                 ${tampil.map(({ menu: m, sisa }) => {
-                  const hpp = dapur ? hppMenu(db, m) : NaN;
+                  const h = hpp.get(m.id) || { real: NaN, berubah: false };
                   const harga = hargaJual(m);
-                  const laba = Number.isFinite(hpp) && harga > 0 ? harga - hpp : NaN;
-                  const mg = Number.isFinite(hpp) && harga > 0 ? marginDariHarga(hpp, harga) : null;
+                  const { laba, real: mg, simpan: mgSimpan } = labaMenu(h, harga);
                   const opsi = opsiMenu(m);
                   return html`<tr key=${m.id} class=${m.aktif ? '' : 'mati'}>
                     <td>
@@ -228,10 +262,11 @@ export function MenuJual({ k }) {
                         <span><b>${m.nama}</b><small>${m.jenis === 'paket' ? 'Paket' : 'Resep'}${opsi.length ? ` · ${opsi.length} varian` : ''}${labelDiskon(m) ? ` · diskon ${labelDiskon(m).slice(1)}` : ''}</small></span>
                       </span>
                     </td>
-                    ${dapur && html`<td class="angka">${Number.isFinite(hpp) ? rupiah(hpp) : '–'}</td>`}
+                    ${dapur &&
+                    html`<td class="angka">${Number.isFinite(h.real) ? rupiah(h.real) : '–'}${h.berubah ? html`<br /><small class=${h.selisih > 0 ? 'teks-buruk' : 'teks-baik'}>${h.selisih > 0 ? '▲' : '▼'} ${rupiah(Math.abs(h.selisih))}</small><br /><small class="teks-kecil">tersimpan ${rupiah(h.simpan)}</small>` : ''}</td>`}
                     <td class="angka"><b>${rupiah(harga)}</b>${diskonBerlaku(m) ? html`<br /><s class="teks-kecil">${rupiah(m.harga)}</s>` : ''}</td>
                     ${dapur && html`<td class=${'angka ' + (laba < 0 ? 'teks-buruk' : 'teks-baik')}>${Number.isFinite(laba) ? rupiah(laba) : '–'}</td>`}
-                    ${dapur && html`<td class=${'angka' + (mg && mg.marginPersen < 0 ? ' teks-buruk' : '')}>${mg ? persen(mg.marginPersen) : '–'}</td>`}
+                    ${dapur && html`<td class=${'angka' + (mg && mg.marginPersen < 0 ? ' teks-buruk' : '')}>${mg ? persen(mg.marginPersen) : '–'}${h.berubah && mgSimpan ? html`<br /><small class="teks-kecil">tadinya ${persen(mgSimpan.marginPersen)}</small>` : ''}</td>`}
                     <td class="angka"><${TeksSisa} db=${db} m=${m} sisa=${sisaMenu(db, m, stok) ?? sisa} /></td>
                     <td><span class=${'lencana-status ' + (m.aktif ? 'lunas' : 'belum')}>${m.aktif ? 'Dijual' : 'Tidak dijual'}</span>${m.aktif && m.online ? html`<br /><small class="teks-kecil">+ etalase</small>` : ''}${m.segera ? html`<br /><span class="label-segera">Coming soon</span>` : ''}</td>
                     ${dapur &&

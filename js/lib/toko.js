@@ -396,6 +396,78 @@ export function pilihanMenu(db) {
 }
 
 /** Harga saran: harga jual yang sudah ditetapkan di HPP Jual / paket, atau harga minimum dari margin target. */
+/**
+ * HPP satu menu (hanya akun dapur yang punya datanya).
+ * - simpan: HPP yang disimpan (dasar harga saran)
+ * - real: HPP menurut harga bahan saat ini; untung dan margin memakai angka ini
+ */
+export function hppRealMenu(db, menu) {
+  let simpan = NaN;
+  let real = NaN;
+  if (menu.jenis === 'paket') {
+    const p = dataPaket(db, menu.idRef);
+    if (p) (simpan = p.hppPaket), (real = p.hppKini);
+  } else {
+    const d = dataHPP(db, menu.idRef);
+    if (d) (simpan = d.hppJual), (real = d.hppJualKini);
+  }
+  if (!Number.isFinite(real)) real = simpan;
+  const selisih = Number.isFinite(simpan) && Number.isFinite(real) ? real - simpan : 0;
+  return {
+    simpan,
+    real,
+    selisih,
+    berubah: Math.abs(selisih) >= 0.5,
+    halamanHPP: menu.jenis === 'paket' ? `/paket/${menu.idRef}` : `/resep/${menu.idRef}/hpp`,
+  };
+}
+
+// ---------- Riwayat HPP menu (untuk HPP dan margin di laporan) ----------
+
+/** Riwayat HPP per menu, urut dari yang terlama: Map idMenu -> [{waktu, hpp}]. */
+export function indeksRiwayatHpp(db) {
+  const peta = new Map();
+  for (const r of db.semua('RiwayatHpp')) {
+    if (!r.idMenu || !Number.isFinite(r.hpp) || !Number.isFinite(r.waktu)) continue;
+    if (!peta.has(r.idMenu)) peta.set(r.idMenu, []);
+    peta.get(r.idMenu).push({ waktu: r.waktu, hpp: r.hpp });
+  }
+  for (const daftar of peta.values()) daftar.sort((a, b) => a.waktu - b.waktu);
+  return peta;
+}
+
+/** HPP satu menu yang berlaku pada waktu `t` (catatan terakhir sebelum / tepat t). NaN = belum tercatat saat itu. */
+export function hppPadaWaktu(indeks, idMenu, t) {
+  const daftar = idMenu ? indeks.get(idMenu) : null;
+  if (!daftar) return NaN;
+  let hasil = NaN;
+  for (const r of daftar) {
+    if (r.waktu > t) break;
+    hasil = r.hpp;
+  }
+  return hasil;
+}
+
+/**
+ * Catat HPP real setiap menu yang berubah sejak catatan terakhirnya (atau belum pernah dicatat).
+ * Dijalankan perangkat dapur setiap data berubah. Catatan lama tidak pernah diubah, jadi HPP pesanan lama tetap.
+ * Mengembalikan jumlah catatan baru.
+ */
+export function catatRiwayatHpp(db, sekarang = Date.now()) {
+  const indeks = indeksRiwayatHpp(db);
+  let baru = 0;
+  for (const m of db.semua('Menu')) {
+    const { real } = hppRealMenu(db, m);
+    if (!Number.isFinite(real)) continue;
+    const daftar = indeks.get(m.id);
+    const terakhir = daftar && daftar[daftar.length - 1];
+    if (terakhir && Math.abs(terakhir.hpp - real) < 0.5) continue;
+    db.simpan('RiwayatHpp', { idMenu: m.id, hpp: Math.round(real * 100) / 100, waktu: sekarang });
+    baru += 1;
+  }
+  return baru;
+}
+
 export function hargaSaranMenu(db, jenis, idRef) {
   if (jenis === 'paket') {
     const p = dataPaket(db, idRef);

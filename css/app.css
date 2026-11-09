@@ -7248,3 +7248,31 @@ a.chip {
 .ubin-jenis .jenis-lain .batang-favorit span {
   background: var(--muted);
 }
+
+/* Menu & Harga Jual: daftar menu yang HPP-nya berubah karena harga bahan */
+.daftar-margin-berubah {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.daftar-margin-berubah .btn {
+  text-align: left;
+  white-space: normal;
+}
+
+/* Laporan: laba kotor (HPP saat pesanan dibuat) */
+.ubin-tren .ubin.ubin-laba {
+  background: var(--hijau-muda);
+  border-color: transparent;
+}
+.ubin-tren .ubin.ubin-laba > b {
+  color: var(--hijau-2);
+}
+.ubin-tren .ubin.ubin-rugi {
+  background: #fdecea;
+  border-color: transparent;
+}
+.ubin-tren .ubin.ubin-rugi > b {
+  color: var(--bahaya);
+}

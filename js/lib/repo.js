@@ -532,7 +532,7 @@ export function resepTambahan(db, idResep) {
  * `dipakaiPer`: 'porsi' = untuk setiap porsi yang dijual (bawaan); 'resep' (data lama) = untuk satu kali masak,
  * dibagi jumlah porsi resep ini (`porsiInduk`).
  */
-export function biayaResepTambahan(db, idResep, porsiInduk = 0) {
+export function biayaResepTambahan(db, idResep, porsiInduk = 0, kini = false) {
   const rincian = resepTambahan(db, idResep).map((rt) => {
     const jumlah = Number(rt.jumlah) || 0;
     const dipakaiPer = rt.dipakaiPer === 'porsi' ? 'porsi' : 'resep';
@@ -540,7 +540,8 @@ export function biayaResepTambahan(db, idResep, porsiInduk = 0) {
     const gagal = (alasan) => ({ ...rt, jumlah, dipakaiPer, resep: k ? k.resep : null, komponen: k, biaya: NaN, biayaPorsi: NaN, alasan });
     if (!k) return gagal('resepnya sudah dihapus');
     if (!k.eksperimen) return gagal('belum punya eksperimen');
-    const perSatuan = k.tanpaPacking;
+    // kini: pakai hitungan resep itu menurut harga bahan saat ini, bukan angka tersimpan.
+    const perSatuan = kini ? k.hpp.hppPorsi - (Number.isFinite(k.hpp.packingPorsi) ? k.hpp.packingPorsi : 0) : k.tanpaPacking;
     const biaya = rt.satuan === 'resep' ? perSatuan * k.porsi * jumlah : perSatuan * jumlah;
     const biayaPorsi = dipakaiPer === 'porsi' ? biaya : porsiInduk > 0 ? biaya / porsiInduk : NaN;
     return {
@@ -574,12 +575,21 @@ export function tambahResepTambahan(db, idResep, idResepKomponen) {
  * Semua angka untuk tab HPP Resep dan HPP Jual satu resep.
  * - hpp: hitungan HPP resep saat ini; hppPorsi/packingPorsi: yang tersimpan (lihat hppResep)
  * - tambahan: HPP resep lain; hppJual = hppPorsi + tambahan.totalPorsi
+ * - hppJualKini / packingKini: HPP Jual menurut harga bahan SAAT INI (resep ini dan resep tambahannya),
+ *   untuk melihat margin real walau HPP belum disimpan ulang.
  */
 export function dataHPP(db, idResep) {
   const h = hppResep(db, idResep);
   if (!h) return null;
   const tambahan = biayaResepTambahan(db, idResep, h.porsi);
-  return { ...h, tambahan, hppJual: h.hppPorsi + tambahan.totalPorsi };
+  const tambahanKini = biayaResepTambahan(db, idResep, h.porsi, true);
+  return {
+    ...h,
+    tambahan,
+    hppJual: h.hppPorsi + tambahan.totalPorsi,
+    hppJualKini: h.hpp.hppPorsi + tambahanKini.totalPorsi,
+    packingKini: Number.isFinite(h.hpp.packingPorsi) ? h.hpp.packingPorsi : 0,
+  };
 }
 
 /**
@@ -647,18 +657,22 @@ export function dataPaket(db, idPaket) {
     const packing = ada && Number.isFinite(d.packingPorsi) ? d.packingPorsi : 0;
     // Bawaan: packing resep dibuang (paket punya packing sendiri). Dicentang: packing resep tetap dihitung.
     const biayaProduksi = ada ? d.hppJual - (i.pakaiPacking ? 0 : packing) : NaN;
+    const biayaProduksiKini = ada ? d.hppJualKini - (i.pakaiPacking ? 0 : d.packingKini) : NaN;
     const alasan = !d ? 'resepnya sudah dihapus' : !d.eksperimen ? 'belum punya eksperimen' : !Number.isFinite(biayaProduksi) ? 'jumlah porsinya belum diisi' : '';
     return {
       ...i,
       resep: d ? d.resep : null,
       satuanPorsi: ada ? d.satuanPorsi : 'porsi',
       biayaProduksi,
+      biayaProduksiKini,
       biayaPorsiResep: packing,
       alasan,
     };
   });
   const biaya = biayaPaketList(db, idPaket);
   const hitung = hitungPaket({ isi, biayaPaket: biaya });
+  // HPP paket menurut harga bahan saat ini (margin real di menu jual).
+  const kini = hitungPaket({ isi: isi.map((i) => ({ ...i, biayaProduksi: i.biayaProduksiKini })), biayaPaket: biaya });
   // Seperti HPP resep: angka tersimpan dipakai di menu jual sampai disimpan ulang.
   const tersimpan = typeof paket.hppSimpan === 'number' && Number.isFinite(paket.hppSimpan);
   const berubah = tersimpan && Math.abs(hitung.hppPaket - paket.hppSimpan) >= 0.5;
@@ -668,6 +682,7 @@ export function dataPaket(db, idPaket) {
     ...hitung,
     isi: hitung.rincian,
     hppHitung: hitung.hppPaket,
+    hppKini: kini.bermasalah.length ? NaN : kini.hppPaket,
     hppPaket: tersimpan ? paket.hppSimpan : hitung.hppPaket,
     tersimpan,
     berubah,

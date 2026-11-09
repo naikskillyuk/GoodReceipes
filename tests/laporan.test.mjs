@@ -190,3 +190,48 @@ test('aksi massal: ubah status dan tandai lunas banyak pesanan, yang tidak perlu
   assert.equal(toko.stokMakanan(db).get(brownies), 17, 'stok C kembali');
   assert.equal(toko.prosesMassal(db, [a.id, 'tidak-ada'], 'menunggu'), 0, 'menunggu bukan aksi');
 });
+
+test('laporan: laba kotor memakai HPP saat pesanan dibuat, laporan lama tidak berubah', async () => {
+  const { db, menu } = await siapkan();
+  const hari = new Date(2026, 10, 1, 9, 0).getTime();
+  const jam = (n) => hari + n * 3600 * 1000;
+  const pesan = (t, jumlah, diskon = 0) =>
+    db.simpan('Pesanan', { nomor: 'L' + t, sumber: 'kasir', status: 'selesai', waktu: t, item: [{ idMenu: menu.id, nama: menu.nama, harga: 10000, jumlah }], subtotal: 10000 * jumlah, diskon, total: 10000 * jumlah - diskon, ongkir: 0 });
+  const lapHari = () => buatLaporan(db, { dari: hari, sampai: hari });
+
+  // Pesanan sebelum riwayat HPP ada: tidak punya HPP, laba belum bisa dihitung.
+  pesan(jam(0), 1);
+  let lap = lapHari();
+  assert.equal(lap.laba.ada, false);
+  assert.equal(lap.laba.tanpaHpp.item, 1);
+
+  // Riwayat mulai dicatat, lalu pesanan kedua (dengan diskon promo Rp 2.000).
+  assert.equal(toko.catatRiwayatHpp(db, jam(1)), 1);
+  assert.equal(toko.catatRiwayatHpp(db, jam(1) + 1), 0, 'HPP tidak berubah: tidak dicatat lagi');
+  const hppLama = toko.hppRealMenu(db, menu).real;
+  pesan(jam(2), 2, 2000);
+  lap = lapHari();
+  assert.equal(lap.laba.ada, true);
+  assert.equal(lap.laba.item, 2);
+  assert.equal(Math.round(lap.laba.penjualan), 18000, 'diskon promo mengurangi penjualan');
+  assert.equal(Math.round(lap.laba.hpp), Math.round(hppLama * 2));
+  assert.equal(Math.round(lap.laba.laba), Math.round(18000 - hppLama * 2));
+  const labaSebelum = lap.laba.laba;
+
+  // Harga bahan naik: HPP baru dicatat; pesanan sesudahnya memakai HPP baru, pesanan lama tetap.
+  const bahan = db.semua('Bahan')[0];
+  db.simpan('Bahan', { ...bahan, hargaBeli: bahan.hargaBeli * 3 });
+  assert.equal(toko.catatRiwayatHpp(db, jam(3)), 1);
+  const hppBaru = toko.hppRealMenu(db, menu).real;
+  assert.ok(hppBaru > hppLama);
+  assert.equal(Math.round(lapHari().laba.laba), Math.round(labaSebelum), 'laporan lama tidak berubah');
+
+  pesan(jam(4), 1);
+  lap = lapHari();
+  assert.equal(Math.round(lap.laba.hpp), Math.round(hppLama * 2 + hppBaru));
+  const produk = lap.produk.find((x) => x.idMenu === menu.id);
+  assert.equal(produk.laba.item, 3);
+  assert.equal(produk.laba.tanpaHpp.item, 1);
+  assert.ok(tabelCsv(db, lap, 'ringkasan').some((b) => b[0] === 'Laba kotor (Rp)'));
+  assert.equal(tabelCsv(db, lap, 'produk')[0].includes('Margin (%)'), true);
+});

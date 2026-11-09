@@ -147,6 +147,12 @@ export const TABEL = {
       buktiPada: 'n', kendala: 't', riwayat: 'j',
     },
   },
+  // Riwayat HPP per menu: dicatat perangkat dapur setiap HPP real (harga bahan terbaru) berubah. Hanya bertambah,
+  // jadi laporan bisa memakai HPP yang berlaku saat pesanan dibuat. Tidak dikirim ke akun toko.
+  RiwayatHpp: {
+    awalan: 'rhp',
+    kolom: { id: 't', idMenu: 't', hpp: 'n', waktu: 'n' },
+  },
   // metode 'tunai' | 'transfer' (transfer/QRIS manual) | 'mayar'. status 'menunggu' | 'lunas' | 'batal'. Baris Mayar dibuat dan dilunasi oleh server.
   Pembayaran: {
     awalan: 'byr',

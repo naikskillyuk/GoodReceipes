@@ -435,3 +435,32 @@ test('log resep: hanya bahan yang berubah, dengan HPP sebelum dan sesudah', asyn
   repo.hapusResep(db, resep.id);
   assert.equal(repo.logResep(db, resep.id).length, 0);
 });
+
+test('HPP real: mengikuti harga bahan terbaru walau HPP tersimpan belum diperbarui', async () => {
+  const db = await dbBaru();
+  const { brownies } = muatContoh(db);
+  repo.simpanHPPResep(db, brownies);
+  const paket = repo.buatPaket(db, 'Paket Real');
+  repo.tambahIsiPaket(db, paket.id, brownies);
+  db.simpan('BiayaPaket', { idPaket: paket.id, jenis: 'Kotak', nilai: 2500, urutan: 0 });
+  assert.ok(repo.simpanHPPPaket(db, paket.id));
+
+  let d = repo.dataHPP(db, brownies);
+  let p = repo.dataPaket(db, paket.id);
+  assert.equal(Math.round(d.hppJualKini), Math.round(d.hppJual), 'baru disimpan: real = tersimpan');
+  assert.equal(Math.round(p.hppKini), Math.round(p.hppPaket));
+  const jualTadi = d.hppJual;
+  const paketTadi = p.hppPaket;
+
+  // Harga bahan naik: angka tersimpan (dasar harga saran) tetap, HPP real naik.
+  const bahan = db.semua('Bahan')[0];
+  db.simpan('Bahan', { ...bahan, hargaBeli: bahan.hargaBeli * 3 });
+  d = repo.dataHPP(db, brownies);
+  p = repo.dataPaket(db, paket.id);
+  assert.equal(d.hppJual, jualTadi);
+  assert.ok(d.hppJualKini > jualTadi);
+  assert.equal(Math.round(d.hppJualKini), Math.round(d.hpp.hppPorsi + d.tambahan.totalPorsi));
+  assert.equal(p.hppPaket, paketTadi);
+  assert.equal(p.berubah, false, 'HPP resep belum disimpan ulang, jadi hitungan paket tersimpan belum berubah');
+  assert.equal(Math.round(p.hppKini - paketTadi), Math.round(d.hppJualKini - jualTadi), 'kenaikan resep ikut ke paket');
+});

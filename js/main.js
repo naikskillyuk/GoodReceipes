@@ -36,13 +36,14 @@ import { LayarStruk } from './layar/struk.js';
 import { Laporan } from './layar/laporan.js';
 import { PelangganPromo } from './layar/pelanggan.js';
 import { PesanOnline, TiruanMayar } from './layar/pesan-online.js';
-import { peranAkun, RUTE_TOKO, halamanAdmin, ALAMAT_ADMIN } from './lib/toko.js';
+import { peranAkun, RUTE_TOKO, halamanAdmin, ALAMAT_ADMIN, catatRiwayatHpp } from './lib/toko.js';
 
 // Data utama ada di database server. Perangkat hanya menyimpan salinan supaya cepat dan tetap
 // terbuka saat sinyal putus; setiap perubahan dikirim ke server sesaat setelah disimpan.
 const KIRIM_SETELAH_MS = 1000;
 const AMBIL_TIAP_MS = 20 * 1000; // penilaian QR dan perubahan dari perangkat lain
 const JEDA_PESAN_GAGAL_MS = 60 * 1000;
+const CATAT_HPP_SETELAH_MS = 2000;
 
 // Halaman tanpa login: penilai QR, link pemesanan pembeli, dan halaman bayar tiruan (server uji).
 const RUTE_TERBUKA = ['nilai', 'pesan', 'tiruan-mayar'];
@@ -193,6 +194,27 @@ function App({ db, penyinkron, peringatan, pasangan }) {
       clearInterval(jam);
       document.removeEventListener('visibilitychange', saatTampil);
       window.removeEventListener('online', otomatis);
+    };
+  }, []);
+
+  // Riwayat HPP menu untuk margin di laporan: akun dapur mencatat HPP real setiap kali berubah (mis. harga bahan naik).
+  // Ditunggu sampai sinkron pertama berhasil, supaya data lama di perangkat ini tidak tercatat sebagai HPP terbaru.
+  useEffect(() => {
+    let tunda = null;
+    const jadwalkan = () => {
+      clearTimeout(tunda);
+      tunda = setTimeout(() => {
+        if (!sudahMasuk(db) || peranAkun(db) !== 'dapur') return;
+        if (db.pengaturan.scriptUrl && !penyinkron.status.berhasilTerakhir) return;
+        catatRiwayatHpp(db);
+      }, CATAT_HPP_SETELAH_MS);
+    };
+    const lepasDb = db.ubah(jadwalkan);
+    const lepasSinkron = penyinkron.ubah(jadwalkan);
+    return () => {
+      lepasDb();
+      lepasSinkron();
+      clearTimeout(tunda);
     };
   }, []);
 
