@@ -22,7 +22,7 @@ export function peranAkun(db) {
 }
 
 /** Halaman yang boleh dibuka akun toko / kasir (bagian pertama alamat, di /admin). */
-export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'laporan', 'stok-makanan', 'pelanggan', 'pengaturan'];
+export const RUTE_TOKO = ['', 'kasir', 'catat-pesanan', 'pesanan', 'laporan', 'stok-makanan', 'sampling', 'pelanggan', 'pengaturan'];
 
 // Situs punya dua pintu: "/" = etalase toko untuk pembeli (tanpa login), "/admin" = login admin dan kasir.
 export const ALAMAT_TOKO = '/';
@@ -297,6 +297,118 @@ export function ubahStokMakanan(db, idResep, { jenis, nilai, catatan = '' }) {
 
 export function riwayatMakanan(db, idResep) {
   return db.semua('MutasiMakanan', (m) => m.idResep === idResep).sort((a, b) => (b.waktu || 0) - (a.waktu || 0));
+}
+
+// ---------- Sampling (produk dikirim gratis untuk dicoba) ----------
+
+const idMutasiSampling = (idSampling, idResep) => `mmk_${idSampling}_${idResep}`;
+
+/** HPP per porsi satu produk menurut harga bahan saat ini. null bila datanya tidak ada (mis. akun toko). */
+export function hppPorsiResep(db, idResep) {
+  const d = dataHPP(db, idResep);
+  const n = d ? d.hppJualKini : NaN;
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+/** Biaya satu baris item sampling: HPP yang tercatat saat dikirim, atau HPP saat ini bila belum tercatat. */
+export function biayaItemSampling(db, i) {
+  const hpp = Number.isFinite(i.hpp) ? i.hpp : hppPorsiResep(db, i.idResep);
+  return Number.isFinite(hpp) ? hpp * (Number(i.jumlah) || 0) : NaN;
+}
+
+/**
+ * Catat (atau ubah, bila `id` diisi) produk yang dikirim untuk sampling. Stok produk langsung dipotong.
+ * item = [{idResep, jumlah}]. HPP per porsi dicatat saat itu supaya biayanya tidak berubah saat harga bahan naik;
+ * saat diubah, HPP produk yang sudah ada tetap memakai angka lama.
+ * Lempar Error bila penerima kosong, tidak ada produk, atau nomor WhatsApp tidak valid.
+ */
+export function simpanSampling(db, { id = '', penerima = '', hp = '', lokasi = '', tujuan = '', catatan = '', tanggapan = '', item = [], foto, oleh = '', waktu = Date.now() }) {
+  const lama = id ? db.ambil('Sampling', id) : null;
+  const nama = String(penerima || '').trim().slice(0, 80);
+  if (!nama) throw new Error('Isi nama penerima sampling.');
+  const nomorHp = hp ? normalHp(hp) : '';
+  if (hp && !nomorHp) throw new Error('Nomor WhatsApp tidak valid, mis. 0812xxxxxxx.');
+  const hppLama = new Map(((lama && lama.item) || []).map((i) => [i.idResep, i.hpp]));
+  const gabung = new Map();
+  for (const b of item || []) {
+    const jumlah = Number(b.jumlah) || 0;
+    const resep = db.ambil('Resep', b.idResep);
+    if (!resep || !(jumlah > 0)) continue;
+    const ada = gabung.get(resep.id);
+    if (ada) ada.jumlah = bulat(ada.jumlah + jumlah);
+    else {
+      const hpp = Number.isFinite(hppLama.get(resep.id)) ? hppLama.get(resep.id) : hppPorsiResep(db, resep.id);
+      gabung.set(resep.id, { idResep: resep.id, nama: resep.nama, jumlah: bulat(jumlah), hpp });
+    }
+  }
+  const isi = [...gabung.values()];
+  if (!isi.length) throw new Error('Pilih minimal satu produk beserta jumlahnya.');
+  const t = Number(waktu) || Date.now();
+  const fotoLama = (lama && (lama.fotoLokal || lama.fotoUrl)) || '';
+  const s = db.simpan('Sampling', {
+    ...(lama || {}),
+    ...(id ? { id } : {}),
+    penerima: nama,
+    hp: nomorHp,
+    lokasi: String(lokasi || '').trim().slice(0, 120),
+    tujuan: String(tujuan || '').trim().slice(0, 120),
+    catatan: String(catatan || '').trim().slice(0, 500),
+    tanggapan: String(tanggapan || '').trim().slice(0, 500),
+    item: isi,
+    oleh: lama ? lama.oleh : String(oleh || ''),
+    waktu: t,
+    ...(foto !== undefined && foto !== fotoLama ? { fotoLokal: foto || '', fotoUrl: '' } : {}),
+  });
+  // Mutasi stok memakai id tetap: produk yang dihapus dari catatan dikembalikan, sisanya ditimpa.
+  for (const m of db.semua('MutasiMakanan', (m) => m.jenis === 'sampling' && m.idRef === s.id)) {
+    if (!gabung.has(m.idResep)) db.hapus('MutasiMakanan', m.id);
+  }
+  for (const i of isi) {
+    db.simpan('MutasiMakanan', { id: idMutasiSampling(s.id, i.idResep), idResep: i.idResep, jumlah: -i.jumlah, jenis: 'sampling', idRef: s.id, catatan: `Sampling: ${nama}`, waktu: t });
+  }
+  return s;
+}
+
+/** Hapus catatan sampling; stok produknya dikembalikan. */
+export function hapusSampling(db, idSampling) {
+  db.semua('MutasiMakanan', (m) => m.jenis === 'sampling' && m.idRef === idSampling).forEach((m) => db.hapus('MutasiMakanan', m.id));
+  db.hapus('Sampling', idSampling);
+}
+
+/** Catatan sampling terbaru dulu, bisa dibatasi rentang waktu [sejak, sampai). */
+export function daftarSampling(db, { sejak = 0, sampai = Infinity } = {}) {
+  return db.semua('Sampling', (s) => (s.waktu || 0) >= sejak && (s.waktu || 0) < sampai).sort((a, b) => (b.waktu || 0) - (a.waktu || 0));
+}
+
+/**
+ * Ringkasan daftar sampling: jumlah kiriman, porsi, biaya (HPP), dan per produk.
+ * tanpaHpp = ada produk yang HPP-nya belum diketahui (biaya hanya menghitung yang diketahui).
+ */
+export function ringkasSampling(db, daftar) {
+  const produk = new Map();
+  let porsi = 0;
+  let biaya = 0;
+  let tanpaHpp = false;
+  for (const s of daftar) {
+    for (const i of s.item || []) {
+      const jumlah = Number(i.jumlah) || 0;
+      const b = biayaItemSampling(db, i);
+      porsi += jumlah;
+      if (Number.isFinite(b)) biaya += b;
+      else tanpaHpp = true;
+      const p = produk.get(i.idResep) || { idResep: i.idResep, nama: (db.ambil('Resep', i.idResep) || i).nama, jumlah: 0, biaya: 0 };
+      p.jumlah = bulat(p.jumlah + jumlah);
+      if (Number.isFinite(b)) p.biaya += b;
+      produk.set(i.idResep, p);
+    }
+  }
+  return {
+    kiriman: daftar.length,
+    porsi: bulat(porsi),
+    biaya: Math.round(biaya),
+    tanpaHpp,
+    produk: [...produk.values()].sort((a, b) => b.jumlah - a.jumlah),
+  };
 }
 
 // ---------- Menu jual ----------

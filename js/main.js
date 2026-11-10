@@ -26,6 +26,7 @@ import { DaftarPaket, DetailPaket } from './layar/paket.js';
 import { StokBahan } from './layar/stok-bahan.js';
 import { Produksi } from './layar/produksi.js';
 import { StokMakanan } from './layar/stok-makanan.js';
+import { Sampling } from './layar/sampling.js';
 import { MenuJual } from './layar/menu-jual.js';
 import { Kasir } from './layar/kasir.js';
 import { BerandaKasir } from './layar/beranda-kasir.js';
@@ -75,6 +76,7 @@ function Layar({ k }) {
   if (a === 'stok-bahan') return html`<${StokBahan} k=${k} />`;
   if (a === 'produksi') return html`<${Produksi} k=${k} />`;
   if (a === 'stok-makanan') return html`<${StokMakanan} k=${k} />`;
+  if (a === 'sampling') return html`<${Sampling} k=${k} />`;
   if (a === 'menu') return html`<${MenuJual} k=${k} />`;
   if (a === 'kasir') return html`<${Kasir} k=${k} />`;
   if (a === 'catat-pesanan') return html`<${CatatPesanan} key=${k.rute.kueri.id || 'baru'} k=${k} />`;

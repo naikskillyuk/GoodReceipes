@@ -246,8 +246,8 @@ export function buatLaporan(db, { dari, sampai }) {
     if (!c.nama) c.nama = c.hp ? '+' + c.hp : 'Tanpa nama';
   }
 
-  // Stok produk: stok awal, masuk (produksi + tambah), terjual, rusak, koreksi, stok akhir.
-  const stok = daftarStokMakanan(db).map(({ resep, stok: sekarang, satuan }) => ({ idResep: resep.id, nama: resep.nama, satuan, awal: 0, produksi: 0, masuk: 0, terjual: 0, rusak: 0, koreksi: 0, akhir: 0, sekarang }));
+  // Stok produk: stok awal, masuk (produksi + tambah), terjual, sampling, rusak, koreksi, stok akhir.
+  const stok = daftarStokMakanan(db).map(({ resep, stok: sekarang, satuan }) => ({ idResep: resep.id, nama: resep.nama, satuan, awal: 0, produksi: 0, masuk: 0, terjual: 0, sampling: 0, rusak: 0, koreksi: 0, akhir: 0, sekarang }));
   const perResep = new Map(stok.map((s) => [s.idResep, s]));
   for (const m of db.semua('MutasiMakanan')) {
     const s = perResep.get(m.idResep);
@@ -260,6 +260,7 @@ export function buatLaporan(db, { dari, sampai }) {
       continue;
     }
     if (m.jenis === 'jual') s.terjual -= n;
+    else if (m.jenis === 'sampling') s.sampling -= n;
     else if (m.jenis === 'rusak') s.rusak -= n;
     else if (m.jenis === 'produksi') s.produksi += n;
     else if (m.jenis === 'masuk') s.masuk += n;
@@ -267,8 +268,8 @@ export function buatLaporan(db, { dari, sampai }) {
   }
   const bulat = (n) => Math.round(n * 1000) / 1000;
   for (const s of stok) {
-    s.akhir = bulat(s.awal + s.produksi + s.masuk - s.terjual - s.rusak + s.koreksi);
-    for (const k of ['awal', 'produksi', 'masuk', 'terjual', 'rusak', 'koreksi']) s[k] = bulat(s[k]);
+    s.akhir = bulat(s.awal + s.produksi + s.masuk - s.terjual - s.sampling - s.rusak + s.koreksi);
+    for (const k of ['awal', 'produksi', 'masuk', 'terjual', 'sampling', 'rusak', 'koreksi']) s[k] = bulat(s[k]);
   }
 
   const jumlahPesanan = pesananSah.length;
@@ -299,7 +300,7 @@ export function buatLaporan(db, { dari, sampai }) {
     perJenis: [...perJenis.values()].filter((j) => j.jenis !== 'lain' || j.item > 0).map((j) => ({ ...j, laba: akhiriLaba(j.laba) })),
     produk: [...produk.values()].map((x) => ({ ...x, laba: akhiriLaba(x.laba) })).sort((a, b) => b.jumlah - a.jumlah || b.penjualan - a.penjualan || a.nama.localeCompare(b.nama)),
     pelanggan: [...pelanggan.values()].sort((a, b) => b.belanja - a.belanja || b.pesanan - a.pesanan || a.nama.localeCompare(b.nama)),
-    stok: stok.filter((s) => s.awal || s.produksi || s.masuk || s.terjual || s.rusak || s.koreksi || s.sekarang),
+    stok: stok.filter((s) => s.awal || s.produksi || s.masuk || s.terjual || s.sampling || s.rusak || s.koreksi || s.sekarang),
     metode: Object.keys(perMetode).map((m) => ({ metode: m, label: m === 'mayar' ? 'Online (Mayar)' : LABEL_METODE[m], jumlah: jumlahMetode[m], nilai: perMetode[m] })),
     sumber: [...perSumber.values()].sort((a, b) => b.penjualan - a.penjualan),
     perJam,
@@ -373,7 +374,7 @@ export function tabelCsv(db, lap, bagian, { status = '' } = {}) {
     ];
   }
   if (bagian === 'pelanggan') return [['Peringkat', 'Pelanggan', 'WhatsApp', 'Pesanan', 'Belanja (Rp)', 'Terakhir pesan', 'Pelanggan baru'], ...lap.pelanggan.map((c, i) => [i + 1, c.nama, c.hp, c.pesanan, c.belanja, tgl(c.terakhir), c.baru ? 'Ya' : ''])];
-  if (bagian === 'stok') return [['Produk', 'Satuan', 'Stok awal', 'Produksi', 'Tambah stok', 'Terjual', 'Rusak', 'Koreksi', 'Stok akhir', 'Stok sekarang'], ...lap.stok.map((s) => [s.nama, s.satuan, s.awal, s.produksi, s.masuk, s.terjual, s.rusak, s.koreksi, s.akhir, s.sekarang])];
+  if (bagian === 'stok') return [['Produk', 'Satuan', 'Stok awal', 'Produksi', 'Tambah stok', 'Terjual', 'Sampling', 'Rusak', 'Koreksi', 'Stok akhir', 'Stok sekarang'], ...lap.stok.map((s) => [s.nama, s.satuan, s.awal, s.produksi, s.masuk, s.terjual, s.sampling, s.rusak, s.koreksi, s.akhir, s.sekarang])];
   const r = lap.ringkasan;
   return [
     ['Laporan', `${tgl(lap.dari)} s.d. ${tgl(lap.sampai)}`],

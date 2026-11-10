@@ -92,6 +92,7 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
   db.simpan('MutasiMakanan', { idResep: brownies, jumlah: 40, jenis: 'produksi', idRef: '', catatan: '', waktu: hari(1) });
   db.simpan('MutasiMakanan', { idResep: brownies, jumlah: 20, jenis: 'produksi', idRef: '', catatan: '', waktu: hari(12) });
   db.simpan('MutasiMakanan', { idResep: brownies, jumlah: -2, jenis: 'rusak', idRef: '', catatan: '', waktu: hari(13) });
+  db.simpan('MutasiMakanan', { idResep: brownies, jumlah: -3, jenis: 'sampling', idRef: 'smp_x', catatan: '', waktu: hari(11) });
   const pesan = (tgl, jam, item, { nama = '', hp = '', status = 'selesai', bayar = 'tunai' } = {}) => {
     const total = item.reduce((j, i) => j + i.harga * i.jumlah, 0);
     const p = db.simpan('Pesanan', { nomor: 'N' + tgl + jam, sumber: 'kasir', nama, hp, idPelanggan: hp ? 'plg_' + hp : '', item, total, diskon: 0, ongkir: 0, status, waktu: hari(tgl, jam) });
@@ -139,7 +140,9 @@ test('laporan: ringkasan, produk terlaris, pelanggan teratas, metode, stok per r
   assert.equal(s.produksi, 20);
   assert.equal(s.terjual, 2 + 1 + 3 + 1 + 9, 'mutasi jual pesanan batal masih tercatat di contoh ini');
   assert.equal(s.rusak, 2);
-  assert.equal(s.akhir, 35 + 20 - 16 - 2);
+  assert.equal(s.sampling, 3);
+  assert.equal(s.koreksi, 0, 'sampling tidak masuk koreksi');
+  assert.equal(s.akhir, 35 + 20 - 16 - 3 - 2);
 
   const panjang = buatLaporan(db, { dari: new Date(2026, 0, 1).getTime(), sampai: new Date(2026, 9, 30).getTime() });
   assert.equal(panjang.grafik.satuan, 'bulan');

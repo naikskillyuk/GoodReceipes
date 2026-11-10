@@ -1,4 +1,4 @@
-// Stok produk jadi (dapur dan toko): bertambah dari hasil produksi yang dikirim ke stok atau ditambah langsung, berkurang dari pesanan,
+// Stok produk jadi (dapur dan toko): bertambah dari hasil produksi yang dikirim ke stok atau ditambah langsung, berkurang dari pesanan dan sampling,
 // bisa dihitung ulang atau dicatat rusak.
 
 import { html, useState } from '../../vendor/preact-htm.js';
@@ -10,7 +10,7 @@ import { daftarStokMakanan, ubahStokMakanan, riwayatMakanan, tampilanToko, produ
 import { DialogKirimStok } from './produksi.js';
 import { tampilJumlah, tanggal } from '../lib/util.js';
 
-const JENIS = { produksi: 'Produksi', jual: 'Terjual', koreksi: 'Hitung ulang', rusak: 'Rusak / basi', masuk: 'Tambah stok' };
+const JENIS = { produksi: 'Produksi', jual: 'Terjual', koreksi: 'Hitung ulang', rusak: 'Rusak / basi', masuk: 'Tambah stok', sampling: 'Sampling' };
 
 function Detail({ k, s, onTutup }) {
   const { db } = k;

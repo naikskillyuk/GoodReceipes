@@ -301,7 +301,7 @@ function TabelPelanggan({ lap }) {
 
 function TabelStok({ lap, hariIni }) {
   const j = (n) => (n ? tampilJumlah(n) : html`<span class="teks-kecil">–</span>`);
-  return html`<${Tabel} kepala=${['Produk', { angka: 'Awal' }, { angka: 'Produksi' }, { angka: 'Tambah' }, { angka: 'Terjual' }, { angka: 'Rusak' }, { angka: 'Koreksi' }, { angka: 'Akhir' }, ...(hariIni ? [] : [{ angka: 'Sekarang' }])]} kosong=${lap.stok.length ? '' : 'Belum ada stok produk.'}>
+  return html`<${Tabel} kepala=${['Produk', { angka: 'Awal' }, { angka: 'Produksi' }, { angka: 'Tambah' }, { angka: 'Terjual' }, { angka: 'Sampling' }, { angka: 'Rusak' }, { angka: 'Koreksi' }, { angka: 'Akhir' }, ...(hariIni ? [] : [{ angka: 'Sekarang' }])]} kosong=${lap.stok.length ? '' : 'Belum ada stok produk.'}>
     ${lap.stok.map(
       (s) => html`<tr key=${s.idResep}>
         <td><b>${s.nama}</b><br /><small class="teks-kecil">${s.satuan}</small></td>
@@ -309,6 +309,7 @@ function TabelStok({ lap, hariIni }) {
         <td class="angka">${j(s.produksi)}</td>
         <td class="angka">${j(s.masuk)}</td>
         <td class="angka">${j(s.terjual)}</td>
+        <td class="angka">${j(s.sampling)}</td>
         <td class="angka">${j(s.rusak)}</td>
         <td class="angka">${s.koreksi ? (s.koreksi > 0 ? '+' : '') + tampilJumlah(s.koreksi) : j(0)}</td>
         <td class=${'angka' + (s.akhir <= 0 ? ' teks-buruk' : '')}><b>${tampilJumlah(s.akhir)}</b></td>

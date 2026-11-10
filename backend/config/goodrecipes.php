@@ -190,6 +190,13 @@ return [
                 'hppLama' => 'n', 'hppBaru' => 'n', 'bahan' => 'j', 'perubahan' => 'j',
             ],
         ],
+        'Sampling' => [
+            'db' => 'sampling',
+            'kolom' => [
+                'id' => 't', 'penerima' => 't', 'hp' => 't', 'lokasi' => 't', 'tujuan' => 't', 'catatan' => 't', 'item' => 'j',
+                'tanggapan' => 't', 'fotoUrl' => 't', 'oleh' => 't', 'waktu' => 'n',
+            ],
+        ],
         'RiwayatHpp' => [
             'db' => 'riwayat_hpp',
             'kolom' => ['id' => 't', 'idMenu' => 't', 'hpp' => 'n', 'waktu' => 'n'],
@@ -203,8 +210,8 @@ return [
     ],
 
     // Akun toko (dibuat oleh akun dapur) hanya menerima dan mengirim tabel ini. Sama dengan js/lib/schema.js.
-    'tabel_toko_baca' => ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner'],
-    'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'],
+    'tabel_toko_baca' => ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner', 'Sampling'],
+    'tabel_toko_tulis' => ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Sampling'],
 
     // Kolom angka berisi waktu (ms): disimpan sebagai bilangan bulat besar.
     'kolom_waktu' => ['dibuat', 'waktu', 'hargaDiperbarui', 'hppSimpanPada', 'lunasPada', 'mulai', 'sampai', 'jadwal', 'diskonSampai', 'buktiPada'],

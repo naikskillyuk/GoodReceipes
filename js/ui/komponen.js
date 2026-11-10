@@ -48,6 +48,7 @@ const MENU_ADMIN = [
   { kunci: 'stok-bahan', jalur: '/stok-bahan', label: 'Stok Bahan & Belanja', ikon: 'kotak' },
   { kunci: 'produksi', jalur: '/produksi', label: 'Produksi', ikon: 'panci' },
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
+  { kunci: 'sampling', jalur: '/sampling', label: 'Sampling', ikon: 'kirim' },
   { kunci: 'menu', jalur: '/menu', label: 'Menu & Harga Jual', ikon: 'tag' },
   { kunci: 'kasir', jalur: '/kasir', label: 'Kasir', ikon: 'struk' },
   { kunci: 'catat-pesanan', jalur: '/catat-pesanan', label: 'Catat Pesanan', ikon: 'ubah' },
@@ -67,6 +68,7 @@ const MENU_TOKO = [
   { kunci: 'pesanan', jalur: '/pesanan', label: 'Status Pesanan', ikon: 'dompet', pil: true },
   { kunci: 'laporan', jalur: '/laporan', label: 'Laporan', ikon: 'daftar' },
   { kunci: 'stok-makanan', jalur: '/stok-makanan', label: 'Stok Produk', ikon: 'kue' },
+  { kunci: 'sampling', jalur: '/sampling', label: 'Sampling', ikon: 'kirim' },
   { kunci: 'pelanggan', jalur: '/pelanggan', label: 'Pelanggan', ikon: 'pelanggan' },
   { kunci: 'pengaturan', jalur: '/pengaturan', label: 'Akun', ikon: 'orang', pil: true },
 ];

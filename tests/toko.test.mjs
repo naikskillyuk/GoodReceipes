@@ -379,3 +379,39 @@ test('banner & header: simpan, urutan, tampil di etalase/kasir, foto header', as
   toko.simpanFotoHeader(db, 'kasir', '');
   assert.equal(toko.fotoHeader(db, 'kasir'), '');
 });
+
+test('sampling memotong stok produk, mencatat HPP, bisa diubah dan dihapus', async () => {
+  const { db, brownies } = await dbContoh();
+  repo.simpanHPPResep(db, brownies);
+  toko.ubahStokMakanan(db, brownies, { jenis: 'masuk', nilai: 20 });
+  assert.throws(() => toko.simpanSampling(db, { penerima: '', item: [{ idResep: brownies, jumlah: 1 }] }), /penerima/);
+  assert.throws(() => toko.simpanSampling(db, { penerima: 'Kafe', item: [] }), /produk/);
+  assert.throws(() => toko.simpanSampling(db, { penerima: 'Kafe', hp: '12', item: [{ idResep: brownies, jumlah: 1 }] }), /WhatsApp/);
+
+  const s = toko.simpanSampling(db, { penerima: ' Kafe Senja ', hp: '0812 3456 7890', tujuan: 'Calon reseller', item: [{ idResep: brownies, jumlah: 3 }, { idResep: brownies, jumlah: 2 }] });
+  assert.equal(s.penerima, 'Kafe Senja');
+  assert.equal(s.item.length, 1, 'produk sama digabung');
+  assert.equal(s.item[0].jumlah, 5);
+  assert.ok(s.item[0].hpp > 0, 'HPP per porsi dicatat');
+  assert.equal(toko.stokMakanan(db).get(brownies), 15);
+  assert.ok(toko.riwayatMakanan(db, brownies).some((m) => m.jenis === 'sampling' && m.idRef === s.id));
+
+  // HPP tercatat tidak berubah saat harga bahan naik, termasuk saat catatan diubah.
+  const hppAwal = s.item[0].hpp;
+  const bahan = db.semua('Bahan')[0];
+  db.simpan('Bahan', { ...bahan, hargaBeli: bahan.hargaBeli * 3 });
+  const ubah = toko.simpanSampling(db, { id: s.id, penerima: 'Kafe Senja', tanggapan: 'Suka, minta penawaran', item: [{ idResep: brownies, jumlah: 2 }], waktu: s.waktu });
+  assert.equal(ubah.item[0].hpp, hppAwal);
+  assert.equal(ubah.tanggapan, 'Suka, minta penawaran');
+  assert.equal(toko.stokMakanan(db).get(brownies), 18, 'stok dihitung ulang, bukan dipotong dua kali');
+
+  const r = toko.ringkasSampling(db, toko.daftarSampling(db));
+  assert.equal(r.kiriman, 1);
+  assert.equal(r.porsi, 2);
+  assert.equal(r.biaya, Math.round(hppAwal * 2));
+  assert.equal(r.tanpaHpp, false);
+
+  toko.hapusSampling(db, s.id);
+  assert.equal(toko.stokMakanan(db).get(brownies), 20, 'stok dikembalikan');
+  assert.equal(toko.daftarSampling(db).length, 0);
+});

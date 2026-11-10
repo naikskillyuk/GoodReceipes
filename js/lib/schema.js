@@ -147,6 +147,17 @@ export const TABEL = {
       buktiPada: 'n', kendala: 't', riwayat: 'j',
     },
   },
+  // Sampling: produk yang dikirim gratis (mis. ke calon pelanggan, reseller, kafe). Stok produk dipotong lewat
+  // MutasiMakanan jenis 'sampling' (id tetap "mmk_{idSampling}_{idResep}"). item = [{idResep, nama, jumlah, hpp}];
+  // hpp per porsi diisi saat dicatat oleh akun dapur (akun toko tidak punya data HPP: dihitung di laporan dapur).
+  Sampling: {
+    awalan: 'smp',
+    kolom: {
+      id: 't', penerima: 't', hp: 't', lokasi: 't', tujuan: 't', catatan: 't', item: 'j', tanggapan: 't',
+      fotoUrl: 't', oleh: 't', waktu: 'n',
+    },
+    lokal: ['fotoLokal'],
+  },
   // Riwayat HPP per menu: dicatat perangkat dapur setiap HPP real (harga bahan terbaru) berubah. Hanya bertambah,
   // jadi laporan bisa memakai HPP yang berlaku saat pesanan dibuat. Tidak dikirim ke akun toko.
   RiwayatHpp: {
@@ -213,8 +224,8 @@ export const TABEL = {
 export const NAMA_TABEL = Object.keys(TABEL);
 
 // Akun toko hanya menerima dan mengirim tabel berikut (sama dengan backend/config/goodrecipes.php).
-export const TABEL_TOKO_BACA = ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner'];
-export const TABEL_TOKO_TULIS = ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan'];
+export const TABEL_TOKO_BACA = ['Kategori', 'Resep', 'Paket', 'IsiPaket', 'Menu', 'MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Promo', 'Setelan', 'Banner', 'Sampling'];
+export const TABEL_TOKO_TULIS = ['MutasiMakanan', 'Pesanan', 'Pembayaran', 'Pelanggan', 'Sampling'];
 
 const META = { diubah: 'n', dihapus: 'b' };
 
@@ -274,5 +285,6 @@ export const KOLOM_FOTO = {
   Banner: [['fotoLokal', 'fotoUrl']],
   Eksperimen: [['fotoHasilLokal', 'fotoHasilUrl']],
   Bahan: [['fotoLokal', 'fotoUrl']],
+  Sampling: [['fotoLokal', 'fotoUrl']],
   Setelan: [['logoLokal', 'logoUrl'], ['qrisLokal', 'qrisUrl'], ['headerLokal', 'headerUrl'], ['headerKasirLokal', 'headerKasirUrl']],
 };
